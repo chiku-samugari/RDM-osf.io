@@ -38,6 +38,9 @@
             display: flex;
             justify-content: right;
         }
+        .right-button-element .btn-default {
+            margin-right: 10px;
+        }
     </style>
     <h2 style="margin-bottom:40px;">{% trans "Institutional Storage " %}<small>({{ institution.name }})</small></h2>
     <div class="row">
@@ -47,7 +50,7 @@
                 <div class="row form-inline storage-name">
                     <div class="form-group">
                         <label for="storage_name" style="width:80px;">{% trans  "Name: " %}</label>
-                        <input type="text" required class="form-control" id="storage_name" name="storage_name"
+                        <input type="text" required class="form-control" id="storage_name" name="storage_name" maxlength="200" pattern="^(?=\s*\S).*$"
                                oninvalid="this.setCustomValidity('This field is required.') " oninput="setCustomValidity('')">
                     </div>
                 </div>
@@ -95,8 +98,7 @@
                                                 value=""
                                             {% endif %}
                                                 class="form-control storage_input_value" required type="text"
-                                                name="{{ provider_item.provider.short_name }}" id="{{ provider_item.region.id }}"
-                                                oninvalid="this.setCustomValidity('This field is required.') " oninput="setCustomValidity('')">
+                                                name="{{ provider_item.provider.short_name }}" id="{{ provider_item.region.id }}" maxlength="200">
                                         </div>
                                     </td>
                                     <td>

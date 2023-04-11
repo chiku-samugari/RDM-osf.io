@@ -53,7 +53,7 @@ class InstitutionalStorageView(InstitutionalStorageBaseView, TemplateView):
         list_providers_configured = []
         provider_name = None
 
-        for i in range(len(list_region)):
+        for i in reversed(range(len(list_region))):
             provider_name = list_region[i].waterbutler_settings['storage']['provider']
             provider_name = provider_name if provider_name != 'filesystem' else 'osfstorage'
             for provider in list_providers:

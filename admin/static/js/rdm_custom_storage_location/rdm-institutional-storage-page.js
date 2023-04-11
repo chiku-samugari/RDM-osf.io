@@ -143,31 +143,37 @@ $('#institutional_storage_form').submit(function (e) {
 $('.save_button').click(function (e) {
     var id = $(this).attr('id');
     var element = $(`input[type=text][id=${id}]`);
+    var storageNameElement = document.getElementById(id);
     var provider = element.attr('name');
     NEW_NAME_CURRENT = element.val().trim();
     NAME_CURRENT = element.attr('value').trim();
-    if ($('#institutional_storage_form_update_' + id)[0].checkValidity()) {
-        preload(provider, null);
-        var showModal = function () {
-            $('#' + provider + '_modal').modal('show');
-            $('body').css('overflow', 'hidden');
-            $('.modal').css('overflow', 'auto');
-            validateRequiredFields(provider);
-        };
-        if (provider === 'osfstorage') {
-            showModal();
-        } else {
-            $osf.confirmDangerousAction({
-                title: _('Are you sure you want to change institutional storage?'),
-                callback: showModal,
-                buttons: {
-                    success: {
-                        label: _('Change')
+    if (NEW_NAME_CURRENT || !NEW_NAME_CURRENT && storageNameElement.disabled) {
+        if ($('#institutional_storage_form_update_' + id)[0].checkValidity()) {
+            preload(provider, null);
+            var showModal = function () {
+                $('#' + provider + '_modal').modal('show');
+                $('body').css('overflow', 'hidden');
+                $('.modal').css('overflow', 'auto');
+                validateRequiredFields(provider);
+            };
+            if (provider === 'osfstorage') {
+                showModal();
+            } else {
+                $osf.confirmDangerousAction({
+                    title: _('Are you sure you want to change institutional storage?'),
+                    callback: showModal,
+                    buttons: {
+                        success: {
+                            label: _('Change')
+                        }
                     }
-                }
-            });
+                });
+            }
+            e.preventDefault();
         }
-        e.preventDefault();
+    } else {
+        storageNameElement.setCustomValidity('This field is required.');
+        storageNameElement.reportValidity();
     }
 });
 
