@@ -150,12 +150,12 @@ class InstitutionStorageList(RdmPermissionMixin, ListView):
         if self.is_super_admin:
             return self.render_to_response(ctx)
         elif self.is_admin:
-            if count == 1:
-                return redirect(reverse(
-                    'institutional_storage_quota_control:'
-                    'institutional_storages',
-                    kwargs={'institution_id': institution_id}
-                ))
+            # if count == 1:
+            #     return redirect(reverse(
+            #         'institutional_storage_quota_control:'
+            #         'institutional_storages',
+            #         kwargs={'institution_id': institution_id}
+            #     ))
             return self.render_to_response(ctx)
 
     def get_queryset(self):
@@ -163,9 +163,7 @@ class InstitutionStorageList(RdmPermissionMixin, ListView):
             query = 'select {} ' \
                     'from osf_institution ' \
                     'where addons_osfstorage_region._id = osf_institution._id'
-            return Region.objects.filter(
-                ~Q(waterbutler_settings__storage__provider='filesystem'))\
-                .extra(select={'institution_id': query.format('id'),
+            return Region.objects.extra(select={'institution_id': query.format('id'),
                                'institution_name': query.format('name'),
                                'institution_logo_name': query.format(
                                    'logo_name'),
@@ -181,9 +179,7 @@ class InstitutionStorageList(RdmPermissionMixin, ListView):
                     '    from osf_osfuser_affiliated_institutions ' \
                     '    where osfuser_id = {}' \
                     ')'
-            return Region.objects.filter(
-                ~Q(waterbutler_settings__storage__provider='filesystem'))\
-                .extra(select={'institution_id': query.format('id', user_id),
+            return Region.objects.extra(select={'institution_id': query.format('id', user_id),
                                'institution_name': query.format(
                                    'name',
                                    user_id),
