@@ -11,9 +11,9 @@
 {% endblock title %}
 {% block content %}
 {% if institution.id %}
-<h2>{% trans "Institutional Storages" %}<small>({{ institution.name }})</small></h2>
+<h2>{% trans "Institutional storages " %}<small>({{ institution.name }})</small></h2>
 {% else %}
-<h2>{% trans "Institutional Storages" %}</h2>
+<h2>{% trans "Institutional storages" %}</h2>
 {% endif %}
 {% include "util/pagination.html" with items=page status=status %}
 

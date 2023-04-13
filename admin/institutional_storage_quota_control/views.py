@@ -56,6 +56,30 @@ class ProviderListByInstitution(RdmPermissionMixin, ListView):
             return 'desc'
         return direction
 
+    def get_institution(self):
+        institution_id = self.kwargs.get('institution_id')
+        institution = Institution.objects.filter(id=institution_id).first()
+        if institution is None:
+            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+        return institution
+
+    def get(self, request, *args, **kwargs):
+        query_set = self.get_queryset()
+        self.object_list = query_set
+        ctx = self.get_context_data()
+
+        if len(query_set) == 1:
+            institution = self.get_institution()
+            return redirect(
+                reverse_qs(
+                    'institutional_storage_quota_control:institution_user_list',
+                    kwargs={'institution_id': institution.id},
+                    query_kwargs={'region': query_set[0]['region_id']}
+                )
+            )
+
+        return self.render_to_response(ctx)
+
     def get_queryset(self):
         list_provider = []
         number_id = 0
@@ -92,10 +116,7 @@ class ProviderListByInstitution(RdmPermissionMixin, ListView):
         paginator, page, query_set, is_paginated = self.paginate_queryset(query_set, page_size)
         kwargs.setdefault('page', page)
 
-        institution_id = self.kwargs.get('institution_id')
-        inst_obj = Institution.objects.filter(id=institution_id).first()
-        if inst_obj is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+        inst_obj = self.get_institution()
         kwargs['institution'] = inst_obj
         kwargs['list_storage'] = query_set
         kwargs['order_by'] = self.get_order_by()

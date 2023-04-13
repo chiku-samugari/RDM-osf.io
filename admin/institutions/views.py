@@ -30,6 +30,7 @@ from api.base import settings as api_settings
 import csv
 from framework.exceptions import HTTPError
 from rest_framework import status as http_status
+from admin.base.utils import reverse_qs
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +337,11 @@ class QuotaUserList(ListView):
         kwargs['page'] = self.page
         kwargs['order_by'] = self.get_order_by()
         kwargs['direction'] = self.get_direction()
-        kwargs['region_id'] = self.request.GET.get('region', None)
+        region = self.get_region()
+        if region is not None:
+            kwargs['region_id'] = region.id
+        else:
+            kwargs['region_id'] = self.request.GET.get('region', None)
         return super(QuotaUserList, self).get_context_data(**kwargs)
 
 
@@ -472,6 +477,21 @@ class InstitutionalStorage(RdmPermissionMixin, ListView):
         if direction not in ['asc', 'desc']:
             return 'desc'
         return direction
+
+    def get(self, request, *args, **kwargs):
+        query_set = self.get_queryset()
+        self.object_list = query_set
+        ctx = self.get_context_data()
+
+        if len(query_set) == 1:
+            return redirect(
+                reverse_qs(
+                    'institutions:statistical_status_default_storage',
+                    query_kwargs={'region_id': query_set[0]['region_id']}
+                )
+            )
+
+        return self.render_to_response(ctx)
 
     def get_queryset(self):
         new_list = []
