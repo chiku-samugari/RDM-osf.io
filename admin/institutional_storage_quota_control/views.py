@@ -74,7 +74,7 @@ class ProviderListByInstitution(RdmPermissionMixin, ListView):
                 reverse_qs(
                     'institutional_storage_quota_control:institution_user_list',
                     kwargs={'institution_id': institution.id},
-                    query_kwargs={'region': query_set[0]['region_id']}
+                    query_kwargs={'region_id': query_set[0]['region_id']}
                 )
             )
 
@@ -252,7 +252,7 @@ class UserListByInstitutionStorageID(RdmPermissionMixin, QuotaUserStorageList):
         return user_list
 
     def get_region(self):
-        region_id = self.request.GET.get('region', None)
+        region_id = self.request.GET.get('region_id', None)
         if region_id is None:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
         return Region.objects.get(id=region_id)
