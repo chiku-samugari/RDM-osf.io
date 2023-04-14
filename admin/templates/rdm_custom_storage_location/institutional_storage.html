@@ -50,8 +50,7 @@
                 <div class="row form-inline storage-name">
                     <div class="form-group">
                         <label for="storage_name" style="width:80px;">{% trans  "Name: " %}</label>
-                        <input type="text" required class="form-control" id="storage_name" name="storage_name" maxlength="200" pattern="^(?=\s*\S).*$"
-                               oninvalid="this.setCustomValidity('This field is required.') " oninput="setCustomValidity('')">
+                        <input type="text" class="form-control" id="storage_name" name="storage_name" maxlength="200">
                     </div>
                 </div>
                 <div class="row form-inline storage-name">
@@ -64,7 +63,7 @@
                         </select>
                     </div>
                 </div>
-                <button style="width:90px; margin-bottom:30px; margin-top:10px" class="btn btn-success" type="submit">{% trans "Add" %}</button>
+                <button id="add_storage" style="width:90px; margin-bottom:30px; margin-top:10px" class="btn btn-success">{% trans "Add" %}</button>
             </form>
         </div>
     </div>
@@ -91,7 +90,7 @@
                                 <tr>
                                     <td class="storage_input_content">
                                         <div>
-                                            <input {% if provider_item.provider.short_name != 'osfstorage' %}
+                                            <input {% if provider_item.provider.short_name != 'osfstorage' and provider_item.provider.short_name != 'onedrivebusiness' %}
                                                 value="{{ provider_item.region.name }}"
                                             {% else %}
                                                 disabled

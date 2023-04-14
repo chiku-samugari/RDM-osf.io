@@ -110,10 +110,22 @@ $('.change_readonly').change(function () {
     ajaxRequest(params, providerShortName, 'change_readonly', toggle_button, this);
 });
 
-$('#institutional_storage_form').submit(function (e) {
+$('#storage_name').on('keyup', function(e){
+    var value = e.target.value;
+    if (value.trim()) {
+        e.target.setCustomValidity('');
+    } else {
+        e.target.setCustomValidity('This field is required.');
+    }
+    e.target.reportValidity();
+});
+
+$('#add_storage').click(function (e) {
     NEW_NAME_CURRENT = null;
     NAME_CURRENT = null;
-    if ($('#institutional_storage_form')[0].checkValidity()) {
+    var storageNameElement = document.getElementById('storage_name');
+    var value = storageNameElement.value;
+    if (value || (!value && storageNameElement.disabled)) {
         var provider = selectedProvider();
 
         preload(provider, null);
@@ -137,7 +149,20 @@ $('#institutional_storage_form').submit(function (e) {
             });
         }
         e.preventDefault();
+    } else {
+        storageNameElement.setCustomValidity('This field is required.');
+        storageNameElement.reportValidity();
     }
+});
+
+$('.storage_input_value').on('keyup', function(e){
+    var value = e.target.value;
+    if (value.trim()) {
+        e.target.setCustomValidity('');
+    } else {
+        e.target.setCustomValidity('This field is required.');
+    }
+    e.target.reportValidity();
 });
 
 $('.save_button').click(function (e) {

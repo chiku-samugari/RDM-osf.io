@@ -199,7 +199,11 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
             return JsonResponse(response, status=http_status.HTTP_400_BAD_REQUEST)
 
         storage_name = data.get('storage_name')
+        if storage_name is not None:
+            storage_name = storage_name.strip()
         new_storage_name = data.get('new_storage_name')
+        if new_storage_name is not None:
+            new_storage_name = new_storage_name.strip()
         if not storage_name and utils.have_storage_name(provider_short_name):
             return JsonResponse({
                 'message': 'Storage name is missing.'
