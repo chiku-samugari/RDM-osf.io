@@ -124,7 +124,7 @@ $('#add_storage').click(function (e) {
     NEW_NAME_CURRENT = null;
     NAME_CURRENT = null;
     var storageNameElement = document.getElementById('storage_name');
-    var value = storageNameElement.value;
+    var value = storageNameElement.value.trim();
     if (value || (!value && storageNameElement.disabled)) {
         var provider = selectedProvider();
 
