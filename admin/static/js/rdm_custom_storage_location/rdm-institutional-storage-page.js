@@ -115,7 +115,7 @@ $('#storage_name').on('keyup', function(e){
     if (value.trim()) {
         e.target.setCustomValidity('');
     } else {
-        e.target.setCustomValidity('This field is required.');
+        e.target.setCustomValidity(e.target.dataset.title);
     }
     e.target.reportValidity();
 });
@@ -150,7 +150,7 @@ $('#add_storage').click(function (e) {
         }
         e.preventDefault();
     } else {
-        storageNameElement.setCustomValidity('This field is required.');
+        storageNameElement.setCustomValidity(storageNameElement.dataset.title);
         storageNameElement.reportValidity();
     }
 });
@@ -160,7 +160,7 @@ $('.storage_input_value').on('keyup', function(e){
     if (value.trim()) {
         e.target.setCustomValidity('');
     } else {
-        e.target.setCustomValidity('This field is required.');
+        e.target.setCustomValidity(e.target.dataset.title);
     }
     e.target.reportValidity();
 });
@@ -197,7 +197,7 @@ $('.save_button').click(function (e) {
             e.preventDefault();
         }
     } else {
-        storageNameElement.setCustomValidity('This field is required.');
+        storageNameElement.setCustomValidity(storageNameElement.dataset.title);
         storageNameElement.reportValidity();
     }
 });

@@ -49,13 +49,13 @@
                 {% csrf_token %}
                 <div class="row form-inline storage-name">
                     <div class="form-group">
-                        <label for="storage_name" style="width:80px;">{% trans  "Name: " %}</label>
-                        <input type="text" class="form-control" id="storage_name" name="storage_name" maxlength="200">
+                        <label for="storage_name" style="width:80px;">{% trans  "Name" %}:</label>
+                        <input type="text" class="form-control" id="storage_name" name="storage_name" maxlength="200" data-title="{% trans 'This field is required.' %}">
                     </div>
                 </div>
                 <div class="row form-inline storage-name">
                     <div class="form-group">
-                        <label for="providers" style="width:80px;">{% trans "Provider: " %}</label>
+                        <label for="providers" style="width:80px;">{% trans "Provider" %}:</label>
                         <select id="providers" name="options" class="form-control">
                             {% for provider_item in providers %}
                                 <option value="{{ provider_item.short_name }}">{{ provider_item.full_name }}</option>
@@ -97,7 +97,7 @@
                                                 value=""
                                             {% endif %}
                                                 class="form-control storage_input_value" required type="text"
-                                                name="{{ provider_item.provider.short_name }}" id="{{ provider_item.region.id }}" maxlength="200">
+                                                name="{{ provider_item.provider.short_name }}" id="{{ provider_item.region.id }}" maxlength="200" data-title="{% trans 'This field is required.' %}">
                                         </div>
                                     </td>
                                     <td>
