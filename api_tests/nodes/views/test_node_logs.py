@@ -349,7 +349,7 @@ class TestLogStorageName(ApiTestCase):
         self.user = AuthUserFactory()
         self.node = ProjectFactory(creator=self.user)
 
-    def add_folder_created_log(self):
+    def add_folder_created_log(self, region_id=None):
         self.node.add_log(
             'osf_storage_folder_created',
             auth=Auth(self.user),
@@ -365,7 +365,8 @@ class TestLogStorageName(ApiTestCase):
                         'url': 'index.html',
                         'title': 'Hello World',
                     }
-                }
+                },
+                'region': region_id,
             },
         )
 
@@ -422,7 +423,7 @@ class TestLogStorageName(ApiTestCase):
         institution = InstitutionFactory()
         self.user.affiliated_institutions.add(institution)
 
-        self.add_folder_created_log()
+        self.add_folder_created_log(region_id=institution.id)
         url = '/{}nodes/{}/logs/'.format(API_BASE, self.node._id)
         res = self.app.get(url, auth=self.user.auth)
 
@@ -439,9 +440,9 @@ class TestLogStorageName(ApiTestCase):
         )
         institution = InstitutionFactory()
         self.user.affiliated_institutions.add(institution)
-        RegionFactory(_id=institution._id, name='Kitten Storage')
+        region = RegionFactory(_id=institution._id, name='Kitten Storage')
 
-        self.add_folder_created_log()
+        self.add_folder_created_log(region_id=region.id)
         url = '/{}nodes/{}/logs/'.format(API_BASE, self.node._id)
         res = self.app.get(url, auth=self.user.auth)
 

@@ -331,7 +331,7 @@ def get_auth(auth, **kwargs):
         if provider_name == 'osfstorage':
             if (provider_settings.region.is_allowed is False) or \
                     (provider_settings.region.is_readonly is True
-                     and action not in ['metadata', 'download']):
+                     and action not in ['metadata', 'download', 'revisions', 'render']):
                 raise HTTPError(http_status.HTTP_403_FORBIDDEN)
 
     credentials = None
