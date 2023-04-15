@@ -500,11 +500,11 @@ msgstr "次を入力して続行します。<strong>%1$s</ strong><br><br>"
 msgid "Disallow"
 msgstr "禁止"
 
-#: admin/templatesrdm_custom_storage_locationinstitutional_storage.html:82
+#: admin/templates/rdm_custom_storage_location/institutional_storage.html:82
 msgid "Allow"
 msgstr "許可"
 
-#: admin/templatesrdm_custom_storage_locationinstitutional_storage.html:83
+#: admin/templates/rdm_custom_storage_location/institutional_storage.html:83
 msgid "Read only"
 msgstr "読み取り専用"
 

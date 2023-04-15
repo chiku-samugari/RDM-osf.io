@@ -495,11 +495,11 @@ msgstr ""
 msgid "Disallow"
 msgstr ""
 
-#: admin/templatesrdm_custom_storage_locationinstitutional_storage.html:82
+#: admin/templates/rdm_custom_storage_location/institutional_storage.html:82
 msgid "Allow"
 msgstr ""
 
-#: admin/templatesrdm_custom_storage_locationinstitutional_storage.html:83
+#: admin/templates/rdm_custom_storage_location/institutional_storage.html:83
 msgid "Read only"
 msgstr ""
 

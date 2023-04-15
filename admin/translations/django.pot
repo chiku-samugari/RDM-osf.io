@@ -40,6 +40,15 @@ msgid ""
 "page."
 msgstr ""
 
+#: admin/templates/rdm_custom_storage_location/institutional_storage.html:82
+msgid "Allow"
+msgstr ""
+
+#: admin/templates/rdm_custom_storage_location/institutional_storage.html:83
+msgid "Read only"
+msgstr ""
+
+
 #: admin/banners/forms.py:18 admin/banners/forms.py:19
 #: admin/templates/messages.html:31
 msgid "Alt text for accessibility"
