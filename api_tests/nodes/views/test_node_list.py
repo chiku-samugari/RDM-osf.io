@@ -1790,7 +1790,7 @@ class TestNodeCreate:
         )
         assert res.status_code == 201
         region_id = res.json['data']['relationships']['region']['data']['id']
-        assert region_id == region._id
+        assert region_id == DEFAULT_REGION_ID
 
         node_id = res.json['data']['id']
         node = AbstractNode.load(node_id)
