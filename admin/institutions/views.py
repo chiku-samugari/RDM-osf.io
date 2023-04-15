@@ -319,6 +319,9 @@ class QuotaUserList(ListView):
             return 'desc'
         return direction
 
+    def get_region(self):
+        return None
+
     def get_context_data(self, **kwargs):
         institution = self.get_institution()
         kwargs['institution_id'] = institution.id
@@ -338,10 +341,8 @@ class QuotaUserList(ListView):
         kwargs['order_by'] = self.get_order_by()
         kwargs['direction'] = self.get_direction()
         region = self.get_region()
-        if region is not None:
+        if region is not None and institution._id == region._id:
             kwargs['region_id'] = region.id
-        else:
-            kwargs['region_id'] = self.request.GET.get('region', None)
         return super(QuotaUserList, self).get_context_data(**kwargs)
 
 
@@ -414,6 +415,9 @@ class UserListByInstitutionID(PermissionRequiredMixin, QuotaUserList):
 
     def get_institution(self):
         return Institution.objects.get(id=self.kwargs['institution_id'])
+
+    def get_region(self):
+        return None
 
 
 class UpdateQuotaUserListByInstitutionID(PermissionRequiredMixin, View):
@@ -566,8 +570,6 @@ class QuotaUserStorageList(QuotaUserList):
         }
 
     def get_context_data(self, **kwargs):
-        region = self.get_region()
-        kwargs['region_id'] = region.id
         return super(QuotaUserStorageList, self).get_context_data(**kwargs)
 
 
@@ -593,6 +595,6 @@ class StatisticalStatusDefaultInstitutionalStorage(QuotaUserStorageList, RdmPerm
 
     def get_region(self):
         region_id = self.request.GET.get('region_id', None)
-        if region_id is None:
+        if not region_id:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
         return Region.objects.get(id=region_id)

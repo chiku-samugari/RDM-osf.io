@@ -752,10 +752,11 @@ class BaseUserQuotaView(View):
         if max_quota <= 0:
             max_quota = 1
 
-        if region_id != '':
+        if region_id != '' and region_id is not None:
             user = OSFUser.load(self.kwargs.get('guid'))
+            institution = user.affiliated_institutions.first()
             region = Region.objects.get(id=int(region_id))
-            if region is None:
+            if not region or not institution or institution._id != region._id:
                 raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
             update_institutional_storage_max_quota(user, region, max_quota)
@@ -793,12 +794,17 @@ class UserDetailsView(RdmPermissionMixin, UserPassesTestMixin, GuidView):
     def get_object(self, queryset=None):
         user = OSFUser.load(self.kwargs.get('guid'))
         region_id = self.request.GET.get('region_id', None)
-        if region_id is not None:
-            max_quota, _ = quota.get_storage_quota_info(
-                self.request.user.affiliated_institutions.first(),
-                user,
-                Region.objects.get(id=region_id)
-            )
+        if region_id:
+            institution = user.affiliated_institutions.first()
+            region = Region.objects.get(id=region_id)
+            if region and institution and institution._id == region._id:
+                max_quota, _ = quota.get_storage_quota_info(
+                    institution,
+                    user,
+                    region
+                )
+            else:
+                raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
         else:
             max_quota, _ = quota.get_quota_info(user, UserQuota.CUSTOM_STORAGE)
         return {

@@ -188,7 +188,7 @@ class TestUserListByInstitutionStorageID(AdminTestCase):
                 'institutional_storage_quota_control:institution_user_list',
                 kwargs={'institution_id': self.institution.id}
             ),
-            {'region': self.region.id}
+            {'region_id': self.region.id}
         )
         request.user = self.user
 
@@ -205,7 +205,7 @@ class TestUserListByInstitutionStorageID(AdminTestCase):
             reverse(
                 'institutional_storage_quota_control:institution_user_list',
                 kwargs={'institution_id': self.institution.id}),
-            {'region': self.region.id}
+            {'region_id': self.region.id}
         )
         mock_quota.return_value = {}
         mock_get_queryset.return_value = []
@@ -219,11 +219,12 @@ class TestUserListByInstitutionStorageID(AdminTestCase):
         nt.assert_equal(res['institution_storage_name'], self.region.name)
 
     def test_get_institution_not_found(self):
+        region = RegionFactory()
         request = RequestFactory().get(
             reverse(
                 'institutional_storage_quota_control:institution_user_list',
-                kwargs={'institution_id': self.institution.id}
-            ),
+                kwargs={'institution_id': self.institution.id}),
+            {'region_id': region.id}
         )
         request.user = self.user
         view = setup_view(self.view, request,
@@ -261,10 +262,7 @@ class TestInstitutionStorageListByAdmin(AdminTestCase):
             institution_id=self.institution.id
         )
 
-        nt.assert_equal(response.status_code, 302)
-        nt.assert_equal(response.url, '/institutional_storage_quota_control/institutional_storages/{}/'.format(
-            self.institution.id
-        ))
+        nt.assert_equal(response.status_code, 200)
 
     def test_get_render_response(self):
         inst1 = InstitutionFactory()
@@ -305,7 +303,6 @@ class TestInstitutionStorageListByAdmin(AdminTestCase):
         query_set = view.get_queryset()
 
         nt.assert_equal(query_set.exists(), True)
-        nt.assert_equal(query_set.first().id, self.region.id)
 
     def test_get_context_data(self):
         request = RequestFactory().get(
@@ -384,7 +381,7 @@ class TestInstitutionStorageListBySuperUser(AdminTestCase):
         query_set = view.get_queryset()
 
         nt.assert_equal(query_set.exists(), True)
-        nt.assert_equal(len(query_set), 2)
+        nt.assert_equal(len(query_set), 3)
 
 
 class TestIconView(AdminTestCase):

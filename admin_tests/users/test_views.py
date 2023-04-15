@@ -990,7 +990,7 @@ class TestGetUserInstitutionQuota(AdminTestCase):
         nt.assert_equal(context['quota'], 200)
 
     def test_get_quota_region(self):
-        region = RegionFactory()
+        region = RegionFactory(_id=self.institution._id)
         region_id = region.id
         UserStorageQuota.objects.create(
             user=self.user,
@@ -1007,19 +1007,18 @@ class TestGetUserInstitutionQuota(AdminTestCase):
         context = response.get_object()
         nt.assert_equal(context['quota'], 150)
 
+
 class TestSetUserInstitutionQuota(AdminTestCase):
     def setUp(self):
         self.user = AuthUserFactory()
         self.view = views.UserInstitutionQuotaView()
         self.institution = InstitutionFactory()
         self.user.affiliated_institutions.add(self.institution)
-        region = RegionFactory(id=2)
-        self.region_id = region.id
 
     def test_permissions_staff(self):
         request = RequestFactory().post(
             reverse('users:quota', kwargs={'guid': self.user._id}),
-            {'maxQuota': 200, 'region_id': self.region_id},)
+            {'maxQuota': 200})
         request.user = self.user
         request.user.is_superuser = False
         request.user.is_staff = True
@@ -1045,7 +1044,7 @@ class TestSetUserInstitutionQuota(AdminTestCase):
     def test_new_quota(self):
         request = RequestFactory().post(
             reverse('users:quota', kwargs={'guid': self.user._id}),
-            {'maxQuota': 150, 'region_id': self.region_id},)
+            {'maxQuota': 150})
         self.view = setup_view(self.view, request, guid=self.user._id)
         response = self.view.post(request)
         nt.assert_equal(response.status_code, 302)
@@ -1061,7 +1060,7 @@ class TestSetUserInstitutionQuota(AdminTestCase):
 
         request = RequestFactory().post(
             reverse('users:quota', kwargs={'guid': self.user._id}),
-            {'maxQuota': 200, 'region_id': self.region_id})
+            {'maxQuota': 200})
         self.view = setup_view(self.view, request, guid=self.user._id)
         response = self.view.post(request)
         nt.assert_equal(response.status_code, 302)
@@ -1077,7 +1076,7 @@ class TestSetUserInstitutionQuota(AdminTestCase):
 
         request = RequestFactory().post(
             reverse('users:quota', kwargs={'guid': self.user._id}),
-            {'maxQuota': -200, 'region_id': self.region_id})
+            {'maxQuota': -200})
         self.view = setup_view(self.view, request, guid=self.user._id)
         response = self.view.post(request)
         nt.assert_equal(response.status_code, 302)

@@ -11,7 +11,6 @@ from django.views.generic import ListView, View
 from django.shortcuts import redirect
 from admin.rdm.utils import RdmPermissionMixin
 from django.core.urlresolvers import reverse
-from django.db.models import Q
 from django.http import HttpResponse, Http404
 from rest_framework import status as http_status
 from admin.base.utils import reverse_qs
@@ -155,13 +154,11 @@ class InstitutionStorageList(RdmPermissionMixin, ListView):
 
     def get(self, request, *args, **kwargs):
         count = 0
-        institution_id = 0
         query_set = self.get_queryset()
         self.object_list = query_set
 
         for item in query_set:
             if item.institution_id:
-                institution_id = item.institution_id
                 count += 1
             else:
                 self.object_list = self.object_list.exclude(id=item.id)
@@ -185,11 +182,10 @@ class InstitutionStorageList(RdmPermissionMixin, ListView):
                     'from osf_institution ' \
                     'where addons_osfstorage_region._id = osf_institution._id'
             return Region.objects.extra(select={'institution_id': query.format('id'),
-                               'institution_name': query.format('name'),
-                               'institution_logo_name': query.format(
-                                   'logo_name'),
-                               }).order_by('institution_name', self.ordering)
-
+                                                'institution_name': query.format('name'),
+                                                'institution_logo_name': query.format(
+                                                    'logo_name'),
+                                                }).order_by('institution_name', self.ordering)
         elif self.is_admin:
             user_id = self.request.user.id
             query = 'select {} ' \
@@ -201,13 +197,13 @@ class InstitutionStorageList(RdmPermissionMixin, ListView):
                     '    where osfuser_id = {}' \
                     ')'
             return Region.objects.extra(select={'institution_id': query.format('id', user_id),
-                               'institution_name': query.format(
-                                   'name',
-                                   user_id),
-                               'institution_logo_name': query.format(
-                                   'logo_name',
-                                   user_id),
-                               })
+                                                'institution_name': query.format(
+                                                    'name',
+                                                    user_id),
+                                                'institution_logo_name': query.format(
+                                                    'logo_name',
+                                                    user_id),
+                                                })
 
     def get_context_data(self, **kwargs):
         object_list = self.merge_data(self.object_list)
@@ -253,9 +249,12 @@ class UserListByInstitutionStorageID(RdmPermissionMixin, QuotaUserStorageList):
 
     def get_region(self):
         region_id = self.request.GET.get('region_id', None)
-        if region_id is None:
+        institution_id = self.kwargs['institution_id']
+        region = Region.objects.get(id=region_id)
+        institution = Institution.objects.get(id=institution_id)
+        if not region or not institution or institution._id != region._id:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-        return Region.objects.get(id=region_id)
+        return region
 
 
 class UpdateQuotaUserListByInstitutionStorageID(RdmPermissionMixin, View):
@@ -279,6 +278,6 @@ class UpdateQuotaUserListByInstitutionStorageID(RdmPermissionMixin, View):
             reverse_qs(
                 'institutional_storage_quota_control:institution_user_list',
                 kwargs={'institution_id': institution_id},
-                query_kwargs={'region': region.id}
+                query_kwargs={'region_id': region.id}
             )
         )
