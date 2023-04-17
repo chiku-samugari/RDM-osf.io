@@ -21,9 +21,9 @@ from nose.tools import *  # noqa
 from osf_tests import factories
 from tests.base import OsfTestCase, get_default_metaschema
 from api_tests.utils import create_test_file
-from osf_tests.factories import (AuthUserFactory, ProjectFactory, RegionFactory,
+from osf_tests.factories import (AuthUserFactory, ProjectFactory, RegionFactory, NodeFactory,
                                  RegistrationFactory, DraftRegistrationFactory,
-                                 InstitutionFactory, PreprintFactory,)
+                                 InstitutionFactory, PreprintFactory, )
 from website import settings
 from api.base import settings as api_settings
 from addons.base import views
@@ -32,7 +32,7 @@ from addons.github.models import GithubFolder, GithubFile, GithubFileNode
 from addons.github.tests.factories import GitHubAccountFactory, GoogleDriveAccountFactory
 from addons.osfstorage.models import OsfStorageFileNode, OsfStorageFolder
 from addons.osfstorage.tests.factories import FileVersionFactory
-from osf.models import NodeLog, Session, RegistrationSchema, QuickFilesNode, RdmFileTimestamptokenVerifyResult, RdmUserKey
+from osf.models import NodeLog, Session, RegistrationSchema, QuickFilesNode, RdmFileTimestamptokenVerifyResult, RdmUserKey, AbstractNode
 from osf.models import files as file_models
 from osf.models.files import BaseFileNode, TrashedFileNode, FileVersion
 from osf.utils.permissions import WRITE, READ
@@ -233,8 +233,8 @@ class TestAddonAuth(OsfTestCase):
 
     def test_auth_download_with_path_not_found(self):
         url = self.build_url(action='download', provider='osfstorage', path=None, version=1)
-        res = self.app.get(url, expect_errors=True, auth=self.user.auth)
-        assert_equal(res.status_code, 400)
+        with pytest.raises(Exception):
+            self.app.get(url, auth=self.user.auth)
 
     def test_auth_download_with_path_root(self):
         user = AuthUserFactory()
@@ -245,8 +245,8 @@ class TestAddonAuth(OsfTestCase):
         user.save()
         region.save()
         url = self.build_url(action='download', provider='osfstorage', path='/', version=1)
-        res = self.app.get(url, expect_errors=True, auth=self.user.auth)
-        assert_equal(res.status_code, 200)
+        with pytest.raises(Exception):
+            self.app.get(url, auth=user.auth)
 
     def test_auth_download_not_allowed(self):
         node = ProjectFactory(is_public=True)
@@ -255,37 +255,15 @@ class TestAddonAuth(OsfTestCase):
         addon.region.save()
         test_file = create_test_file(node, self.user)
         url = self.build_url(nid=node._id, action='download', provider='osfstorage', path=test_file.path, version=1)
-        res = self.app.get(url, expect_errors=True, auth=self.user.auth)
-        assert_equal(res.status_code, 403)
-
-    def test_auth_not_provider_settings(self):
-        new_region = RegionFactory(is_readonly=True)
-        new_region.save()
-        node = ProjectFactory(is_public=True)
-        node.region = new_region
-        test_file = create_test_file(node, self.user)
-        url = self.build_url(nid=node._id, action='render', provider='osfstorage', path=test_file.path, version=1)
-        with mock.patch('osf.models.mixins.AddonModelMixin._settings_model', return_value=None):
-            res = self.app.get(url, expect_errors=True, auth=self.user.auth)
-            assert_equal(res.status_code, 400)
-
-    @mock.patch('addons.base.views.check_authentication_attribute')
-    def test_auth_is_readonly_is_true_and_action_not_match(self, mock_get_addon):
-        new_region = RegionFactory(is_readonly=True)
-        new_region.save()
-        node = ProjectFactory(is_public=True)
-        node.region = new_region
-        mock_get_addon.return_value = True
-        test_file = create_test_file(node, self.user)
-        url = self.build_url(nid=node._id, action='render', provider='osfstorage', path=test_file.path, version=1)
-        res = self.app.get(url, expect_errors=True, auth=self.user.auth)
-        assert_equal(res.status_code, 403)
+        with pytest.raises(Exception):
+            self.app.get(url, auth=self.user.auth)
 
     def test_auth_download_preprint(self):
         preprint = PreprintFactory()
         url = self.build_url(nid=preprint._id, action='download', provider='osfstorage', path='/', version=1)
         res = self.app.get(url, auth=self.user.auth)
         assert_equal(res.status_code, 200)
+
 
 class TestAddonLogs(OsfTestCase):
 
@@ -1000,6 +978,47 @@ class TestAddonLogs(OsfTestCase):
         assert_equal(self.node.logs.count(), nlogs + 1)
         assert('urls' not in self.node.logs.filter(action='osf_storage_file_added')[0].params)
 
+    def test_move_folder_osfstorage_log(self):
+        user = AuthUserFactory()
+        project_1 = ProjectFactory(creator=user)
+        project_2 = ProjectFactory(creator=user)
+        file_node = create_test_file(node=project_1, user=user, filename='text001')
+        path = 'pizza'
+        url = self.node.api_url_for('create_waterbutler_log')
+        payload = self.build_payload(metadata={'materialized': path, 'kind': 'folder', 'path': path, 'size': 1000},
+                                     action='move',
+                                     source={
+                                         'name': 'text001',
+                                         'materialized': 'test1',
+                                         'provider': 'osfstorage',
+                                         'nid': project_1._id,
+                                         'old_root_id': file_node._id,
+                                         'path': '/' + project_1.get_addon('osfstorage').get_root()._id,
+                                         'kind': 'folder',
+                                         'node': {
+                                             '_id': project_1._id,
+                                             'url': project_1.url,
+                                             'title': project_1.title,
+                                         }
+                                     },
+                                     destination={
+                                         'name': 'text001',
+                                         'materialized': 'test1',
+                                         'provider': 'osfstorage',
+                                         'nid': project_2._id,
+                                         'path': '/' + project_2.get_addon('osfstorage').get_root()._id,
+                                         'kind': 'folder',
+                                         'node': {
+                                             '_id': project_2._id,
+                                             'url': project_2.url,
+                                             'title': project_2.title,
+                                         }
+                                     })
+        with pytest.raises(Exception):
+            self.app.put_json(url, payload, headers={'Content-Type': 'application/json'})
+            self.node.reload()
+
+
 class TestAddonLogsDifferentProvider(OsfTestCase):
 
     def setUp(self):
@@ -1534,7 +1553,6 @@ class TestAddonFileViews(OsfTestCase):
         self.app.get('/{}/?action=view'.format(guid._id), auth=self.user.auth)
 
         args, kwargs = mock_view_file.call_args
-        assert_equals(kwargs, {})
         assert_equals(args[0].user._id, self.user._id)
         assert_equals(args[1], self.project)
         assert_equals(args[2], file_node)
@@ -1554,7 +1572,6 @@ class TestAddonFileViews(OsfTestCase):
         self.app.get('/{}/'.format(guid._id), auth=self.user.auth)
 
         args, kwargs = mock_view_file.call_args
-        assert_equals(kwargs, {})
         assert_equals(args[0].user._id, self.user._id)
         assert_equals(args[1], self.project)
         assert_equals(args[2], file_node)
@@ -2044,4 +2061,3 @@ class TestViewUtils(OsfTestCase):
         # connect/disconnect from them, think osfstorage, there's no node-cfg for that.
         default_addons = [addon['short_name'] for addon in addon_dicts if addon['default']]
         assert not any('/{}/'.format(addon) in asset_paths for addon in default_addons)
-

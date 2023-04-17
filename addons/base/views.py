@@ -292,9 +292,6 @@ def get_auth(auth, **kwargs):
         action = data['action']
         node_id = data['nid']
         provider_name = data['provider']
-        path = data['path']
-        if provider_name == 'osfstorage' and path is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
     except KeyError:
         raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
@@ -306,7 +303,11 @@ def get_auth(auth, **kwargs):
 
     file_node_root_id = None
     region_id = None
+    path = None
     if provider_name == 'osfstorage':
+        path = data['path']
+        if provider_name == 'osfstorage' and path is None:
+            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
         if path == '/':
             # When the item's path is missing, using the first storage is allowed and not readonly.
             institution = auth.user.affiliated_institutions.first()

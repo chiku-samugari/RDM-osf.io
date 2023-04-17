@@ -1030,7 +1030,7 @@ generic_location = {
 
 generic_waterbutler_settings = {
     'storage': {
-        'provider': 'glowcloud',
+        'provider': 'osfstorage',
         'container': 'osf_storage',
         'use_public': True,
     }
@@ -1134,3 +1134,10 @@ class BrandFactory(DjangoModelFactory):
 
     primary_color = factory.Faker('hex_color')
     secondary_color = factory.Faker('hex_color')
+
+class UserQuotaFactory(DjangoModelFactory):
+    class Meta:
+        model = models.UserQuota
+
+    max_quota = 1000000
+    used = 10

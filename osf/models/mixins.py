@@ -541,6 +541,8 @@ class AddonModelMixin(models.Model):
             return False
         if not settings_model:
             return False
+        if is_deleted:
+            return bool(settings_model.objects.filter(owner=self))
         return bool(settings_model.objects.filter(owner=self, is_deleted=is_deleted))
 
     def get_addon_names(self):
@@ -560,18 +562,21 @@ class AddonModelMixin(models.Model):
         if not settings_model:
             return None
         try:
-            if root_id:
-                settings_obj = settings_model.objects.filter(owner=self, root_node_id=root_id).first()
-            elif region_id:
-                settings_obj = settings_model.objects.filter(owner=self, region_id=region_id).first()
-            else:
-                settings_obj = settings_model.objects.get(owner=self)
-
-            if settings_obj and (not settings_obj.is_deleted or is_deleted):
-                return settings_obj
+            settings_obj = None
+            settings_obj = settings_model.objects.get(owner=self)
         except ObjectDoesNotExist:
             pass
-        return None
+        except MultipleObjectsReturned:
+            if root_id:
+                settings_obj = settings_model.objects.filter(owner=self,
+                                                             root_node_id=root_id).first()
+            elif region_id:
+                settings_obj = settings_model.objects.filter(owner=self,
+                                                             region_id=region_id).first()
+        if settings_obj and (not settings_obj.is_deleted or is_deleted):
+            return settings_obj
+        else:
+            return None
 
     def get_osfstorage_addons(self):
         """Get all osfstorage addons were owned
@@ -623,10 +628,16 @@ class AddonModelMixin(models.Model):
             return False
 
         # Reactivate deleted add-on if present
-        try:
-            addon = self.get_addon(addon_name, is_deleted=True, region_id=region_id)
-        except MultipleObjectsReturned:
-            addon = self.get_first_addon(addon_name, is_deleted=True)
+        if region_id:
+            try:
+                settings_model = self._settings_model(addon_name)
+            except LookupError:
+                return None
+            if not settings_model:
+                return None
+            addon = settings_model.objects.filter(owner=self, region_id=region_id).first()
+        else:
+            addon = self.get_addon(addon_name, is_deleted=True)
         if addon:
             if addon.deleted:
                 addon.undelete(save=True)

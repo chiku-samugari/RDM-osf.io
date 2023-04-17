@@ -149,7 +149,6 @@ def update_used_quota(self, target, user, event_type, payload):
             lastest_node.save()
     data = dict(payload.get('metadata')) if payload.get('metadata') else None
     metadata_provider = data.get('provider') if payload.get('metadata') else None
-    storage_type = get_project_storage_type(target)
     if metadata_provider in PROVIDERS or metadata_provider == 'osfstorage':
         file_node = None
         action_payload = dict(payload).get('action')
@@ -183,7 +182,7 @@ def update_used_quota(self, target, user, event_type, payload):
         except BaseFileNode.DoesNotExist:
             logging.error('FileNode not found, cannot update used quota!')
             return
-
+        storage_type = get_project_storage_type(target)
         if event_type == FileLog.FILE_ADDED:
             file_added(target, payload, file_node, storage_type)
         elif event_type == FileLog.FILE_REMOVED:
@@ -220,7 +219,7 @@ def update_used_quota(self, target, user, event_type, payload):
         elif event_type == FileLog.FILE_UPDATED:
             file_modified(target, user, payload, file_node, storage_type)
     elif event_type == FileLog.FILE_MOVED:
-        file_moved(target, payload, storage_type)
+        file_moved(target, payload)
     else:
         return
 
@@ -317,7 +316,7 @@ def file_modified(target, user, payload, file_node, storage_type):
     file_info.file_size = file_size
     file_info.save()
 
-def file_moved(target, payload, storage_type):
+def file_moved(target, payload):
     """Update per-user-per-storage used quota when moving file
 
     :param Object target: Id of project
@@ -326,43 +325,45 @@ def file_moved(target, payload, storage_type):
     :return Object: The addon is found
 
     """
-    if storage_type == ProjectStorageType.CUSTOM_STORAGE:
-        file_size = int(payload['destination']['size'])
-        if file_size < 0:
-            return
+    if isinstance(target, AbstractNode):
+        storage_type = get_project_storage_type(target)
+        if storage_type == ProjectStorageType.CUSTOM_STORAGE:
+            file_size = int(payload['destination']['size'])
+            if file_size < 0:
+                return
 
-        if payload['destination']['provider'] == 'osfstorage':
-            node_addon_destination = get_addon_osfstorage_by_path(
-                target,
-                payload['destination']['path'],
-                payload['destination']['provider']
-            )
-
-            if node_addon_destination is not None:
-                update_institutional_storage_used_quota(
-                    target.creator,
-                    node_addon_destination.region,
-                    payload['destination']['provider'],
-                    file_size
+            if payload['destination']['provider'] == 'osfstorage':
+                node_addon_destination = get_addon_osfstorage_by_path(
+                    target,
+                    payload['destination']['path'],
+                    payload['destination']['provider']
                 )
 
-        source_node_id = payload['source']['nid']
-        source_node = AbstractNode.objects.get(guids___id=source_node_id)
-        if payload['source']['provider'] == 'osfstorage' \
-                and source_node.type != 'osf.quickfilesnode':
-            node_addon_source = get_addon_osfstorage_by_path(
-                target,
-                payload['source']['old_root_id'],
-                payload['source']['provider']
-            )
+                if node_addon_destination is not None:
+                    update_institutional_storage_used_quota(
+                        target.creator,
+                        node_addon_destination.region,
+                        payload['destination']['provider'],
+                        file_size
+                    )
 
-            if node_addon_source is not None:
-                update_institutional_storage_used_quota(
-                    target.creator,
-                    node_addon_source.region,
-                    payload['source']['provider'],
-                    file_size, add=False
+            source_node_id = payload['source']['nid']
+            source_node = AbstractNode.objects.get(guids___id=source_node_id)
+            if payload['source']['provider'] == 'osfstorage' \
+                    and source_node.type != 'osf.quickfilesnode':
+                node_addon_source = get_addon_osfstorage_by_path(
+                    target,
+                    payload['source']['old_root_id'],
+                    payload['source']['provider']
                 )
+
+                if node_addon_source is not None:
+                    update_institutional_storage_used_quota(
+                        target.creator,
+                        node_addon_source.region,
+                        payload['source']['provider'],
+                        file_size, add=False
+                    )
 
 def update_default_storage(user):
     # logger.info('----{}::{}({})from:{}::{}({})'.format(inspect.getframeinfo(inspect.currentframe())[0], inspect.getframeinfo(inspect.currentframe())[2], inspect.getframeinfo(inspect.currentframe())[1], inspect.stack()[1][1], inspect.stack()[1][3], inspect.stack()[1][2]))

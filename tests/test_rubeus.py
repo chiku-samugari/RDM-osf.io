@@ -6,9 +6,7 @@ from nose.tools import *  # noqa: F403
 
 from tests.base import OsfTestCase
 from osf_tests.factories import (UserFactory, ProjectFactory, NodeFactory,
-                             AuthFactory, PrivateLinkFactory, AuthUserFactory,
-                             InstitutionFactory, AuthenticationAttributeFactory,
-                             RegionFactory)
+                             AuthFactory, PrivateLinkFactory, RegionFactory)
 from framework.auth import Auth
 from website.util import rubeus
 from website.util.rubeus import sort_by_name
@@ -36,21 +34,6 @@ class TestRubeus(OsfTestCase):
         self.node_settings.bucket = 'Sheer-Heart-Attack'
         self.node_settings.user_settings = self.user_settings
         self.node_settings.save()
-        self.user = AuthUserFactory()
-        self.institution = InstitutionFactory()
-        self.user.affiliated_institutions.add(self.institution)
-        self.region = RegionFactory()
-        self.region._id = self.institution._id
-        self.attribute_1 = AuthenticationAttributeFactory(
-            institution=self.institution,
-            index_number=1
-        )
-        self.attribute_2 = AuthenticationAttributeFactory(
-            institution=self.institution,
-            index_number=2,
-        )
-        self.region.save()
-        self.user.save()
 
     def test_hgrid_dummy(self):
         node_settings = self.node_settings
@@ -92,6 +75,48 @@ class TestRubeus(OsfTestCase):
         del actual['urls']
 
         assert_equals(actual, expected)
+
+    def test_build_addon_root_with_osfstorage(self):
+        self.project.add_addon('osfstorage', self.consolidated_auth)
+        self.project.creator.add_addon('osfstorage', self.consolidated_auth)
+        self.node_settings = self.project.get_addon('osfstorage')
+        self.user_settings = self.project.creator.get_addon('osfstorage')
+        self.node_settings.bucket = 'Sheer-Heart-Attack'
+        self.node_settings.user_settings = self.user_settings
+        self.node_settings.save()
+
+        node_settings = self.node_settings
+
+        actual = rubeus.build_addon_root(node_settings, node_settings.bucket)
+        assert actual['urls']['fetch']
+        assert actual['urls']['upload']
+
+        del actual['urls']
+
+        assert_equals(actual['path'].strip('/'), node_settings.root_node._id)
+
+    def test_build_addon_root_with_is_readonly_true(self):
+        self.project.add_addon('osfstorage', self.consolidated_auth)
+        self.project.creator.add_addon('osfstorage', self.consolidated_auth)
+        self.node_settings = self.project.get_addon('osfstorage')
+        self.user_settings = self.project.creator.get_addon('osfstorage')
+        self.node_settings.bucket = 'Sheer-Heart-Attack'
+        self.node_settings.user_settings = self.user_settings
+        self.node_settings.save()
+
+        region = RegionFactory(is_readonly=True)
+        node_settings = self.node_settings
+        node_settings.region = region
+        node_settings.save()
+
+        actual = rubeus.build_addon_root(node_settings, node_settings.bucket)
+        assert actual['urls']['fetch']
+        assert actual['urls']['upload']
+
+        del actual['urls']
+
+        assert_true(actual['permissions']['view'])
+        assert_false(actual['permissions']['edit'])
 
     def test_build_addon_root_has_correct_upload_limits(self):
         self.node_settings.config.max_file_size = 10
@@ -305,50 +330,6 @@ class TestRubeus(OsfTestCase):
 
         assert 'Private Component' not in ret
 
-    def test_check_authentication_attribute_valid(self):
-        self.attribute_1.attribute_name = 'mail'
-        self.attribute_1.attribute_value = 'test'
-        self.attribute_1.save()
-        self.attribute_2.attribute_name = 'displayName'
-        self.attribute_2.attribute_value = 'name_test'
-        self.attribute_2.save()
-        self.user.username = 'test01@gmail.com'
-        self.user.fullname = 'name_test_01'
-        self.user.save()
-        self.region.allow_expression = '1&&2'
-        self.region.save()
-        result = rubeus.check_authentication_attribute(self.user,
-                                                       self.region.allow_expression,
-                                                       self.region.is_allowed)
-        assert result == self.region.is_allowed
-
-    def test_check_authentication_attribute_key_error(self):
-        self.attribute_1.attribute_name = ''
-        self.attribute_1.attribute_value = ''
-        self.attribute_1.save()
-        self.user.username = 'test01@gmail.com'
-        self.user.fullname = 'name_test_01'
-        self.user.save()
-        self.region.allow_expression = '1&&2'
-        self.region.save()
-        result = rubeus.check_authentication_attribute(self.user,
-                                                       self.region.allow_expression,
-                                                       self.region.is_allowed)
-        assert result is False
-
-    def test_check_authentication_attribute_expression_error(self):
-        self.attribute_1.attribute_name = 'jasn'
-        self.attribute_1.attribute_value = ''
-        self.attribute_1.save()
-        self.user.username = 'test01@gmail.com'
-        self.user.fullname = 'name_test_01'
-        self.user.save()
-        self.region.allow_expression = '1&&&2'
-        self.region.save()
-        result = rubeus.check_authentication_attribute(self.user,
-                                                       self.region.allow_expression,
-                                                       self.region.is_allowed)
-        assert result is False
 
 # TODO: Make this more reusable across test modules
 mock_addon = mock.Mock()
@@ -379,6 +360,53 @@ class TestSerializingNodeWithAddon(OsfTestCase):
     def test_collect_addons(self):
         ret = self.serializer._collect_addons(self.project)
         assert_equal(ret, [serialized])
+
+    def test_collect_addons_have_region(self):
+        project = ProjectFactory(creator=self.auth.user)
+        node_settings = project.get_addon('osfstorage')
+        user_settings = project.creator.get_addon('osfstorage')
+        node_settings.user_settings = user_settings
+        node_settings.save()
+        region = RegionFactory()
+        node_settings = node_settings
+        node_settings.region = region
+        node_settings.save()
+
+        serializer = rubeus.NodeFileCollector(node=project, auth=self.auth)
+        ret = serializer._collect_addons(project)
+        assert_is_instance(ret, list)
+
+    def test_collect_addons_osfstorage_storage(self):
+        project = ProjectFactory(creator=self.auth.user)
+        node_settings = project.get_addon('osfstorage')
+        user_settings = project.creator.get_addon('osfstorage')
+        node_settings.bucket = 'Sheer-Heart-Attack'
+        node_settings.user_settings = user_settings
+        node_settings.save()
+        region = RegionFactory(is_allowed=False)
+        node_settings = node_settings
+        node_settings.region = region
+        node_settings.save()
+
+        serializer = rubeus.NodeFileCollector(node=project, auth=self.auth)
+        ret = serializer._collect_addons(project)
+        assert_is_instance(ret, list)
+
+    def test_collect_addons_for_institutions_is_true(self):
+        project = ProjectFactory(creator=self.auth.user)
+        node_settings = project.get_addon('osfstorage')
+        user_settings = project.creator.get_addon('osfstorage')
+        node_settings.user_settings = user_settings
+        node_settings.config.for_institutions = True
+        node_settings.save()
+        region = RegionFactory()
+        node_settings = node_settings
+        node_settings.region = region
+        node_settings.save()
+
+        serializer = rubeus.NodeFileCollector(node=project, auth=self.auth)
+        ret = serializer._collect_addons(project)
+        assert_is_instance(ret, list)
 
     def test_sort_by_name(self):
         files = [

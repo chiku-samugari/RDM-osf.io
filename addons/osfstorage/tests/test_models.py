@@ -134,6 +134,36 @@ class TestOsfstorageFileNode(StorageTestCase):
             u'sha512': None,
         })
 
+    def test_create_version_for_institutional_storage(self):
+        child = self.node_settings.get_root().append_file('Test')
+        version = child.create_version(
+            self.user,
+            {
+                u'service': u'cloud',
+                settings.WATERBUTLER_RESOURCE: u'osf',
+                u'object': u'06d80e',
+            }, {
+                u'size': 1234,
+                u'contentType': u'text/plain'
+            })
+        assert_equal(self.node_settings.region.id, version.region.id)
+
+    def test_create_version_target_has_not_get_addon(self):
+        preprint = PreprintFactory()
+        file = OsfStorageFile(name='MOAR PYLONS', target=preprint)
+        file.save()
+        version = file.create_version(
+            self.user,
+            {
+                u'service': u'cloud',
+                settings.WATERBUTLER_RESOURCE: u'osf',
+                u'object': u'06d80e',
+            }, {
+                u'size': 1234,
+                u'contentType': u'text/plain'
+            })
+        assert_equal(preprint.osfstorage_region.id, version.region.id)
+
     def test_get_child_by_name(self):
         child = self.node_settings.get_root().append_file('Test')
         assert_equal(child, self.node_settings.get_root().find_child_by_name('Test'))
