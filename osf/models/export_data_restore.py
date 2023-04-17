@@ -32,6 +32,7 @@ class ExportDataRestore(base.BaseModel):
     last_check = models.DateTimeField(auto_now=False, auto_now_add=False, null=True, blank=True)
     status = models.CharField(choices=ExportData.EXPORT_DATA_STATUS_CHOICES, max_length=255)
     task_id = models.CharField(max_length=255, null=True, blank=True)
+    creator = models.ForeignKey('OSFUser', on_delete=models.CASCADE)
 
     class Meta:
         db_table = 'osf_export_data_restore'
@@ -190,7 +191,6 @@ class ExportDataRestore(base.BaseModel):
             name=file_name,
             kind='file',
             _internal=True, location_id=self.destination.id,
-            is_check_permission=False,
             **kwargs
         )
         return requests.put(url, data=file_data, cookies=cookies)
