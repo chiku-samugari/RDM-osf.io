@@ -76,7 +76,8 @@ class TestRubeus(OsfTestCase):
 
         assert_equals(actual, expected)
 
-    def test_build_addon_root_with_osfstorage(self):
+    @mock.patch('website.util.rubeus.check_authentication_attribute')
+    def test_build_addon_root_with_osfstorage(self, mock_is_readonly):
         self.project.add_addon('osfstorage', self.consolidated_auth)
         self.project.creator.add_addon('osfstorage', self.consolidated_auth)
         self.node_settings = self.project.get_addon('osfstorage')
@@ -86,6 +87,7 @@ class TestRubeus(OsfTestCase):
         self.node_settings.save()
 
         node_settings = self.node_settings
+        mock_is_readonly.return_value = True
 
         actual = rubeus.build_addon_root(node_settings, node_settings.bucket)
         assert actual['urls']['fetch']
@@ -95,7 +97,8 @@ class TestRubeus(OsfTestCase):
 
         assert_equals(actual['path'].strip('/'), node_settings.root_node._id)
 
-    def test_build_addon_root_with_is_readonly_true(self):
+    @mock.patch('website.util.rubeus.check_authentication_attribute')
+    def test_build_addon_root_with_is_readonly_true(self, mock_is_readonly):
         self.project.add_addon('osfstorage', self.consolidated_auth)
         self.project.creator.add_addon('osfstorage', self.consolidated_auth)
         self.node_settings = self.project.get_addon('osfstorage')
@@ -108,7 +111,7 @@ class TestRubeus(OsfTestCase):
         node_settings = self.node_settings
         node_settings.region = region
         node_settings.save()
-
+        mock_is_readonly.return_value = True
         actual = rubeus.build_addon_root(node_settings, node_settings.bucket)
         assert actual['urls']['fetch']
         assert actual['urls']['upload']
