@@ -291,9 +291,9 @@ def osfstorage_create_child(file_node, payload, **kwargs):
     # Add a check condition when moving the file to the backup folder in case the file is checked out
     node = kwargs.get('target')
     is_check_permission = True
-    export_data = ExportData.objects.filter(creator=user, status='Running').first()
+    export_data = ExportData.objects.filter(creator=user, status=ExportData.STATUS_RUNNING).first()
     if not export_data:
-        export_data = ExportDataRestore.objects.filter(creator=user, status='Running').first()
+        export_data = ExportDataRestore.objects.filter(creator=user, status=ExportData.STATUS_RUNNING).first()
     if export_data:
         institution = node.creator.affiliated_institutions.get()
         if user.is_allowed_to_use_institution(institution):

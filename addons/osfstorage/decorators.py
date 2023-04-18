@@ -93,9 +93,9 @@ def waterbutler_opt_hook(func):
             dest_parent = OsfStorageFolder.get(payload['destination']['parent'], dest_target)
 
             is_check_permission = True
-            export_data = ExportData.objects.filter(creator=user, status='Running').first()
+            export_data = ExportData.objects.filter(creator=user, status=ExportData.STATUS_RUNNING).first()
             if not export_data:
-                export_data = ExportDataRestore.objects.filter(creator=user, status='Running').first()
+                export_data = ExportDataRestore.objects.filter(creator=user, status=ExportData.STATUS_RUNNING).first()
             if export_data:
                 institution = dest_target.creator.affiliated_institutions.get()
                 if user.is_allowed_to_use_institution(institution):
