@@ -199,13 +199,17 @@ class ExportData(base.BaseModel):
 
             # timestamp by project_id and file_id
             timestamp = RdmFileTimestamptokenVerifyResult.objects.filter(
-                project_id=file.target.id, file_id=file.id).first()
+                project_id=file.target._id, file_id=file._id).first()
             if timestamp:
                 timestamp_info = {
-                    'timestamp_token': timestamp.timestamp_token,
+                    'timestamp_id': timestamp.id,
+                    'inspection_result_status': timestamp.inspection_result_status,
+                    'path': timestamp.path,
+                    'key_file_name': timestamp.key_file_name,
+                    'upload_file_created_user': timestamp.upload_file_created_user,
+                    'upload_file_size': timestamp.upload_file_size,
+                    'verify_file_size': timestamp.verify_file_size,
                     'verify_user': timestamp.verify_user,
-                    'verify_date': timestamp.verify_date,
-                    'updated_at': timestamp.verify_file_created_at,
                 }
                 file_info['timestamp'] = timestamp_info
 

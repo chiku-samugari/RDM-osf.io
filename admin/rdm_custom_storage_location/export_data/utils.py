@@ -447,8 +447,8 @@ def get_file_data(node_id, provider, file_path, cookies, base_url=WATERBUTLER_UR
 
 
 def create_folder(node_id, provider, parent_path, folder_name, cookies, callback_log=False, base_url=WATERBUTLER_URL, **kwargs):
+    kwargs.update({'callback_log': False})
     kwargs.setdefault('kind', 'folder')
-    kwargs.setdefault('callback_log', callback_log)
     kwargs.setdefault('name', folder_name)
     upload_url = waterbutler_api_url_for(node_id, provider, path=parent_path, _internal=base_url == WATERBUTLER_URL, base_url=base_url, **kwargs)
     try:
@@ -461,6 +461,7 @@ def create_folder(node_id, provider, parent_path, folder_name, cookies, callback
 
 
 def upload_file(node_id, provider, file_parent_path, file_data, file_name, cookies, base_url=WATERBUTLER_URL, **kwargs):
+    kwargs.update({'callback_log': False})
     upload_url = waterbutler_api_url_for(node_id, provider, path=file_parent_path, kind='file', name=file_name,
                                          _internal=base_url == WATERBUTLER_URL, base_url=base_url, **kwargs)
     try:
@@ -474,6 +475,7 @@ def upload_file(node_id, provider, file_parent_path, file_data, file_name, cooki
 
 
 def update_existing_file(node_id, provider, file_path, file_data, cookies, base_url=WATERBUTLER_URL, **kwargs):
+    kwargs.update({'callback_log': False})
     upload_url = waterbutler_api_url_for(node_id, provider, path=file_path, kind='file',
                                          _internal=base_url == WATERBUTLER_URL, base_url=base_url, **kwargs)
     try:

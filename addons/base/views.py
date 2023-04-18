@@ -206,17 +206,6 @@ def check_access(node, auth, action, cas_resp):
             institution = node.creator.affiliated_institutions.get()
             if user_info.is_allowed_to_use_institution(institution):
                 return True
-        else:
-            export_data_restore_completed = ExportDataRestore.objects.filter(creator=user_info, status=ExportData.STATUS_COMPLETED).order_by(
-                '-process_end').first()
-            if export_data_restore_completed:
-                institution = node.creator.affiliated_institutions.get()
-                process_end = export_data_restore_completed.process_end + datetime.timedelta(minutes=PROCESS_GRACE_PERIOD)
-                process_end = process_end.replace(tzinfo=utc)
-                current_time = timezone.make_naive(timezone.now(), timezone.utc)
-                current_time = utc.localize(current_time)
-                if process_end >= current_time and user_info.is_allowed_to_use_institution(institution):
-                    return True
 
     if cas_resp:
         if permission == permissions.READ:
