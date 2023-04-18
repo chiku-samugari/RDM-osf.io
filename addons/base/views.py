@@ -137,7 +137,6 @@ You may wish to verify this through {provider}'s website.
 This content has been removed."""}
 
 WATERBUTLER_JWE_KEY = jwe.kdf(settings.WATERBUTLER_JWE_SECRET.encode('utf-8'), settings.WATERBUTLER_JWE_SALT.encode('utf-8'))
-PROCESS_GRACE_PERIOD = settings.PROCESS_GRACE_PERIOD
 
 
 @decorators.must_have_permission(permissions.WRITE)

@@ -86,14 +86,21 @@ def check_before_restore_export_data(cookies, export_id, destination_id, **kwarg
         return {'open_dialog': False, 'message': f'Cannot be restored because export data does not exist', 'not_found': True}
     # Update status RUNNING for export data for checking connect to destination storage
     export_data = check_export_data[0]
+    pre_status = export_data.status
+    export_data.status = ExportData.STATUS_RUNNING
+    export_data.save()
     try:
         is_export_data_file_valid = read_export_data_and_check_schema(export_data, cookies, **kwargs)
         if not is_export_data_file_valid:
             # Update status COMPLETED for export data if raise error
+            export_data.status = pre_status
+            export_data.save()
             return {'open_dialog': False, 'message': f'The export data files are corrupted'}
     except Exception as e:
         logger.error(f'Exception: {e}')
         # Update status COMPLETED for export data if raise exception when reading export data and checking schema
+        export_data.status = pre_status
+        export_data.save()
         return {'open_dialog': False, 'message': f'Cannot connect to the export data storage location'}
 
     # Get file info file: /export_{process_start}/file_info_{institution_guid}_{process_start}.json
@@ -102,15 +109,21 @@ def check_before_restore_export_data(cookies, export_id, destination_id, **kwarg
         export_data_folders = export_data_json.get('folders', [])
     except Exception as e:
         logger.error(f'Exception: {e}')
+        export_data.status = pre_status
+        export_data.save()
         return {'open_dialog': False, 'message': str(e)}
 
     if not len(export_data_folders):
+        export_data.status = pre_status
+        export_data.save()
         return {'open_dialog': False, 'message': f'The export data files are corrupted'}
     destination_first_project_id = export_data_folders[0].get('project', {}).get('id')
 
     # Check whether the restore destination storage is not empty
     destination_region = Region.objects.filter(id=destination_id).first()
     if not destination_region:
+        export_data.status = pre_status
+        export_data.save()
         return {'open_dialog': False, 'message': f'Failed to get destination storage information'}
 
     destination_base_url = destination_region.waterbutler_url
@@ -121,17 +134,25 @@ def check_before_restore_export_data(cookies, export_id, destination_id, **kwarg
         if response.status_code != status.HTTP_200_OK:
             # Error
             logger.error(f'Return error with response: {response.content}')
+            export_data.status = pre_status
+            export_data.save()
             return {'open_dialog': False, 'message': f'Cannot connect to destination storage'}
 
         response_body = response.json()
         data = response_body.get('data')
         if len(data) != 0:
             # Destination storage is not empty, show confirm dialog
+            export_data.status = pre_status
+            export_data.save()
             return {'open_dialog': True}
     except Exception as e:
         logger.error(f'Exception: {e}')
+        export_data.status = pre_status
+        export_data.save()
         return {'open_dialog': False, 'message': f'Cannot connect to destination storage'}
 
+    export_data.status = pre_status
+    export_data.save()
     # Destination storage is empty, return False
     return {'open_dialog': False}
 

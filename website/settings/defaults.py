@@ -2073,4 +2073,3 @@ BABEL_LANGUAGES = {
     'ja_jp': '日本語'
 }
 BABEL_DEFAULT_LOCALE = 'ja'
-PROCESS_GRACE_PERIOD = 10 # in minutes
