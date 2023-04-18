@@ -401,17 +401,20 @@ def add_timestamp_to_file_node(file_node, project_id, timestamp):
     except RdmFileTimestamptokenVerifyResult.DoesNotExist:
         verify_data = RdmFileTimestamptokenVerifyResult()
         verify_data.file_id = file_node._id
-        verify_data.project_id = project_id
-        verify_data.provider = file_node.provider
+        verify_data.project_id = timestamp.get('project_id', project_id)
+        verify_data.provider = timestamp.get('provider', file_node.provider)
 
     if timestamp_obj:
         verify_data.timestamp_token = timestamp_obj.timestamp_token
         verify_data.verify_date = timestamp_obj.verify_date
         verify_data.verify_file_modified_at = timestamp_obj.verify_file_modified_at
+        verify_data.upload_file_created_at = timestamp_obj.upload_file_created_at
+        verify_data.upload_file_modified_at = timestamp_obj.upload_file_modified_at
     verify_data.path = timestamp.get('path', file_node.path)
     verify_data.inspection_result_status = timestamp.get('inspection_result_status', 0)
     verify_data.key_file_name = timestamp.get('key_file_name', file_node.path)
     verify_data.upload_file_created_user = timestamp.get('upload_file_created_user', None)
+    verify_data.upload_file_modified_user = timestamp.get('upload_file_modified_user', None)
     verify_data.upload_file_size = timestamp.get('upload_file_size', None)
     verify_data.verify_file_size = timestamp.get('verify_file_size', None)
     verify_data.verify_user = timestamp.get('verify_user', None)

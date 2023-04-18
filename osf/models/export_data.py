@@ -204,6 +204,9 @@ class ExportData(base.BaseModel):
                 timestamp_info = {
                     'timestamp_id': timestamp.id,
                     'inspection_result_status': timestamp.inspection_result_status,
+                    'provider': timestamp.provider,
+                    'upload_file_modified_user': timestamp.upload_file_modified_user,
+                    'project_id': timestamp.project_id,
                     'path': timestamp.path,
                     'key_file_name': timestamp.key_file_name,
                     'upload_file_created_user': timestamp.upload_file_created_user,
