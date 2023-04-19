@@ -410,6 +410,7 @@ def add_timestamp_to_file_node(file_node, project_id, timestamp):
         verify_data.verify_file_modified_at = timestamp_obj.verify_file_modified_at
         verify_data.upload_file_created_at = timestamp_obj.upload_file_created_at
         verify_data.upload_file_modified_at = timestamp_obj.upload_file_modified_at
+        verify_data.verify_file_created_at = timestamp_obj.verify_file_created_at
     verify_data.path = timestamp.get('path', file_node.path)
     verify_data.inspection_result_status = timestamp.get('inspection_result_status', 0)
     verify_data.key_file_name = timestamp.get('key_file_name', file_node.path)
