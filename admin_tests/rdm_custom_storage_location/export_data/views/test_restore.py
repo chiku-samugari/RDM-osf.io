@@ -27,8 +27,7 @@ from osf_tests.factories import (
     UserFactory,
     ProjectFactory,
     InstitutionFactory,
-    FileVersionFactory,
-    BaseFileVersionsThroughFactory
+    FileVersionFactory
 )
 from tests.base import AdminTestCase
 
