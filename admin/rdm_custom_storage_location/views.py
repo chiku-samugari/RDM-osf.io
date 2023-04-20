@@ -353,7 +353,7 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
             else:
                 result = ({'message': 'Invalid provider.'}, http_status.HTTP_400_BAD_REQUEST)
         except IntegrityError:
-            result = ({'message': 'The name of institutional storage already exists.'},
+            result = ({'message': 'The name of institutional storage already exists'},
                       http_status.HTTP_400_BAD_REQUEST)
         status = result[1]
         if status == http_status.HTTP_200_OK:
@@ -722,14 +722,17 @@ class DeleteAttributeFormView(InstitutionalStorageBaseView, View):
         if attribute_id is None:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
         regions = Region.objects.filter(_id=institution._id)
+        attribute = AuthenticationAttribute.objects.get(id=attribute_id)
+        if attribute is None:
+            raise HTTPError(http_status.HTTP_404_NOT_FOUND)
         is_used = False
         for region in regions:
             if region.allow_expression is not None:
-                is_used = utils.check_index_number_exists(region.allow_expression, str(attribute_id))
+                is_used = utils.check_index_number_exists(region.allow_expression, attribute.index_number)
                 if is_used:
                     break
-            if region.readonly_expression:
-                is_used = utils.check_index_number_exists(region.readonly_expression, str(attribute_id))
+            if region.readonly_expression is not None:
+                is_used = utils.check_index_number_exists(region.readonly_expression, attribute.index_number)
                 if is_used:
                     break
 
@@ -739,7 +742,6 @@ class DeleteAttributeFormView(InstitutionalStorageBaseView, View):
             }, status=http_status.HTTP_400_BAD_REQUEST)
         else:
             try:
-                attribute = AuthenticationAttribute.objects.get(id=attribute_id)
                 attribute.delete()
             except AuthenticationAttribute.DoesNotExist:
                 raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
@@ -793,7 +795,7 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
 
         if not is_valid_allow or not is_valid_readonly:
             return JsonResponse({
-                'message': 'Invalid expression.'
+                'message': 'Invalid condition.'
             }, status=http_status.HTTP_400_BAD_REQUEST)
 
         institution = request.user.affiliated_institutions.first()
@@ -804,7 +806,7 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
 
         if not is_valid_allow or not is_valid_readonly:
             return JsonResponse({
-                'message': 'Invalid expression.'
+                'message': 'Invalid condition.'
             }, status=http_status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -815,7 +817,7 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
                 ).exclude(id=region.id)
                 if regions.exists():
                     return JsonResponse({
-                        'message': 'The name of institutional storage already exists.'
+                        'message': 'The name of institutional storage already exists'
                     }, status=http_status.HTTP_400_BAD_REQUEST)
                 region.name = storage_name
             region.is_allowed = allow

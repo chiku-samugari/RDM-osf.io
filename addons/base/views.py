@@ -340,7 +340,7 @@ def get_auth(auth, **kwargs):
                 is_readonly = check_authentication_attribute(auth.user,
                                                              region.readonly_expression,
                                                              region.is_readonly)
-                if is_readonly is True and action not in ['metadata', 'download']:
+                if is_readonly is True and action not in ['metadata', 'download', 'revisions', 'render']:
                     raise HTTPError(http_status.HTTP_403_FORBIDDEN)
 
     credentials = None

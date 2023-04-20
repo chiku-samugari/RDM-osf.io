@@ -1146,7 +1146,7 @@ def check_index_number_exists(expression, item):
     """
 
     result = re.findall(r'\d+', expression)
-    return True if item in result else False
+    return True if str(item) in result else False
 
 
 def validate_index_number_not_found(expression, index_list):
