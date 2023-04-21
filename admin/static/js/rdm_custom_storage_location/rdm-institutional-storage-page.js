@@ -566,7 +566,7 @@ var afterRequest = {
             location.reload(true);
         },
         'fail': function (id, message) {
-            $osf.growl('Failed', _(message));
+            $osf.growl(_('Error'), _(message));
         }
     },
     'add_attribute_form': {
@@ -574,7 +574,7 @@ var afterRequest = {
             location.reload(true);
         },
         'fail': function (id, message) {
-            $osf.growl('Failed', _(message), 'danger', 5000);
+            $osf.growl(_('Error'), _(message), 'danger', 5000);
         }
     },
     'delete_attribute_form': {
@@ -582,7 +582,7 @@ var afterRequest = {
             location.reload(true);
         },
         'fail': function (id, message) {
-            $osf.growl('Failed', _(message), 'danger', 5000);
+            $osf.growl(_('Error'), _(message), 'danger', 5000);
         }
     },
     'save_attribute_form': {
@@ -590,7 +590,7 @@ var afterRequest = {
             location.reload(true);
         },
         'fail': function (id, message) {
-            $osf.growl('Failed', _(message), 'danger', 5000);
+            $osf.growl(_('Error'), _(message), 'danger', 5000);
         }
     },
     'save_institutional_storage': {
@@ -598,7 +598,7 @@ var afterRequest = {
             location.reload(true);
         },
         'fail': function (id, message) {
-            $osf.growl('Failed', _(message), 'danger', 5000);
+            $osf.growl(_('Error'), _(message), 'danger', 5000);
         }
     },
     'credentials': {

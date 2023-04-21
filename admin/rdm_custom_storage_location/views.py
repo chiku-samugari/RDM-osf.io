@@ -353,7 +353,7 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
             else:
                 result = ({'message': 'Invalid provider.'}, http_status.HTTP_400_BAD_REQUEST)
         except IntegrityError:
-            result = ({'message': 'The name of institutional storage already exists'},
+            result = ({'message': 'The name of institutional storage already exists.'},
                       http_status.HTTP_400_BAD_REQUEST)
         status = result[1]
         if status == http_status.HTTP_200_OK:
@@ -817,7 +817,7 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
                 ).exclude(id=region.id)
                 if regions.exists():
                     return JsonResponse({
-                        'message': 'The name of institutional storage already exists'
+                        'message': 'The name of institutional storage already exists.'
                     }, status=http_status.HTTP_400_BAD_REQUEST)
                 region.name = storage_name
             region.is_allowed = allow
