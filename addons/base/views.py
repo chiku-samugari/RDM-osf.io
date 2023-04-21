@@ -890,6 +890,17 @@ def addon_view_or_download_file(auth, path, provider, **kwargs):
 
         node_addon = target.get_addon(provider, root_id=file_node_root_id)
 
+        if hasattr(node_addon, 'region'):
+            region = node_addon.region
+            is_allowed = check_authentication_attribute(auth.user,
+                                                        region.allow_expression,
+                                                        region.is_allowed)
+            if not is_allowed:
+                raise HTTPError(http_status.HTTP_404_NOT_FOUND, data={
+                    'message_short': 'File Not Found',
+                    'message_long': 'The requested file could not be found.'
+                })
+
         if not isinstance(node_addon, BaseStorageAddon):
             object_text = markupsafe.escape(getattr(target, 'project_or_component', 'this object'))
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST, data={
