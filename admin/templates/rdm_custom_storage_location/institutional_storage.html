@@ -238,5 +238,15 @@
 {% endblock content %}
 
 {% block bottom_js %}
+    <script>
+        $(document).ready(function() {
+            $("input[name*='attribute_value'], input[name*='attribute']").each(function(i, obj) {
+                var length = obj.value.length;
+                if (length >= 30) {
+                    obj.title = obj.value;
+                }
+            });
+        });
+    </script>
     {% render_bundle 'rdm-institutional-storage-page' %}
 {% endblock %}

@@ -137,6 +137,15 @@ $("#storage_name, input[name*='attribute_value'], input[name*='attribute'], .sto
     e.target.reportValidity();
 });
 
+$("input[name*='attribute_value'], input[name*='attribute']").on('input', function(e) {
+    var length = e.target.value.length;
+    if (length >= 30) {
+        e.target.title = e.target.value;
+    } else {
+        e.target.title = '';
+    }
+});
+
 $('#attribute_authentication').change(function () {
     var is_attribute_authentication = !($(this).val() === 'on');
     var params = {
@@ -258,7 +267,15 @@ $('.save_attribute').click(function (e) {
 })
 
 $(".attribute_name").autocomplete({
-    source: ATTRIBUTE_LIST
+    source: ATTRIBUTE_LIST,
+    select: function(event, ui) {
+        var selected_value = ui.item.value;
+        if (selected_value.length >= 30) {
+            $(this)[0].title = selected_value;
+        } else {
+            $(this)[0].title = '';
+        }
+    }
 });
 
 $(".attribute_name").on('keydown', function(e) {
@@ -268,6 +285,12 @@ $(".attribute_name").on('keydown', function(e) {
         var id = this.getAttribute('id');
         var firstItem = $("#ui-id-" + id[id.length - 1] + " .ui-menu-item").first().text();
         $(this).val(firstItem);
+    }
+    var value = e.target.value;
+    if (value.length >= 30) {
+        this.setAttribute('title', value);
+    } else {
+        this.setAttribute('title', '');
     }
 });
 

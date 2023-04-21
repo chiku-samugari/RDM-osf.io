@@ -896,10 +896,7 @@ def addon_view_or_download_file(auth, path, provider, **kwargs):
                                                         region.allow_expression,
                                                         region.is_allowed)
             if not is_allowed:
-                raise HTTPError(http_status.HTTP_404_NOT_FOUND, data={
-                    'message_short': 'File Not Found',
-                    'message_long': 'The requested file could not be found.'
-                })
+                raise HTTPError(http_status.HTTP_403_FORBIDDEN)
 
         if not isinstance(node_addon, BaseStorageAddon):
             object_text = markupsafe.escape(getattr(target, 'project_or_component', 'this object'))
