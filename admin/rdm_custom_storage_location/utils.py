@@ -1184,7 +1184,7 @@ def validate_logic_expression(expression):
         if expression.find('|') >= 0:
             return False
         try:
-            if type(eval(expression)) != int:
+            if not (type(eval(expression)) == int or type(eval(expression)) == bool):
                 return False
         except SyntaxError:
             return False
