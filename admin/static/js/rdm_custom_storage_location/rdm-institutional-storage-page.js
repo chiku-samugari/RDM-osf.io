@@ -283,8 +283,10 @@ $(".attribute_name").on('keydown', function(e) {
     if (keyCode == 9) {
         e.preventDefault();
         var id = this.getAttribute('id');
-        var firstItem = $("#ui-id-" + id[id.length - 1] + " .ui-menu-item").first().text();
-        $(this).val(firstItem);
+        if (!ATTRIBUTE_LIST.includes(this.value)) {
+            var firstItem = $("#ui-id-" + id[id.length - 1] + " .ui-menu-item").first().text();
+            $(this).val(firstItem);
+        }
     }
     var value = e.target.value;
     if (value.length >= 30) {
