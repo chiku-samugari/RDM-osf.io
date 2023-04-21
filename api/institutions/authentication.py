@@ -396,7 +396,7 @@ class InstitutionAuthentication(BaseAuthentication):
                 'organizational_unit': organizational_unit,
                 'organization_name_ja': organization_name_ja,
                 'organizational_unit_ja': organizational_unit_ja,
-                'goups': groups,
+                'groups': groups,
             },
         )
 
