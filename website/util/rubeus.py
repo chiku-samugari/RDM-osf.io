@@ -378,7 +378,7 @@ def check_authentication_attribute(user, expression, is_enabled):
 
     """
 
-    from osf.models import AuthenticationAttribute
+    from osf.models import AuthenticationAttribute, InstitutionEntitlement, UserExtendedData
     institution = user.affiliated_institutions.first()
     if institution:
         if institution.is_authentication_attribute:
@@ -386,6 +386,7 @@ def check_authentication_attribute(user, expression, is_enabled):
                 indexes = re.findall(r'\d+', expression)
                 indexes = [int(i) for i in indexes]
                 sorted(indexes, reverse=True)
+                extended_data = UserExtendedData.objects.filter(user=user).first()
                 for index in indexes:
                     attribute = AuthenticationAttribute.objects.get(
                         institution=institution, index_number=index, is_deleted=False
@@ -394,9 +395,31 @@ def check_authentication_attribute(user, expression, is_enabled):
                     if attribute:
                         try:
                             attribute_name = api_settings.ATTRIBUTE_LIST[attribute.attribute_name]
-                            if hasattr(user, attribute_name):
-                                if attribute.attribute_value in str(getattr(user, attribute_name)):
+                            value = attribute.attribute_value
+                            if attribute.attribute_name == 'eduPersonAffiliation':
+                                jobs = getattr(user, attribute_name)
+                                for job in jobs:
+                                    if value in job['title']:
+                                        result = 'True'
+                                        break
+                            elif attribute.attribute_name == 'eduPersonOrcid':
+                                social = getattr(user, attribute_name)
+                                if value in social['orcid']:
                                     result = 'True'
+                            elif attribute.attribute_name == 'eduPersonScopedAffiliation':
+                                entitlement_list = InstitutionEntitlement.objects.filter(institution=institution)
+                                for item in entitlement_list:
+                                    if value in item.entitlement:
+                                        result = 'True'
+                                        break
+                            elif hasattr(user, attribute_name):
+                                if value in str(getattr(user, attribute_name)):
+                                    result = 'True'
+                            else:
+                                if extended_data is not None:
+                                    data = extended_data.data['idp_attr'][attribute_name]
+                                    if value in data:
+                                        result = 'True'
                         except KeyError:
                             result = 'False'
                         except AttributeError:
