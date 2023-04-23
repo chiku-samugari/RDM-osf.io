@@ -722,8 +722,9 @@ class DeleteAttributeFormView(InstitutionalStorageBaseView, View):
         if attribute_id is None:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
         regions = Region.objects.filter(_id=institution._id)
-        attribute = AuthenticationAttribute.objects.get(id=attribute_id)
-        if attribute is None:
+        try:
+            attribute = AuthenticationAttribute.objects.get(id=attribute_id)
+        except AuthenticationAttribute.DoesNotExist:
             raise HTTPError(http_status.HTTP_404_NOT_FOUND)
         is_used = False
         for region in regions:

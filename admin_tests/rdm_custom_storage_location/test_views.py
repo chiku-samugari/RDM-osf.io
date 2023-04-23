@@ -872,14 +872,18 @@ class TestDeleteAttributeFormView(AdminTestCase):
         with nt.assert_raises(HTTPError) as e:
             self.view.post(self.request)
         res = e.exception
-        assert res.code == 400
+        assert res.code == 404
 
     def test_delete_attribute_used_in_allow_expression(self):
         self.region.allow_expression = '1&&2'
         self.region.save()
+        attribute = AuthenticationAttributeFactory(
+            institution=self.institution,
+            index_number=1
+        )
         self.request = RequestFactory().post(
             'custom_storage_location:delete_attribute_form',
-            json.dumps({'id': 2}),
+            json.dumps({'id': attribute.id}),
             content_type='application/json'
         )
         self.view = views.DeleteAttributeFormView()
@@ -890,9 +894,13 @@ class TestDeleteAttributeFormView(AdminTestCase):
     def test_delete_attribute_used_in_readonly_expression(self):
         self.region.readonly_expression = '1||2'
         self.region.save()
+        attribute = AuthenticationAttributeFactory(
+            institution=self.institution,
+            index_number=2
+        )
         self.request = RequestFactory().post(
             'custom_storage_location:delete_attribute_form',
-            json.dumps({'id': 1}),
+            json.dumps({'id': attribute.id}),
             content_type='application/json'
         )
         self.view = views.DeleteAttributeFormView()
