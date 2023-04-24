@@ -58,6 +58,12 @@ function ViewModel(url) {
         self.skipped_projects([]);
     });
 
+    window.onclick = function(event) {
+       if (event.target.id != '#datastewardModal' && self.is_waiting() === false) {
+        $modal.modal('hide');
+        self.dialog_closed_by_user(true);
+       }
+    }
     /** Close confirm modal */
     self.clearModal = function() {
         $modal.modal('hide');

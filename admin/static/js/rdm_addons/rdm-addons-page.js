@@ -74,6 +74,7 @@ $('.is_allowed input').on('change', function() {
         bootbox.confirm({
             title: sprintf(_("Disallow %s?"),$osf.htmlEscape(addonFullName)),
             message: message,
+            backdrop: true,
             buttons: {
                 cancel: {
                     label: _('Cancel')
