@@ -46,6 +46,7 @@ from website.project import signals as project_signals
 from website import settings, mails, language
 from website.project.licenses import set_license
 from api.base.rdmlogger import RdmLogger, rdmlog
+from django.core.exceptions import MultipleObjectsReturned
 
 
 logger = logging.getLogger(__name__)
@@ -539,7 +540,7 @@ class AddonModelMixin(models.Model):
             return addon
         return self.add_addon(name, *args, **kwargs)
 
-    def get_addon(self, name, is_deleted=False):
+    def get_addon(self, name, is_deleted=False, region_id=None, root_id=None):
         try:
             settings_model = self._settings_model(name)
         except LookupError:
@@ -547,8 +548,15 @@ class AddonModelMixin(models.Model):
         if not settings_model:
             return None
         try:
-            settings_obj = settings_model.objects.get(owner=self)
-            if not settings_obj.is_deleted or is_deleted:
+            # In case of multiple institutional storage, using region id or root folder id to get exact corresponding node settings
+            if root_id:
+                settings_obj = settings_model.objects.filter(owner=self, root_node_id=root_id).first()
+            elif region_id:
+                settings_obj = settings_model.objects.filter(owner=self, region_id=region_id).first()
+            else:
+                settings_obj = settings_model.objects.get(owner=self)
+
+            if settings_obj and (not settings_obj.is_deleted or is_deleted):
                 return settings_obj
         except ObjectDoesNotExist:
             pass
@@ -591,7 +599,10 @@ class AddonModelMixin(models.Model):
             return False
 
         # Reactivate deleted add-on if present
-        addon = self.get_addon(addon_name, is_deleted=True)
+        try:
+            addon = self.get_addon(addon_name, is_deleted=True, region_id=region_id)
+        except MultipleObjectsReturned:
+            addon = self.get_first_addon(addon_name, is_deleted=True)
         if addon:
             if addon.deleted:
                 addon.undelete(save=True)
@@ -622,7 +633,7 @@ class AddonModelMixin(models.Model):
         if save:
             self.save()
 
-    def delete_addon(self, addon_name, auth=None, _force=False):
+    def delete_addon(self, addon_name, auth=None, _force=False, region_id=None):
         """Delete an add-on from the node.
 
         :param str addon_name: Name of add-on
@@ -633,7 +644,7 @@ class AddonModelMixin(models.Model):
         :return bool: Add-on was deleted
         """
         from website.util import timestamp
-        addon = self.get_addon(addon_name)
+        addon = self.get_addon(addon_name, region_id=region_id)
         if not addon:
             return False
         if self.settings_type in addon.config.added_mandatory and not _force:
