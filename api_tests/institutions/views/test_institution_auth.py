@@ -548,7 +548,7 @@ class TestInstitutionAuth:
         assert user
         assert user.is_data_steward is False
 
-    def test_authenticate_enable_datasteward_addon(self, app, url_auth_institution, institution):
+    async def test_authenticate_enable_datasteward_addon(self, app, url_auth_institution, institution):
         username = 'datasteward@osf.edu'
         user = make_user(username, 'addon datasteward')
         user.save()
@@ -560,7 +560,7 @@ class TestInstitutionAuth:
             user.save()
 
         with capture_signals() as mock_signals:
-            res = app.post(url_auth_institution, make_payload(institution, username, entitlement='GakuNinRDMDataSteward'))
+            res = await app.post(url_auth_institution, make_payload(institution, username, entitlement='GakuNinRDMDataSteward'))
         assert res.status_code == 204
         assert not mock_signals.signals_sent()
 

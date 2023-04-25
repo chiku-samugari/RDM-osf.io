@@ -13,6 +13,7 @@ from osf.utils import permissions
 from osf_tests.factories import AuthUserFactory, InstitutionFactory, OSFGroupFactory, ProjectFactory
 from tests.base import OsfTestCase
 from website.util import api_url_for
+from unittest import mock
 
 OSF_NODE = 'osf.node'
 
@@ -141,20 +142,20 @@ class TestDataStewardViews(DataStewardAddonTestCase, OsfTestCase, unittest.TestC
 
         set_project_permission_to_admin(mock_project, self.auth, True)
 
-    def test_set_project_permission_to_admin_raise_exception(self):
+    async def test_set_project_permission_to_admin_raise_exception(self):
         mock_project = mock.Mock()
         mock_project.is_contributor.side_effect = Exception('mock test error')
         with pytest.raises(Exception):
-            set_project_permission_to_admin(mock_project, self.auth, False)
+            await set_project_permission_to_admin(mock_project, self.auth, False)
 
-    def test_set_project_permission_to_admin_add_new_contributor(self):
+    async def test_set_project_permission_to_admin_add_new_contributor(self):
         user = AuthUserFactory(username='new_admin@osf.com', fullname='new_admin')
-        set_project_permission_to_admin(self.project, Auth(user), False)
+        await set_project_permission_to_admin(self.project, Auth(user), False)
 
         contributor = self.project.contributor_class.objects.get(user=user, node=self.project)
         assert_equal(permissions.ADMIN, contributor.permission)
 
-    def test_set_project_permission_to_admin_update_contributor_permission_is_not_admin(self):
+    async def test_set_project_permission_to_admin_update_contributor_permission_is_not_admin(self):
         group_mem = AuthUserFactory(username='test@osf.com', fullname='group_mem')
         group_mem.is_data_steward = False
         group_mem.save()
@@ -164,7 +165,7 @@ class TestDataStewardViews(DataStewardAddonTestCase, OsfTestCase, unittest.TestC
         self.project.add_contributor(contributor=group_mem, permissions=permissions.READ, log=False, save=False)
         self.project.save()
 
-        set_project_permission_to_admin(self.project, Auth(group_mem), False)
+        await set_project_permission_to_admin(self.project, Auth(group_mem), False)
 
         contributor = self.project.contributor_class.objects.get(user=group_mem, node=self.project)
         assert_equal(permissions.ADMIN, contributor.permission)
@@ -187,13 +188,13 @@ class TestDataStewardViews(DataStewardAddonTestCase, OsfTestCase, unittest.TestC
 
         assert_equal(result, [])
 
-    def test_revert_project_permission_error(self):
-        mock_project = mock.Mock()
-        mock_project.is_contributor.side_effect = Exception('mock test error')
+    async def test_revert_project_permission_error(self):
         skipped_projects = []
-        revert_project_permission(mock_project, self.auth, skipped_projects)
-
-        assert_equal(skipped_projects, [mock_project])
+        self.project.add_contributor(contributor=self.new_user, permissions=permissions.ADMIN, log=False, save=False)
+        self.project.save()
+        with mock.patch('osf.models.mixins.ContributorMixin.is_contributor', side_effect=Exception('mock test error')):
+            await revert_project_permission(self.project, self.auth, skipped_projects)
+            assert_equal(skipped_projects, [self.project])
 
     def test_revert_project_permission_is_not_contributor(self):
         user_auth = Auth(AuthUserFactory())
@@ -217,7 +218,7 @@ class TestDataStewardViews(DataStewardAddonTestCase, OsfTestCase, unittest.TestC
 
         assert_equal(skipped_projects, [])
 
-    def test_revert_project_permission_update_contributor(self):
+    async def test_revert_project_permission_update_contributor(self):
         self.project.add_contributor(contributor=self.new_user, permissions=permissions.ADMIN, log=False, save=False)
         self.project.save()
 
@@ -227,7 +228,7 @@ class TestDataStewardViews(DataStewardAddonTestCase, OsfTestCase, unittest.TestC
         contributor.save()
 
         skipped_projects = []
-        revert_project_permission(self.project, self.auth, skipped_projects)
+        await revert_project_permission(self.project, self.auth, skipped_projects)
 
         contributor = self.project.contributor_class.objects.get(user=self.new_user, node=self.project)
         assert_equal(skipped_projects, [])
@@ -249,7 +250,7 @@ class TestDataStewardViews(DataStewardAddonTestCase, OsfTestCase, unittest.TestC
 
         assert_equal(skipped_projects, [])
 
-    def test_revert_project_permission_remove_contributor_error(self):
+    async def test_revert_project_permission_remove_contributor_error(self):
         self.project.add_contributor(contributor=self.new_user, permissions=permissions.ADMIN, log=False, save=False)
         self.project.save()
 
@@ -259,6 +260,6 @@ class TestDataStewardViews(DataStewardAddonTestCase, OsfTestCase, unittest.TestC
         contributor.save()
 
         skipped_projects = []
-        revert_project_permission(self.project, self.auth, skipped_projects)
+        await revert_project_permission(self.project, self.auth, skipped_projects)
 
         assert_equal(skipped_projects, [self.project])
