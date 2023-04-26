@@ -389,23 +389,22 @@ def disconnect_addons_multiple_projects(projects, user):
         # Get project's node settings for each add-on
         project_node_settings = node_settings_model.objects.filter(owner__id__in=project_ids)
 
-        update_fields = []
+        update_node_settings = False
         for setting in project_node_settings:
             if not hasattr(setting, 'user_settings'):
                 continue
 
-            update_fields.append('user_settings_id')
+            update_node_settings = True
             if hasattr(setting.user_settings, 'oauth_grants'):
-                update_fields.append('oauth_grants')
                 # Remove user's external account guid from node's oauth_grants
                 setting.user_settings.oauth_grants[setting.owner._id].pop(setting.external_account._id)
 
             # Disconnect user settings from node settings
             setting.user_settings = None
 
-        if update_fields:
+        if update_node_settings:
             # Bulk update multiple node settings
-            bulk_update(project_node_settings, update_fields=update_fields, batch_size=BATCH_SIZE)
+            bulk_update(project_node_settings, batch_size=BATCH_SIZE)
 
 
 def get_node_settings_model(config):
