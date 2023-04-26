@@ -1801,37 +1801,37 @@ class TestNodeCreate:
         assert res.status_code == 201
         region_id = res.json['data']['relationships']['region']['data']['id']
         assert region_id == DEFAULT_REGION_ID
-            private_project['data']['relationships'] = {
-                'affiliated_institutions': {
-                    'data': [
-                        {
-                            'type': 'institutions',
-                            'id': institution_one._id
-                        },
-                        {
-                            'type': 'institutions',
-                            'id': institution_two._id
-                        }
-                    ]
-                },
-                'region': {
-                    'data': {
-                        'type': 'region',
-                        'id': region.id
+        private_project['data']['relationships'] = {
+            'affiliated_institutions': {
+                'data': [
+                    {
+                        'type': 'institutions',
+                        'id': institution_one._id
+                    },
+                    {
+                        'type': 'institutions',
+                        'id': institution_two._id
                     }
+                ]
+            },
+            'region': {
+                'data': {
+                    'type': 'region',
+                    'id': region.id
                 }
             }
-            res = app.post_json_api(
-                url, private_project, auth=user_one.auth
-            )
-            assert res.status_code == 201
-            region_id = res.json['data']['relationships']['region']['data']['id']
-            assert region_id == str(region.id)
+        }
+        res = app.post_json_api(
+            url, private_project, auth=user_one.auth
+        )
+        assert res.status_code == 201
+        region_id = res.json['data']['relationships']['region']['data']['id']
+        assert region_id == str(region.id)
 
-            node_id = res.json['data']['id']
-            node = AbstractNode.load(node_id)
-            assert institution_one in node.affiliated_institutions.all()
-            assert institution_two in node.affiliated_institutions.all()
+        node_id = res.json['data']['id']
+        node = AbstractNode.load(node_id)
+        assert institution_one in node.affiliated_institutions.all()
+        assert institution_two in node.affiliated_institutions.all()
 
     def test_create_project_with_region_query_param(
             self, app, user_one, region, private_project, url_with_region_query_param):
