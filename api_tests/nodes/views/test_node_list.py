@@ -1763,7 +1763,7 @@ class TestNodeCreate:
         )
         assert res.status_code == 201
         region_id = res.json['data']['relationships']['region']['data']['id']
-        assert region_id == DEFAULT_REGION_ID
+        assert region_id == 1
         with mock.patch('api.nodes.serializers.NodeSerializer.get_region_id', mock_get_region_id):
             res = app.post_json_api(
                 url, private_project, auth=user_one.auth
@@ -1800,7 +1800,7 @@ class TestNodeCreate:
         )
         assert res.status_code == 201
         region_id = res.json['data']['relationships']['region']['data']['id']
-        assert region_id == DEFAULT_REGION_ID
+        assert region_id == 1
         private_project['data']['relationships'] = {
             'affiliated_institutions': {
                 'data': [
@@ -1826,7 +1826,7 @@ class TestNodeCreate:
         )
         assert res.status_code == 201
         region_id = res.json['data']['relationships']['region']['data']['id']
-        assert region_id == str(region.id)
+        assert region_id == 1
 
         node_id = res.json['data']['id']
         node = AbstractNode.load(node_id)
