@@ -21,6 +21,7 @@ from osf.models.nodelog import NodeLog
 from osf.utils.permissions import ADMIN, READ
 from website import language
 from website.project import signals as project_signals
+from timeit import default_timer as timer
 
 logger = logging.getLogger(__name__)
 
@@ -215,6 +216,7 @@ async def update_contributor_permission(project, auth, permission=ADMIN):
 @transaction.atomic
 def disable_datasteward_addon(auth):
     """Start disable DataSteward add-on process"""
+    start = timer()
     # Check if user has any affiliated institutions
     affiliated_institutions = auth.user.affiliated_institutions.all()
     if not affiliated_institutions:
@@ -242,6 +244,8 @@ def disable_datasteward_addon(auth):
     bulk_delete_contributor_id_list = []
     remove_permission_projects = []
     update_user = False
+    start_prepare = timer()
+    logger.info(f'disable_datasteward_addon before prepare runtime: {start_prepare - start}(s)')
     for project in projects:
         admin_contributors = [contributor for contributor in local_contributors if contributor.node.id == project.id]
         contributor = next((contributor for contributor in admin_contributors if contributor.user.id == user.id), None)
@@ -277,6 +281,8 @@ def disable_datasteward_addon(auth):
                 bulk_delete_contributor_id_list.append(contributor.id)
                 remove_permission_projects.append(project)
 
+    start_update = timer()
+    logger.info(f'disable_datasteward_addon prepare runtime: {start_update - start_prepare}(s)')
     # update contributor permission
     if update_permission_list:
         # set permission and send signal
@@ -289,6 +295,8 @@ def disable_datasteward_addon(auth):
         # update to DB
         bulk_update(bulk_update_contributors, update_fields=['is_data_steward', 'data_steward_old_permission'], batch_size=BATCH_SIZE)
 
+    start_remove = timer()
+    logger.info(f'disable_datasteward_addon update runtime: {start_remove - start_update}(s)')
     # remove contributor
     if remove_permission_projects:
         if update_user:
@@ -308,6 +316,9 @@ def disable_datasteward_addon(auth):
         loop.run_until_complete(asyncio.wait(coroutines))
         loop.close()
 
+    end = timer()
+    logger.info(f'disable_datasteward_addon remove runtime: {end - start_remove}(s)')
+    logger.info(f'disable_datasteward_addon runtime: {end - start}(s)')
     return skipped_projects
 
 
@@ -343,13 +354,21 @@ def add_project_logs(projects, user, action):
 
 
 async def after_remove_contributor_permission(project, auth):
+    start_disconnect = timer()
     # After remove callback
     project.disconnect_addons(auth.user, auth)
 
+    start_signals = timer()
+    logger.info(f'disconnect_addons of project {project._id} runtime: {start_signals - start_disconnect}(s)')
     # send signal to remove this user from project subscriptions
     project_signals.contributor_removed.send(project, user=auth.user)
     project_signals.contributors_updated.send(project)
 
+    start_enqueue = timer()
+    logger.info(f'project_signals of project {project._id} runtime: {start_enqueue - start_signals}(s)')
     # enqueue on_node_updated/on_preprint_updated to update DOI metadata when a contributor is removed
     if getattr(project, 'get_identifier_value', None) and project.get_identifier_value('doi'):
         project.update_or_enqueue_on_resource_updated(auth.user._id, first_save=False, saved_fields=['contributors'])
+    end_remove = timer()
+    logger.info(f'update_or_enqueue_on_resource_updated of project {project._id} runtime: {end_remove - start_enqueue}(s)')
+    logger.info(f'after_remove_contributor_permission of project {project._id} runtime: {end_remove - start_disconnect}(s)')

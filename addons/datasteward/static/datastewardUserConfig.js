@@ -59,10 +59,10 @@ function ViewModel(url) {
     });
 
     window.onclick = function(event) {
-       if (event.target.id != '#datastewardModal' && self.is_waiting() === false) {
-        $modal.modal('hide');
-        self.dialog_closed_by_user(true);
-       }
+        if (event.target.id != '#datastewardModal' && self.is_waiting() === false) {
+            $modal.modal('hide');
+            self.dialog_closed_by_user(true);
+        }
     }
     /** Close confirm modal */
     self.clearModal = function() {
@@ -87,6 +87,7 @@ function ViewModel(url) {
             contentType: 'application/json',
             data: JSON.stringify(data)
         }).done(function (response) {
+            self.dialog_closed_by_user(false);
             $modal.modal('hide');
         }).fail(function (xhr, textStatus, error) {
             if (xhr.status === 403) {
@@ -101,6 +102,7 @@ function ViewModel(url) {
                 });
             } else {
                 self.change_add_on_failed(true);
+                self.dialog_closed_by_user(false);
                 $modal.modal('hide');
             }
         });
@@ -120,6 +122,7 @@ function ViewModel(url) {
         }).done(function (response) {
             var skipped_projects = response.skipped_projects;
             self.skipped_projects(skipped_projects);
+            self.dialog_closed_by_user(false);
             $modal.modal('hide');
         }).fail(function (xhr, textStatus, error) {
             self.is_waiting(false);
