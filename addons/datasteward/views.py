@@ -296,7 +296,7 @@ def disable_datasteward_addon(auth):
         bulk_update(bulk_update_contributors, update_fields=['is_data_steward', 'data_steward_old_permission'], batch_size=BATCH_SIZE)
 
     start_remove = timer()
-    logger.info(f'disable_datasteward_addon update runtime: {start_remove - start_update}(s)')
+    logger.info(f'disable_datasteward_addon update contributors runtime: {start_remove - start_update}(s)')
     # remove contributor
     if remove_permission_projects:
         if update_user:
@@ -311,18 +311,24 @@ def disable_datasteward_addon(auth):
 
         add_project_logs(remove_permission_projects, user, NodeLog.CONTRIB_REMOVED)
 
+        start_disconnect = timer()
+        disconnect_addons_multiple_projects(remove_permission_projects, user)
+        end_disconnect = timer()
+        logger.info(f'disconnect_addons_multiple_projects runtime: {end_disconnect - start_disconnect}(s)')
+
         loop = asyncio.new_event_loop()
         coroutines = [loop.create_task(after_remove_contributor_permission(project=project, auth=auth)) for project in remove_permission_projects]
         loop.run_until_complete(asyncio.wait(coroutines))
         loop.close()
 
     end = timer()
-    logger.info(f'disable_datasteward_addon remove runtime: {end - start_remove}(s)')
-    logger.info(f'disable_datasteward_addon runtime: {end - start}(s)')
+    logger.info(f'disable_datasteward_addon remove contributors runtime: {end - start_remove}(s)')
+    logger.info(f'disable_datasteward_addon overall runtime: {end - start}(s)')
     return skipped_projects
 
 
 def clear_permissions(projects, user):
+    """ Clear permission of multiple projects for user """
     group_names = projects[0].groups.keys()
     project_group_names = [project.get_group(name) for name in group_names for project in projects]
     groups = user.groups.filter(name__in=project_group_names).distinct()
@@ -333,6 +339,7 @@ def clear_permissions(projects, user):
 
 
 def add_project_logs(projects, user, action):
+    """ Add multiple project activity logs for user """
     logs = []
     for project in projects:
         params = project.log_params
@@ -354,21 +361,57 @@ def add_project_logs(projects, user, action):
 
 
 async def after_remove_contributor_permission(project, auth):
-    start_disconnect = timer()
-    # After remove callback
-    project.disconnect_addons(auth.user, auth)
-
-    start_signals = timer()
-    logger.info(f'disconnect_addons of project {project._id} runtime: {start_signals - start_disconnect}(s)')
     # send signal to remove this user from project subscriptions
     project_signals.contributor_removed.send(project, user=auth.user)
     project_signals.contributors_updated.send(project)
 
-    start_enqueue = timer()
-    logger.info(f'project_signals of project {project._id} runtime: {start_enqueue - start_signals}(s)')
     # enqueue on_node_updated/on_preprint_updated to update DOI metadata when a contributor is removed
     if getattr(project, 'get_identifier_value', None) and project.get_identifier_value('doi'):
         project.update_or_enqueue_on_resource_updated(auth.user._id, first_save=False, saved_fields=['contributors'])
-    end_remove = timer()
-    logger.info(f'update_or_enqueue_on_resource_updated of project {project._id} runtime: {end_remove - start_enqueue}(s)')
-    logger.info(f'after_remove_contributor_permission of project {project._id} runtime: {end_remove - start_disconnect}(s)')
+
+
+def disconnect_addons_multiple_projects(projects, user):
+    """ Disconnect addons for multiple project at same time """
+    ADDONS_AVAILABLE = sorted([config for config in apps.get_app_configs() if config.name.startswith('addons.') and
+                               config.label != 'base'], key=lambda config: config.name)
+    project_ids = [project.id for project in projects if not project.is_contributor_or_group_member(user)]
+
+    # If there is no add-on or project then returns
+    if not ADDONS_AVAILABLE or not project_ids:
+        return
+
+    for config in ADDONS_AVAILABLE:
+        # Get addon's node settings model
+        node_settings_model = get_node_settings_model(config)
+        if not node_settings_model:
+            continue
+
+        # Get project's node settings for each add-on
+        project_node_settings = node_settings_model.objects.filter(owner__id__in=project_ids)
+
+        update_fields = []
+        for setting in project_node_settings:
+            if not hasattr(setting, 'user_settings'):
+                continue
+
+            update_fields.append('user_settings_id')
+            if hasattr(setting.user_settings, 'oauth_grants'):
+                update_fields.append('oauth_grants')
+                # Remove user's external account guid from node's oauth_grants
+                setting.user_settings.oauth_grants[setting.owner._id].pop(setting.external_account._id)
+
+            # Disconnect user settings from node settings
+            setting.user_settings = None
+
+        if update_fields:
+            # Bulk update multiple node settings
+            bulk_update(project_node_settings, update_fields=update_fields, batch_size=BATCH_SIZE)
+
+
+def get_node_settings_model(config):
+    """ Get addon's node settings"""
+    try:
+        settings_model = getattr(config, '{}_settings'.format('node'))
+    except LookupError:
+        return None
+    return settings_model
