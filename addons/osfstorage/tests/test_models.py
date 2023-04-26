@@ -1,13 +1,13 @@
 from __future__ import unicode_literals
 
 import mock
-import unittest
+import unittest  # noqa
 
 import pytest
 import pytz
 from django.utils import timezone
 from nose.tools import *  # noqa
-
+from unittest import mock
 from framework.auth import Auth
 from addons.osfstorage.models import OsfStorageFile, OsfStorageFileNode, OsfStorageFolder
 from osf.models import BaseFileNode
@@ -1026,6 +1026,7 @@ class TestOsfStorageCheckout(StorageTestCase):
         self.file.target.remove_contributors([self.user], save=True)
         self.file.reload()
         assert_equal(self.file.checkout, None)
+
 
 @pytest.mark.django_db
 class TestRegion(StorageTestCase):
