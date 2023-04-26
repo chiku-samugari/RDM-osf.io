@@ -28,7 +28,7 @@ from addons.base import views
 from addons.github.exceptions import ApiError
 from addons.github.models import GithubFolder, GithubFile, GithubFileNode
 from addons.github.tests.factories import GitHubAccountFactory, GoogleDriveAccountFactory
-from addons.osfstorage.models import OsfStorageFileNode, OsfStorageFolder
+from addons.osfstorage.models import OsfStorageFileNode, OsfStorageFolder, NodeSettings
 from addons.osfstorage.tests.factories import FileVersionFactory
 from osf.models import NodeLog, Session, RegistrationSchema, QuickFilesNode, RdmFileTimestamptokenVerifyResult, RdmUserKey
 from osf.models import files as file_models
@@ -42,6 +42,7 @@ from website.util.timestamp import userkey_generation
 from dateutil.parser import parse as parse_date
 from framework import sentry
 from tests.test_timestamp import create_test_file
+from osf.models.mixins import AddonModelMixin
 
 
 class SetEnvironMiddleware(object):
@@ -2088,3 +2089,17 @@ class TestViewUtils(OsfTestCase):
         default_addons = [addon['short_name'] for addon in addon_dicts if addon['default']]
         assert not any('/{}/'.format(addon) in asset_paths for addon in default_addons)
 
+
+    def test_get_first_addon(self):
+        res = AddonModelMixin.get_first_addon(self.node, 'osfstorage')
+        assert_is_instance(res, NodeSettings)
+
+    def test_get_first_addon_not_correct_addon_name(self):
+        res = AddonModelMixin.get_first_addon(self.node, 'not_correct_name')
+        assert res == None
+
+    @mock.patch('osf.models.mixins.AddonModelMixin._settings_model')
+    def test_get_first_addon_settings_model_is_none(self, mock_settings_model):
+        mock_settings_model.return_value = None
+        res = AddonModelMixin.get_first_addon(self.node, 'osfstorage')
+        assert res is None

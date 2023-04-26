@@ -563,23 +563,25 @@ class AddonModelMixin(models.Model):
         return None
 
     def get_first_addon(self, addon_name, *args, **kwargs):
-        """Get first add-on of the node.
-
-        :param str addon_name: Name of add-on
-        :return bool: Add-on was found
-
+        """
+        This method searches in the list of owned addons
+        and returns the first addon by addon name.
         """
         try:
             settings_model = self._settings_model(addon_name)
         except LookupError:
             return None
+
         if not settings_model:
             return None
+
         try:
             is_deleted = kwargs['is_deleted']
         except KeyError:
             is_deleted = False
-        return settings_model.objects.filter(owner=self, is_deleted=is_deleted).first()
+
+        return settings_model.objects.filter(owner=self,
+                                             is_deleted=is_deleted).order_by('id').first()
 
     def add_addon(self, addon_name, auth=None, override=False, _force=False, region_id=None):
         """Add an add-on to the node.
@@ -612,6 +614,8 @@ class AddonModelMixin(models.Model):
         model = self._settings_model(addon_name, config=config)
         ret = model(owner=self)
         ret.on_add()
+        if region_id:
+            ret.region_id = region_id
         ret.save(clean=False)  # TODO This doesn't feel right
         return ret
 
