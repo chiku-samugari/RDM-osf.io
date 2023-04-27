@@ -26,6 +26,7 @@ from osf import models
 from addons.osfstorage import utils
 from addons.osfstorage import settings
 from website.files.exceptions import FileNodeCheckedOutError, FileNodeIsPrimaryFile
+from addons.osfstorage.tests.factories import OsfStorageNodeSettingsFactory
 
 
 @pytest.mark.django_db
@@ -1026,6 +1027,25 @@ class TestOsfStorageCheckout(StorageTestCase):
         self.file.target.remove_contributors([self.user], save=True)
         self.file.reload()
         assert_equal(self.file.checkout, None)
+
+    def test_create_waterbutler_log(self):
+        user = factories.AuthUserFactory()
+        auth = Auth(user)
+        action = 'download'
+        metadata = {
+            'materialized': '/test_path.txt',
+            'kind': 'file',
+            'path': 'fake_path',
+        }
+        node = ProjectFactory(creator=user)
+        osf_storage_node_setting = OsfStorageNodeSettingsFactory()
+        osf_storage_node_setting.owner = node
+        nlog = node.logs.count()
+        osf_storage_node_setting.create_waterbutler_log(auth, action, metadata)
+        osf_storage_node_setting.reload()
+        assert_equal(node.logs.count(), nlog + 1)
+        assert_equal(node.logs.latest().params['path'], metadata['materialized'])
+
 
 
 @pytest.mark.django_db

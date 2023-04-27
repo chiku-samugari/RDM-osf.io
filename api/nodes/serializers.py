@@ -99,7 +99,7 @@ class RegionRelationshipField(RelationshipField):
 
     def to_internal_value(self, data):
         try:
-            region_id = Region.objects.filter(_id=data).values_list('id', flat=True).get()
+            region_id = Region.objects.filter(id=data).values_list('id', flat=True).get()
         except Region.DoesNotExist:
             raise exceptions.ValidationError(detail='Region {} is invalid.'.format(data))
         return {'region_id': region_id}
@@ -754,11 +754,11 @@ class NodeSerializer(TaxonomizableSerializerMixin, JSONAPISerializer):
     def get_region_id(self, obj):
         try:
             # use the annotated value if possible
-            region_id = obj.region
+            region_id = obj.region.id
         except AttributeError:
             # use computed property if region annotation does not exist
             # i.e. after creating a node
-            region_id = obj.osfstorage_region._id
+            region_id = obj.osfstorage_region.id
         return region_id
 
     def get_wiki_enabled(self, obj):
