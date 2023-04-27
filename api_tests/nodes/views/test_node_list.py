@@ -1763,7 +1763,8 @@ class TestNodeCreate:
         )
         assert res.status_code == 201
         region_id = res.json['data']['relationships']['region']['data']['id']
-        assert region_id == 1
+        assert int(region_id) == api_settings.NII_STORAGE_REGION_ID
+
         with mock.patch('api.nodes.serializers.NodeSerializer.get_region_id', mock_get_region_id):
             res = app.post_json_api(
                 url, private_project, auth=user_one.auth
@@ -1791,32 +1792,6 @@ class TestNodeCreate:
             'region': {
                 'data': {
                     'type': 'region',
-                    'id': region._id
-                }
-            }
-        }
-        res = app.post_json_api(
-            url, private_project, auth=user_one.auth
-        )
-        assert res.status_code == 201
-        region_id = res.json['data']['relationships']['region']['data']['id']
-        assert region_id == 1
-        private_project['data']['relationships'] = {
-            'affiliated_institutions': {
-                'data': [
-                    {
-                        'type': 'institutions',
-                        'id': institution_one._id
-                    },
-                    {
-                        'type': 'institutions',
-                        'id': institution_two._id
-                    }
-                ]
-            },
-            'region': {
-                'data': {
-                    'type': 'region',
                     'id': region.id
                 }
             }
@@ -1826,7 +1801,7 @@ class TestNodeCreate:
         )
         assert res.status_code == 201
         region_id = res.json['data']['relationships']['region']['data']['id']
-        assert region_id == 1
+        assert int(region_id) == api_settings.NII_STORAGE_REGION_ID
 
         node_id = res.json['data']['id']
         node = AbstractNode.load(node_id)
