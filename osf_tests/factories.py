@@ -1101,7 +1101,7 @@ class BrandFactory(DjangoModelFactory):
     class Meta:
         model = models.Brand
 
-    name = factory.Faker('company')
+    name = factory.LazyAttribute(lambda n: fake.sentence()[:10])
     hero_logo_image = factory.Faker('url')
     topnav_logo_image = factory.Faker('url')
     hero_background_image = factory.Faker('url')
@@ -1114,3 +1114,11 @@ class RegionExtraFactory:
     def __init__(self, institution_id, name):
         self.institution_id = institution_id
         self.name = name
+
+
+class UserQuotaFactory(DjangoModelFactory):
+    class Meta:
+        model = models.UserQuota
+
+    max_quota = 1000000
+    used = 10

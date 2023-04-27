@@ -477,6 +477,8 @@ class Region(models.Model):
     waterbutler_url = models.URLField(default=website_settings.WATERBUTLER_URL)
     mfr_url = models.URLField(default=website_settings.MFR_SERVER_URL)
     waterbutler_settings = DateTimeAwareJSONField(default=dict)
+    is_allowed = models.BooleanField(default=True)
+    is_readonly = models.BooleanField(default=False)
 
     def __unicode__(self):
         return '{}'.format(self.name)
@@ -537,7 +539,7 @@ class UserSettings(BaseUserSettings):
 
     def set_region(self, region_id):
         try:
-            region = Region.objects.get(_id=region_id)
+            region = Region.objects.get(id=region_id)
         except Region.DoesNotExist:
             raise ValueError('Region cannot be found.')
 
@@ -555,6 +557,8 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
 
     region = models.ForeignKey(Region, null=True, on_delete=models.CASCADE)
     user_settings = models.ForeignKey(UserSettings, null=True, blank=True, on_delete=models.CASCADE)
+    owner = models.ForeignKey(AbstractNode, related_name='%(app_label)s_node_settings',
+                              null=True, blank=True, on_delete=models.CASCADE)
 
     @property
     def folder_name(self):
@@ -628,7 +632,7 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
         params = {
             'node': self.owner._id,
             'project': self.owner.parent_id,
-
+            'region': self.region.id,
             'path': metadata['materialized'],
         }
 
