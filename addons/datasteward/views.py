@@ -232,12 +232,15 @@ def disable_datasteward_addon(auth):
 
     # query admin contributors
     contributors = Contributor.objects.filter(node__in=projects, is_data_steward=True, user__is_active=True, user__groups__in=groups).distinct()
-    local_contributors = list(contributors)
+    all_project_contributors = []
+    user_project_id_list = []
+    for c in contributors:
+        all_project_contributors.append(c)
+        if c.node.id not in user_project_id_list and c.user.id == user.id:
+            user_project_id_list.append(c.node.id)
 
-    # filter out project does not have user as contributor.
-    project_id_list = contributors.filter(user=user).values_list('node__id', flat=True).distinct()
-    if len(project_id_list) != projects.count():
-        projects = projects.filter(id__in=project_id_list)
+    if len(user_project_id_list) != projects.count():
+        projects = projects.filter(id__in=user_project_id_list)
 
     update_permission_list = []
     bulk_update_contributors = []
@@ -247,14 +250,11 @@ def disable_datasteward_addon(auth):
     start_prepare = timer()
     logger.info(f'disable_datasteward_addon before prepare runtime: {start_prepare - start}(s)')
     for project in projects:
-        admin_contributors = [contributor for contributor in local_contributors if contributor.node.id == project.id]
-        contributor = next((contributor for contributor in admin_contributors if contributor.user.id == user.id), None)
-        if contributor is None:
-            continue
+        all_project_contributors, project_contributors, contributor = get_project_contributors(all_project_contributors, user, project)
 
         # can not be None
         if contributor.data_steward_old_permission is not None:
-            if len(admin_contributors) <= 1:
+            if len(project_contributors) <= 1:
                 # has only one admin
                 if ADMIN != contributor.data_steward_old_permission:
                     # if update to other permission than ADMIN then skip.
@@ -268,7 +268,7 @@ def disable_datasteward_addon(auth):
                 contributor.data_steward_old_permission = None
                 bulk_update_contributors.append(contributor)
         else:
-            not_current_user_admins = [contributor for contributor in admin_contributors if contributor.user.id != user.id and contributor.visible is True]
+            not_current_user_admins = [contributor for contributor in project_contributors if contributor.user.id != user.id and contributor.visible is True]
             if not not_current_user_admins:
                 # If user is the only visible contributor then skip
                 logger.warning('Cannot remove user from project {}'.format(project._id))
@@ -285,6 +285,10 @@ def disable_datasteward_addon(auth):
     logger.info(f'disable_datasteward_addon prepare runtime: {start_update - start_prepare}(s)')
     # update contributor permission
     if update_permission_list:
+        logger.info(f'begin update permission len={len(update_permission_list)}')
+        # update to DB
+        bulk_update(bulk_update_contributors, update_fields=['is_data_steward', 'data_steward_old_permission'], batch_size=BATCH_SIZE)
+
         # set permission and send signal
         loop = asyncio.new_event_loop()
         coroutines = [loop.create_task(update_contributor_permission(project=project, auth=auth, permission=contributor_old_permission)) for
@@ -292,13 +296,11 @@ def disable_datasteward_addon(auth):
         loop.run_until_complete(asyncio.wait(coroutines))
         loop.close()
 
-        # update to DB
-        bulk_update(bulk_update_contributors, update_fields=['is_data_steward', 'data_steward_old_permission'], batch_size=BATCH_SIZE)
-
     start_remove = timer()
     logger.info(f'disable_datasteward_addon update contributors runtime: {start_remove - start_update}(s)')
     # remove contributor
     if remove_permission_projects:
+        logger.info(f'begin remove permission len={len(remove_permission_projects)}')
         if update_user:
             # save after delete unclaimed_records
             user.save()
@@ -312,14 +314,17 @@ def disable_datasteward_addon(auth):
         add_project_logs(remove_permission_projects, user, NodeLog.CONTRIB_REMOVED)
 
         start_disconnect = timer()
+        logger.info(f'-- delete contributor + permissions + add logs runtime: {start_disconnect - start_remove}(s)')
         disconnect_addons_multiple_projects(remove_permission_projects, user)
         end_disconnect = timer()
-        logger.info(f'disconnect_addons_multiple_projects runtime: {end_disconnect - start_disconnect}(s)')
+        logger.info(f'-- disconnect_addons_multiple_projects runtime: {end_disconnect - start_disconnect}(s)')
 
         loop = asyncio.new_event_loop()
         coroutines = [loop.create_task(after_remove_contributor_permission(project=project, auth=auth)) for project in remove_permission_projects]
         loop.run_until_complete(asyncio.wait(coroutines))
         loop.close()
+        end_after_remove = timer()
+        logger.info(f'-- after_remove_contributor_permission runtime: {end_after_remove - end_disconnect}(s)')
 
     end = timer()
     logger.info(f'disable_datasteward_addon remove contributors runtime: {end - start_remove}(s)')
@@ -327,15 +332,27 @@ def disable_datasteward_addon(auth):
     return skipped_projects
 
 
+def get_project_contributors(contributors, user, project):
+    new_list = []
+    project_contributors = []
+    user_contributor = None
+    for contributor in contributors:
+        if contributor.node.id == project.id:
+            project_contributors.append(contributor)
+
+            if contributor.user.id == user.id:
+                user_contributor = contributor
+        else:
+            new_list.append(contributor)
+
+    return new_list, project_contributors, user_contributor
+
+
 def clear_permissions(projects, user):
     """ Clear permission of multiple projects for user """
-    group_names = projects[0].groups.keys()
-    project_group_names = [project.get_group(name) for name in group_names for project in projects]
-    groups = user.groups.filter(name__in=project_group_names).distinct()
-
-    if groups.exists():
-        OSFUserGroup = apps.get_model('osf', 'osfuser_groups')
-        OSFUserGroup.objects.filter(osfuser_id=user.id, group_id__in=[g.id for g in groups]).delete()
+    project_group_names = [name for project in projects for name in project.group_names]
+    OSFUserGroup = apps.get_model('osf', 'osfuser_groups')
+    OSFUserGroup.objects.filter(osfuser_id=user.id, group__name__in=project_group_names).delete()
 
 
 def add_project_logs(projects, user, action):
