@@ -6,20 +6,24 @@ from itertools import islice
 from bulk_update.helper import bulk_update
 # -*- coding: utf-8 -*-
 from django.apps import apps
-from django.contrib.auth.models import Group
 from django.db import transaction
 from django.db.models import Max
 from django.db.models.functions import Coalesce
 from flask import request
 from rest_framework import status as http_status
 
+from addons.base.institutions_utils import sync_contributors
+from addons.osfstorage.listeners import checkin_files_task
 from framework.auth.decorators import must_be_logged_in
+from framework.celery_tasks import app
+from framework.postcommit_tasks.handlers import enqueue_postcommit_task
 from osf.exceptions import UserStateError, ValidationValueError
-from osf.models import Contributor
+from osf.models import Contributor, OSFUser
 from osf.models.node import AbstractNode
 from osf.models.nodelog import NodeLog
 from osf.utils.permissions import ADMIN, READ
 from website import language
+from website.notifications.utils import remove_contributor_from_subscriptions
 from website.project import signals as project_signals
 from timeit import default_timer as timer
 
@@ -226,19 +230,24 @@ def disable_datasteward_addon(auth):
     skipped_projects = []
 
     projects = AbstractNode.objects.filter(type=OSF_NODE, affiliated_institutions__in=affiliated_institutions, is_deleted=False)
-
-    # query admin group
-    groups = Group.objects.filter(name__in=[project.format_group(ADMIN) for project in projects])
+    logger.info(f'institution projects total: {len(projects)}')
 
     # query admin contributors
-    contributors = Contributor.objects.filter(node__in=projects, is_data_steward=True, user__is_active=True, user__groups__in=groups).distinct()
+    start_contributor_query = timer()
+    contributors = Contributor.objects.filter(node__in=projects, is_data_steward=True, user__is_active=True, user__groups__name__in=[project.format_group(ADMIN) for project in projects]).distinct()
+    end_contributor_query = timer()
+    logger.info(f'-- Contributor query runtime: {end_contributor_query - start_contributor_query}(s)')
     all_project_contributors = []
     user_project_id_list = []
+    start_iterator = timer()
     for c in contributors:
         all_project_contributors.append(c)
         if c.node.id not in user_project_id_list and c.user.id == user.id:
             user_project_id_list.append(c.node.id)
+    end_iterator = timer()
+    logger.info(f'-- Contributor iterator runtime: {end_iterator - start_iterator}(s)')
 
+    # filter out project does not have user as contributor.
     if len(user_project_id_list) != projects.count():
         projects = projects.filter(id__in=user_project_id_list)
 
@@ -249,6 +258,8 @@ def disable_datasteward_addon(auth):
     update_user = False
     start_prepare = timer()
     logger.info(f'disable_datasteward_addon before prepare runtime: {start_prepare - start}(s)')
+    logger.info(f'all_project_contributors total: {len(all_project_contributors)}')
+    logger.info(f'user contributing projects total: {len(projects)}')
     for project in projects:
         all_project_contributors, project_contributors, contributor = get_project_contributors(all_project_contributors, user, project)
 
@@ -379,8 +390,8 @@ def add_project_logs(projects, user, action):
 
 async def after_remove_contributor_permission(project, auth):
     # send signal to remove this user from project subscriptions
-    project_signals.contributor_removed.send(project, user=auth.user)
-    project_signals.contributors_updated.send(project)
+    enqueue_postcommit_task(checkin_files_task, (project._id, auth.user._id,), {}, celery=True)
+    enqueue_postcommit_task(task_sync_contributors, (project.id, auth.user.id), {}, celery=True)
 
     # enqueue on_node_updated/on_preprint_updated to update DOI metadata when a contributor is removed
     if getattr(project, 'get_identifier_value', None) and project.get_identifier_value('doi'):
@@ -431,3 +442,14 @@ def get_node_settings_model(config):
     except LookupError:
         return None
     return settings_model
+
+
+@app.task(max_retries=5, default_retry_delay=60)
+def task_sync_contributors(node_id, user_id):
+    node = AbstractNode.objects.get(pk=node_id)
+    user = OSFUser.objects.get(pk=user_id)
+
+    # website/notifications/utils.py
+    remove_contributor_from_subscriptions(node, user)
+    # addons/base/institutions_utils.py
+    sync_contributors(node)
