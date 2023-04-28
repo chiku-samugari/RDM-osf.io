@@ -27,7 +27,9 @@
                             <div>${_('・Each data steward must enable this add-on by themselves.')}</div>
                             <div class="datasteward-indent">${_('・The number of project administrators participating in the project will increase by the number of different data stewards.')}</div>
                             <br>
-                            <div>${_('・If the number of target projects is large, it will take time to process (up to about 30 seconds), so please do not move to another screen or close the screen, and wait until the process is completed.')}</div>
+                            <div>${_('・If the number of target projects is large, it will take time to process (up to a few minutes), so please do not move to another screen or close the screen, and wait until the process is completed.')}</div>
+                            <br>
+                            <div>${_('・Also, even after this add-on is activated, settings for project notifications will continue asynchronously, so notifications may not be received for several minutes.')}</div>
                             <br>
                             <div>${_('Do you want to enable DataSteward add-on?')}</div>
                         </div>
@@ -83,7 +85,9 @@
                             <br>
                             <div>${_('・If you want to revert project registration for all data stewards, each data steward must disable this add-on.')}</div>
                             <br>
-                            <div>${_('・If the number of affected projects is large, it will take time to process (up to about 30 seconds), so please do not move to another screen or close the screen, and wait until the process is completed.')}</div>
+                            <div>${_('・If the number of affected projects is large, it will take time to process (up to a few minutes), so please do not move to another screen or close the screen, and wait until the process is completed.')}</div>
+                            <br>
+                            <div>${_('・Also, even after disabling this add-on is completed, cancellation of project notifications will continue asynchronously, so notifications may continue for several minutes.')}</div>
                             <br>
                             <div>${_('Do you want to disable DataSteward add-on?')}</div>
                         </div>

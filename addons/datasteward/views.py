@@ -7,7 +7,7 @@ from bulk_update.helper import bulk_update
 # -*- coding: utf-8 -*-
 from django.apps import apps
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.db.models.functions import Coalesce
 from flask import request
 from rest_framework import status as http_status
@@ -191,9 +191,9 @@ def disable_datasteward_addon(auth):
     # Query projects
     projects = AbstractNode.objects.filter(type=OSF_NODE, affiliated_institutions__in=affiliated_institutions, is_deleted=False)
 
-    # Query contributors
-    contributors = Contributor.objects.filter(node__in=projects).distinct()
-
+    # Query admin contributors
+    contributors = Contributor.objects.filter(node__in=projects, user__is_active=True).\
+        filter(Q(is_data_steward=True) | Q(user__groups__name__in=[project.format_group(ADMIN) for project in projects])).distinct()
     all_project_contributors = []
     user_project_id_list = []
     for contributor in contributors:
@@ -211,16 +211,14 @@ def disable_datasteward_addon(auth):
     remove_permission_projects = []
     update_user = False
     for project in projects:
-        contributor = get_project_contributors(all_project_contributors, user, project)
+        all_project_contributors, project_admin_contributors, contributor = get_project_contributors(all_project_contributors, user, project)
 
         if not contributor or not contributor.is_data_steward:
             continue
 
         if contributor.data_steward_old_permission is not None:
             # Contributor has old permission before enabling DataSteward add-on
-            # Get current admin contributors
-            project_contributors = contributors.filter(user__is_active=True, user__groups__name=project.format_group(ADMIN), node=project).distinct()
-            if project_contributors.count() <= 1:
+            if len(project_admin_contributors) <= 1:
                 # has only one admin
                 if ADMIN != contributor.data_steward_old_permission:
                     # if update to other permission than ADMIN then skip.
@@ -228,6 +226,10 @@ def disable_datasteward_addon(auth):
                     error_msg = '{} is the only admin.'.format(user.fullname)
                     logger.warning('Project {}: error raised while disabling DataSteward add-on with message "{}"'.format(project._id, error_msg))
                     skipped_projects.append(project)
+                else:
+                    contributor.is_data_steward = False
+                    contributor.data_steward_old_permission = None
+                    bulk_update_contributors.append(contributor)
             else:
                 update_permission_list.append((project, contributor.data_steward_old_permission))
                 contributor.is_data_steward = False
@@ -236,9 +238,8 @@ def disable_datasteward_addon(auth):
         else:
             # Contributor does not have old permission before enabling DataSteward add-on
             # Get project's admin contributors that is not current user
-            not_current_user_admins = contributors.exclude(user=user).filter(user__is_active=True, user__groups__name=project.format_group(ADMIN), visible=True,
-                                                                             node=project).distinct()
-            if not not_current_user_admins.exists():
+            not_current_user_admins = [contributor for contributor in project_admin_contributors if contributor.user.id != user.id and contributor.visible is True]
+            if not not_current_user_admins:
                 # If user is the only visible contributor then skip
                 logger.warning('Cannot remove user from project {}'.format(project._id))
                 skipped_projects.append(project)
@@ -250,11 +251,12 @@ def disable_datasteward_addon(auth):
                 bulk_delete_contributor_id_list.append(contributor.id)
                 remove_permission_projects.append(project)
 
-    # update contributor permission
-    if update_permission_list:
+    if bulk_update_contributors:
         # update to DB
         bulk_update(bulk_update_contributors, update_fields=['is_data_steward', 'data_steward_old_permission'], batch_size=BATCH_SIZE)
 
+    # update contributor permission
+    if update_permission_list:
         # set permission and send signal
         loop = asyncio.new_event_loop()
         coroutines = [loop.create_task(update_contributor_permission(project=project, auth=auth, permission=contributor_old_permission)) for
@@ -291,12 +293,20 @@ def disable_datasteward_addon(auth):
 
 def get_project_contributors(contributors, user, project):
     """ Get project and contributor instances from user"""
+    new_list = []
+    project_admin_contributors = []
     user_contributor = None
     for contributor in contributors:
-        if contributor.node.id == project.id and contributor.user.id == user.id:
-            user_contributor = contributor
+        if contributor.node.id == project.id:
+            if contributor.permission == ADMIN:
+                project_admin_contributors.append(contributor)
 
-    return user_contributor
+            if contributor.user.id == user.id:
+                user_contributor = contributor
+        else:
+            new_list.append(contributor)
+
+    return new_list, project_admin_contributors, user_contributor
 
 
 def get_node_settings_model(config):

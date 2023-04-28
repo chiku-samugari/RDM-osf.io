@@ -453,7 +453,11 @@ msgid "・The number of project administrators participating in the project will
 msgstr ""
 
 #: addons/datasteward/templates/datasteward_modal.mako:30
-msgid "・If the number of target projects is large, it will take time to process (up to about 30 seconds), so please do not move to another screen or close the screen, and wait until the process is completed."
+msgid "・If the number of target projects is large, it will take time to process (up to a few minutes), so please do not move to another screen or close the screen, and wait until the process is completed."
+msgstr ""
+
+#: addons/datasteward/templates/datasteward_modal.mako:31
+msgid "・Also, even after this add-on is activated, settings for project notifications will continue asynchronously, so notifications may not be received for several minutes."
 msgstr ""
 
 #: addons/datasteward/templates/datasteward_modal.mako:32
@@ -505,7 +509,11 @@ msgid "・If you want to revert project registration for all data stewards, each
 msgstr ""
 
 #: addons/datasteward/templates/datasteward_modal.mako:86
-msgid "・If the number of affected projects is large, it will take time to process (up to about 30 seconds), so please do not move to another screen or close the screen, and wait until the process is completed."
+msgid "・If the number of affected projects is large, it will take time to process (up to a few minutes), so please do not move to another screen or close the screen, and wait until the process is completed."
+msgstr ""
+
+#: addons/datasteward/templates/datasteward_modal.mako:87
+msgid "・Also, even after disabling this add-on is completed, cancellation of project notifications will continue asynchronously, so notifications may continue for several minutes."
 msgstr ""
 
 #: addons/datasteward/templates/datasteward_modal.mako:88

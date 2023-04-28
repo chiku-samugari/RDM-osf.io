@@ -458,8 +458,12 @@ msgid "・The number of project administrators participating in the project will
 msgstr "・異なる「データ管理責任者」の人数分、プロジェクトに参加するプロジェクト管理者が増えます。"
 
 #: addons/datasteward/templates/datasteward_modal.mako:30
-msgid "・If the number of target projects is large, it will take time to process (up to about 30 seconds), so please do not move to another screen or close the screen, and wait until the process is completed."
-msgstr "・対象プロジェクト数が多い場合、有効化の処理時に時間がかかる（最大30秒程度）ため、別の画面への移動や画面を閉じることをせず、処理が終わるまで待機してください。"
+msgid "・If the number of target projects is large, it will take time to process (up to a few minutes), so please do not move to another screen or close the screen, and wait until the process is completed."
+msgstr "・対象プロジェクト数が多い場合、有効化の処理時に時間がかかる（最大数分程度）ため、別の画面への移動や画面を閉じることをせず、処理が終わるまで待機してください。"
+
+#: addons/datasteward/templates/datasteward_modal.mako:31
+msgid "・Also, even after this add-on is activated, settings for project notifications will continue asynchronously, so notifications may not be received for several minutes."
+msgstr "・また、本アドオンの有効化が完了した後も、プロジェクト通知の設定などは非同期で継続されるため、数分間通知などが届かない可能性があります。"
 
 #: addons/datasteward/templates/datasteward_modal.mako:32
 msgid "Do you want to enable DataSteward add-on?"
@@ -510,8 +514,12 @@ msgid "・If you want to revert project registration for all data stewards, each
 msgstr "・「データ管理責任者」全ての登録を解除したい場合、「データ管理責任者」それぞれが、本アドオンを無効化する必要があります。"
 
 #: addons/datasteward/templates/datasteward_modal.mako:86
-msgid "・If the number of affected projects is large, it will take time to process (up to about 30 seconds), so please do not move to another screen or close the screen, and wait until the process is completed."
-msgstr "・対象プロジェクト数が多い場合、無効化の処理時に時間がかかる（最大30秒程度）ため、別の画面への移動や画面を閉じることをせず、処理が終わるまで待機してください。"
+msgid "・If the number of affected projects is large, it will take time to process (up to a few minutes), so please do not move to another screen or close the screen, and wait until the process is completed."
+msgstr "・対象プロジェクト数が多い場合、無効化の処理時に時間がかかる（最大数分程度）ため、別の画面への移動や画面を閉じることをせず、処理が終わるまで待機してください。"
+
+#: addons/datasteward/templates/datasteward_modal.mako:87
+msgid "・Also, even after disabling this add-on is completed, cancellation of project notifications will continue asynchronously, so notifications may continue for several minutes."
+msgstr "・また、本アドオンの無効化が完了した後も、プロジェクト通知の解除などは非同期で継続されるため、数分間通知などが続く可能性があります。"
 
 #: addons/datasteward/templates/datasteward_modal.mako:88
 msgid "Do you want to disable DataSteward add-on?"
