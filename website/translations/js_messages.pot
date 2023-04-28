@@ -495,6 +495,14 @@ msgstr ""
 msgid "Disallow"
 msgstr ""
 
+#: admin/templates/rdm_custom_storage_location/institutional_storage.html:82
+msgid "Allow"
+msgstr ""
+
+#: admin/templates/rdm_custom_storage_location/institutional_storage.html:83
+msgid "Read only"
+msgstr ""
+
 #: admin/static/js/rdm_addons/rdm-addons-page.js:85
 msgid "Strings did not match"
 msgstr ""

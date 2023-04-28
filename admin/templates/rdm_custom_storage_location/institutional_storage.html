@@ -38,6 +38,9 @@
             display: flex;
             justify-content: right;
         }
+        .right-button-element .btn-default {
+            margin-right: 10px;
+        }
     </style>
     <h2 style="margin-bottom:40px;">{% trans "Institutional Storage " %}<small>({{ institution.name }})</small></h2>
     <div class="row">
@@ -46,14 +49,13 @@
                 {% csrf_token %}
                 <div class="row form-inline storage-name">
                     <div class="form-group">
-                        <label for="storage_name" style="width:80px;">{% trans  "Name: " %}</label>
-                        <input type="text" required class="form-control" id="storage_name" name="storage_name"
-                               oninvalid="this.setCustomValidity('This field is required.') " oninput="setCustomValidity('')">
+                        <label for="storage_name" style="width:80px;">{% trans  "Name" %}:</label>
+                        <input type="text" class="form-control" id="storage_name" name="storage_name" maxlength="200" data-title="{% trans 'This field is required.' %}">
                     </div>
                 </div>
                 <div class="row form-inline storage-name">
                     <div class="form-group">
-                        <label for="providers" style="width:80px;">{% trans "Provider: " %}</label>
+                        <label for="providers" style="width:80px;">{% trans "Provider" %}:</label>
                         <select id="providers" name="options" class="form-control">
                             {% for provider_item in providers %}
                                 <option value="{{ provider_item.short_name }}">{{ provider_item.full_name }}</option>
@@ -61,7 +63,7 @@
                         </select>
                     </div>
                 </div>
-                <button style="width:90px; margin-bottom:30px; margin-top:10px" class="btn btn-success" type="submit">{% trans "Add" %}</button>
+                <button id="add_storage" style="width:90px; margin-bottom:30px; margin-top:10px" class="btn btn-success">{% trans "Add" %}</button>
             </form>
         </div>
     </div>
@@ -88,15 +90,14 @@
                                 <tr>
                                     <td class="storage_input_content">
                                         <div>
-                                            <input {% if provider_item.provider.short_name != 'osfstorage' %}
+                                            <input {% if provider_item.provider.short_name != 'osfstorage' and provider_item.provider.short_name != 'onedrivebusiness' %}
                                                 value="{{ provider_item.region.name }}"
                                             {% else %}
                                                 disabled
                                                 value=""
                                             {% endif %}
                                                 class="form-control storage_input_value" required type="text"
-                                                name="{{ provider_item.provider.short_name }}" id="{{ provider_item.region.id }}"
-                                                oninvalid="this.setCustomValidity('This field is required.') " oninput="setCustomValidity('')">
+                                                name="{{ provider_item.provider.short_name }}" id="{{ provider_item.region.id }}" maxlength="200" data-title="{% trans 'This field is required.' %}">
                                         </div>
                                     </td>
                                     <td>

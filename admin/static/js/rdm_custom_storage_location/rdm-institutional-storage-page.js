@@ -110,10 +110,22 @@ $('.change_readonly').change(function () {
     ajaxRequest(params, providerShortName, 'change_readonly', toggle_button, this);
 });
 
-$('#institutional_storage_form').submit(function (e) {
+$('#storage_name').on('keyup', function(e){
+    var value = e.target.value;
+    if (value.trim()) {
+        e.target.setCustomValidity('');
+    } else {
+        e.target.setCustomValidity(e.target.dataset.title);
+    }
+    e.target.reportValidity();
+});
+
+$('#add_storage').click(function (e) {
     NEW_NAME_CURRENT = null;
     NAME_CURRENT = null;
-    if ($('#institutional_storage_form')[0].checkValidity()) {
+    var storageNameElement = document.getElementById('storage_name');
+    var value = storageNameElement.value.trim();
+    if (value || (!value && storageNameElement.disabled)) {
         var provider = selectedProvider();
 
         preload(provider, null);
@@ -137,37 +149,56 @@ $('#institutional_storage_form').submit(function (e) {
             });
         }
         e.preventDefault();
+    } else {
+        storageNameElement.setCustomValidity(storageNameElement.dataset.title);
+        storageNameElement.reportValidity();
     }
+});
+
+$('.storage_input_value').on('keyup', function(e){
+    var value = e.target.value;
+    if (value.trim()) {
+        e.target.setCustomValidity('');
+    } else {
+        e.target.setCustomValidity(e.target.dataset.title);
+    }
+    e.target.reportValidity();
 });
 
 $('.save_button').click(function (e) {
     var id = $(this).attr('id');
     var element = $(`input[type=text][id=${id}]`);
+    var storageNameElement = document.getElementById(id);
     var provider = element.attr('name');
     NEW_NAME_CURRENT = element.val().trim();
     NAME_CURRENT = element.attr('value').trim();
-    if ($('#institutional_storage_form_update_' + id)[0].checkValidity()) {
-        preload(provider, null);
-        var showModal = function () {
-            $('#' + provider + '_modal').modal('show');
-            $('body').css('overflow', 'hidden');
-            $('.modal').css('overflow', 'auto');
-            validateRequiredFields(provider);
-        };
-        if (provider === 'osfstorage') {
-            showModal();
-        } else {
-            $osf.confirmDangerousAction({
-                title: _('Are you sure you want to change institutional storage?'),
-                callback: showModal,
-                buttons: {
-                    success: {
-                        label: _('Change')
+    if (NEW_NAME_CURRENT || !NEW_NAME_CURRENT && storageNameElement.disabled) {
+        if ($('#institutional_storage_form_update_' + id)[0].checkValidity()) {
+            preload(provider, null);
+            var showModal = function () {
+                $('#' + provider + '_modal').modal('show');
+                $('body').css('overflow', 'hidden');
+                $('.modal').css('overflow', 'auto');
+                validateRequiredFields(provider);
+            };
+            if (provider === 'osfstorage') {
+                showModal();
+            } else {
+                $osf.confirmDangerousAction({
+                    title: _('Are you sure you want to change institutional storage?'),
+                    callback: showModal,
+                    buttons: {
+                        success: {
+                            label: _('Change')
+                        }
                     }
-                }
-            });
+                });
+            }
+            e.preventDefault();
         }
-        e.preventDefault();
+    } else {
+        storageNameElement.setCustomValidity(storageNameElement.dataset.title);
+        storageNameElement.reportValidity();
     }
 });
 

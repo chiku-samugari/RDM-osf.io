@@ -27,10 +27,12 @@ from osf_tests.factories import (
     DraftNodeFactory,
 )
 from addons.osfstorage.settings import DEFAULT_REGION_ID
+from api.base import settings as api_settings
 from rest_framework import exceptions
 from tests.utils import assert_equals
 from website.views import find_bookmark_collection
 from osf.utils.workflows import DefaultStates
+from unittest import mock
 
 
 @pytest.fixture()
@@ -185,7 +187,7 @@ class TestNodeList:
         # For asserting region properly returned when queryset is annotated with region property
         res = app.get(url)
         assert res.status_code == 200
-        assert res.json['data'][0]['relationships']['region']['data']['id'] == public_project.osfstorage_region._id
+        assert res.json['data'][0]['relationships']['region']['data']['id'] == str(public_project.osfstorage_region.id)
 
     def test_preprint_attribute(self, app, url, public_project, preprint, user):
         # For asserting region properly returned when queryset is annotated with has_viewable_preprints property
@@ -1755,11 +1757,13 @@ class TestNodeCreate:
 
     def test_create_project_with_region_relationship(
             self, app, user_one, region, institution_one, private_project, url):
+        mock_get_region_id = mock.MagicMock()
+        mock_get_region_id.return_value = region.id
         private_project['data']['relationships'] = {
             'region': {
                 'data': {
                     'type': 'region',
-                    'id': region._id
+                    'id': region.id
                 }
             }
         }
@@ -1769,9 +1773,6 @@ class TestNodeCreate:
         assert res.status_code == 201
         region_id = res.json['data']['relationships']['region']['data']['id']
         assert int(region_id) == api_settings.NII_STORAGE_REGION_ID
-
-        institution_two = InstitutionFactory()
-        user_one.affiliated_institutions.add(institution_two)
 
         private_project['data']['relationships'] = {
             'affiliated_institutions': {
@@ -1789,7 +1790,7 @@ class TestNodeCreate:
             'region': {
                 'data': {
                     'type': 'region',
-                    'id': region._id
+                    'id': region.id
                 }
             }
         }

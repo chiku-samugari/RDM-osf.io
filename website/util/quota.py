@@ -13,6 +13,7 @@ from osf.models import (
     ProjectStorageType
 )
 from django.utils import timezone
+from osf.models.user_storage_quota import UserStorageQuota
 
 from osf.models.user_storage_quota import UserStorageQuota
 from rest_framework import status as http_status
@@ -90,14 +91,25 @@ def get_quota_info(user, storage_type=UserQuota.NII_STORAGE):
     except UserQuota.DoesNotExist:
         return (api_settings.DEFAULT_MAX_QUOTA, used_quota(user._id, storage_type))
 
+
 def get_storage_quota_info(institution, user, region):
-    # Get the per-user-per-storage info of institution
+    """ Get the per-user-per-storage info of institution
+
+    :param Object institution: Institution of user
+    :param Object user: User is using the storage
+    :param Object region: Institution storage
+    :return tuple: Tuple of storage's quota and used quota
+
+    """
     try:
         user_storage_quota = user.userstoragequota_set.get(region=region)
         return user_storage_quota.max_quota, user_storage_quota.used
     except UserStorageQuota.DoesNotExist:
-        # If used quota not found, recalculate per-user-per-storage used
-        return api_settings.DEFAULT_MAX_QUOTA, user_per_storage_used_quota(institution, user, region)
+        return (
+            api_settings.DEFAULT_MAX_QUOTA,
+            user_per_storage_used_quota(institution, user, region)
+        )
+
 
 def get_project_storage_type(node):
     try:
