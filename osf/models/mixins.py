@@ -1586,7 +1586,7 @@ class ContributorMixin(models.Model):
                 contributor.save()
 
     # TODO: optimize me
-    def update_contributor(self, user, permission, visible, auth, save=False, check_admin_permission=True):
+    def update_contributor(self, user, permission, visible, auth, save=False):
         """ TODO: this method should be updated as a replacement for the main loop of
         Node#manage_contributors. Right now there are redundancies, but to avoid major
         feature creep this will not be included as this time.
@@ -1595,7 +1595,7 @@ class ContributorMixin(models.Model):
         """
         OSFUser = apps.get_model('osf.OSFUser')
 
-        if check_admin_permission and not self.has_permission(auth.user, ADMIN):
+        if not self.has_permission(auth.user, ADMIN):
             raise PermissionsError('Only admins can modify contributor permissions')
 
         if permission:

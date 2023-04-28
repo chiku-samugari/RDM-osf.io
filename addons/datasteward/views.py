@@ -12,8 +12,8 @@ from django.db.models.functions import Coalesce
 from flask import request
 from rest_framework import status as http_status
 
-from addons.base.institutions_utils import sync_contributors
 from addons.osfstorage.listeners import checkin_files_task
+from framework.auth import Auth
 from framework.auth.decorators import must_be_logged_in
 from framework.celery_tasks import app
 from framework.postcommit_tasks.handlers import enqueue_postcommit_task
@@ -25,7 +25,6 @@ from osf.utils.permissions import ADMIN, READ
 from website import language
 from website.notifications.utils import remove_contributor_from_subscriptions
 from website.project import signals as project_signals
-from timeit import default_timer as timer
 
 logger = logging.getLogger(__name__)
 
@@ -101,13 +100,11 @@ def datasteward_user_config_post(auth, **kwargs):
 def enable_datasteward_addon(auth, is_authenticating=False, **kwargs):
     """Start enable DataSteward add-on process"""
     # Check if user has any affiliated institutions
-    start = timer()
     affiliated_institutions = auth.user.affiliated_institutions.all()
     if not affiliated_institutions:
         return False
     try:
         user = auth.user.merged_by if auth.user.is_merged else auth.user
-
         projects = AbstractNode.objects.filter(type=OSF_NODE, affiliated_institutions__in=affiliated_institutions, is_deleted=False)
         contributors = Contributor.objects.filter(node__in=projects)
 
@@ -117,7 +114,7 @@ def enable_datasteward_addon(auth, is_authenticating=False, **kwargs):
         for project in projects:
             related_contributors = contributors.filter(node=project)
             if related_contributors.filter(user=user).exists():
-                contributor = related_contributors.first()
+                contributor = related_contributors.filter(user=user).first()
 
                 # check if need to save old permission
                 if not contributor.is_data_steward:
@@ -140,7 +137,6 @@ def enable_datasteward_addon(auth, is_authenticating=False, **kwargs):
 
         # add contributor
         if add_contributor_list:
-            logger.info(f'begin add permission len={len(add_contributor_list)}')
             if user.is_disabled:
                 raise ValidationValueError('Deactivated users cannot be added as contributors.')
 
@@ -163,12 +159,10 @@ def enable_datasteward_addon(auth, is_authenticating=False, **kwargs):
 
         # save contributor's old permission
         if update_contributor_list:
-            logger.info(f'begin update contributor list len={len(update_contributor_list)}')
             bulk_update(update_contributor_list, batch_size=BATCH_SIZE)
 
         # update contributor permission
         if update_permission_project_list:
-            logger.info(f'begin update permission len={len(update_permission_project_list)}')
             # set permission and send signal
             loop = asyncio.new_event_loop()
             coroutines = [loop.create_task(update_contributor_permission(project=project, auth=auth)) for project in update_permission_project_list]
@@ -180,60 +174,12 @@ def enable_datasteward_addon(auth, is_authenticating=False, **kwargs):
         logger.error('Project {}: error raised while enabling DataSteward add-on with message "{}"'.format(project._id, e))
         if not is_authenticating:
             raise e
-    end = timer()
-    logger.info(f'enable_datasteward_addon overall runtime: {end - start}(s)')
     return True
-
-
-def bulk_create_contributors(contributors, batch_size=BATCH_SIZE):
-    """ Bulk create multiple contributors for projects """
-    it = iter(contributors)
-    while True:
-        batch = list(islice(it, batch_size))
-        if not batch:
-            break
-        Contributor.objects.bulk_create(batch, batch_size)
-
-
-async def add_contributor_permission(project, auth):
-    """ Add user to project as administrator """
-    project.add_permission(auth.user, ADMIN, save=False)
-    project_signals.contributors_updated.send(project)
-    if project._id and auth.user:
-        project_signals.contributor_added.send(project,
-                                               contributor=auth.user,
-                                               auth=auth, email_template='false', permissions=[ADMIN])
-
-    # enqueue on_node_updated/on_preprint_updated to update DOI metadata when a contributor is added
-    if getattr(project, 'get_identifier_value', None) and project.get_identifier_value('doi'):
-        project.update_or_enqueue_on_resource_updated(auth.user._id, first_save=False, saved_fields=['contributors'])
-
-
-async def update_contributor_permission(project, auth, permission=ADMIN):
-    """ Update exiting user of project """
-    if not project.get_group(permission).user_set.filter(id=auth.user.id).exists():
-        project.set_permissions(auth.user, permission, save=False)
-        permissions_changed = {
-            auth.user._id: permission
-        }
-        params = project.log_params
-        params['contributors'] = permissions_changed
-        project.add_log(
-            action=project.log_class.PERMISSIONS_UPDATED,
-            params=params,
-            auth=auth,
-            save=False
-        )
-        if permission == READ:
-            project_signals.write_permissions_revoked.send(project)
-
-        project_signals.contributors_updated.send(project)
 
 
 @transaction.atomic
 def disable_datasteward_addon(auth):
     """Start disable DataSteward add-on process"""
-    start = timer()
     # Check if user has any affiliated institutions
     affiliated_institutions = auth.user.affiliated_institutions.all()
     if not affiliated_institutions:
@@ -245,17 +191,17 @@ def disable_datasteward_addon(auth):
     # Query projects
     projects = AbstractNode.objects.filter(type=OSF_NODE, affiliated_institutions__in=affiliated_institutions, is_deleted=False)
 
-    # Query admin contributors
-    contributors = Contributor.objects.filter(node__in=projects, is_data_steward=True, user__is_active=True,
-                                              user__groups__name__in=[project.format_group(ADMIN) for project in projects]).distinct()
+    # Query contributors
+    contributors = Contributor.objects.filter(node__in=projects).distinct()
+
     all_project_contributors = []
     user_project_id_list = []
-    for c in contributors:
-        all_project_contributors.append(c)
-        if c.node.id not in user_project_id_list and c.user.id == user.id:
-            user_project_id_list.append(c.node.id)
+    for contributor in contributors:
+        all_project_contributors.append(contributor)
+        if contributor.node.id not in user_project_id_list and contributor.user.id == user.id:
+            user_project_id_list.append(contributor.node.id)
 
-    # filter out project does not have user as contributor.
+    # Filter out projects that does not have user as contributor.
     if len(user_project_id_list) != projects.count():
         projects = projects.filter(id__in=user_project_id_list)
 
@@ -265,17 +211,22 @@ def disable_datasteward_addon(auth):
     remove_permission_projects = []
     update_user = False
     for project in projects:
-        all_project_contributors, project_contributors, contributor = get_project_contributors(all_project_contributors, user, project)
+        contributor = get_project_contributors(all_project_contributors, user, project)
+
+        if not contributor or not contributor.is_data_steward:
+            continue
 
         if contributor.data_steward_old_permission is not None:
             # Contributor has old permission before enabling DataSteward add-on
-            if len(project_contributors) <= 1:
+            # Get current admin contributors
+            project_contributors = contributors.filter(user__is_active=True, user__groups__name=project.format_group(ADMIN), node=project).distinct()
+            if project_contributors.count() <= 1:
                 # has only one admin
                 if ADMIN != contributor.data_steward_old_permission:
                     # if update to other permission than ADMIN then skip.
                     # else do nothing.
                     error_msg = '{} is the only admin.'.format(user.fullname)
-                    logger.warning('Project {}: error raised while disabling DataSteward add-o with message "{}"'.format(project._id, error_msg))
+                    logger.warning('Project {}: error raised while disabling DataSteward add-on with message "{}"'.format(project._id, error_msg))
                     skipped_projects.append(project)
             else:
                 update_permission_list.append((project, contributor.data_steward_old_permission))
@@ -284,8 +235,10 @@ def disable_datasteward_addon(auth):
                 bulk_update_contributors.append(contributor)
         else:
             # Contributor does not have old permission before enabling DataSteward add-on
-            not_current_user_admins = [contributor for contributor in project_contributors if contributor.user.id != user.id and contributor.visible is True]
-            if not not_current_user_admins:
+            # Get project's admin contributors that is not current user
+            not_current_user_admins = contributors.exclude(user=user).filter(user__is_active=True, user__groups__name=project.format_group(ADMIN), visible=True,
+                                                                             node=project).distinct()
+            if not not_current_user_admins.exists():
                 # If user is the only visible contributor then skip
                 logger.warning('Cannot remove user from project {}'.format(project._id))
                 skipped_projects.append(project)
@@ -299,7 +252,6 @@ def disable_datasteward_addon(auth):
 
     # update contributor permission
     if update_permission_list:
-        logger.info(f'begin update permission len={len(update_permission_list)}')
         # update to DB
         bulk_update(bulk_update_contributors, update_fields=['is_data_steward', 'data_steward_old_permission'], batch_size=BATCH_SIZE)
 
@@ -312,7 +264,6 @@ def disable_datasteward_addon(auth):
 
     # remove contributor
     if remove_permission_projects:
-        logger.info(f'begin remove permission len={len(remove_permission_projects)}')
         if update_user:
             # save after delete unclaimed_records
             user.save()
@@ -335,26 +286,36 @@ def disable_datasteward_addon(auth):
         loop.run_until_complete(asyncio.wait(coroutines))
         loop.close()
 
-    end = timer()
-    logger.info(f'disable_datasteward_addon overall runtime: {end - start}(s)')
     return skipped_projects
 
 
 def get_project_contributors(contributors, user, project):
     """ Get project and contributor instances from user"""
-    new_list = []
-    project_contributors = []
     user_contributor = None
     for contributor in contributors:
-        if contributor.node.id == project.id:
-            project_contributors.append(contributor)
+        if contributor.node.id == project.id and contributor.user.id == user.id:
+            user_contributor = contributor
 
-            if contributor.user.id == user.id:
-                user_contributor = contributor
-        else:
-            new_list.append(contributor)
+    return user_contributor
 
-    return new_list, project_contributors, user_contributor
+
+def get_node_settings_model(config):
+    """ Get addon's node settings"""
+    try:
+        settings_model = getattr(config, '{}_settings'.format('node'))
+    except LookupError:
+        return None
+    return settings_model
+
+
+def bulk_create_contributors(contributors, batch_size=BATCH_SIZE):
+    """ Bulk create multiple contributors for projects """
+    it = iter(contributors)
+    while True:
+        batch = list(islice(it, batch_size))
+        if not batch:
+            break
+        Contributor.objects.bulk_create(batch, batch_size)
 
 
 def clear_permissions(projects, user):
@@ -362,39 +323,6 @@ def clear_permissions(projects, user):
     project_group_names = [name for project in projects for name in project.group_names]
     OSFUserGroup = apps.get_model('osf', 'osfuser_groups')
     OSFUserGroup.objects.filter(osfuser_id=user.id, group__name__in=project_group_names).delete()
-
-
-def add_project_logs(projects, user, action):
-    """ Add multiple project activity logs for user """
-    logs = []
-    for project in projects:
-        params = project.log_params
-        params['contributors'] = [user._id]
-        params['node'] = params.get('node') or params.get('project') or project._id
-        original_node = project if project._id == params['node'] else AbstractNode.load(params.get('node'))
-        log = NodeLog(
-            action=action, user=user, foreign_user=None,
-            params=params, node=project, original_node=original_node
-        )
-        logs.append(log)
-
-    it = iter(logs)
-    while True:
-        batch = list(islice(it, BATCH_SIZE))
-        if not batch:
-            break
-        NodeLog.objects.bulk_create(batch, BATCH_SIZE)
-
-
-async def after_remove_contributor_permission(project, auth):
-    # contributor_removed signal receiver function from addons/osfstorage/listeners.py
-    enqueue_postcommit_task(checkin_files_task, (project._id, auth.user._id,), {}, celery=True)
-    # Run background tasks to remove this user from project subscriptions
-    enqueue_postcommit_task(task_after_remove_contributors, (project.id, auth.user.id), {}, celery=True)
-
-    # enqueue on_node_updated/on_preprint_updated to update DOI metadata when a contributor is removed
-    if getattr(project, 'get_identifier_value', None) and project.get_identifier_value('doi'):
-        project.update_or_enqueue_on_resource_updated(auth.user._id, first_save=False, saved_fields=['contributors'])
 
 
 def disconnect_addons_multiple_projects(projects, user):
@@ -434,17 +362,92 @@ def disconnect_addons_multiple_projects(projects, user):
             bulk_update(project_node_settings, batch_size=BATCH_SIZE)
 
 
-def get_node_settings_model(config):
-    """ Get addon's node settings"""
-    try:
-        settings_model = getattr(config, '{}_settings'.format('node'))
-    except LookupError:
-        return None
-    return settings_model
+def add_project_logs(projects, user, action):
+    """ Add multiple project activity logs for user """
+    logs = []
+    for project in projects:
+        params = project.log_params
+        params['contributors'] = [user._id]
+        params['node'] = params.get('node') or params.get('project') or project._id
+        original_node = project if project._id == params['node'] else AbstractNode.load(params.get('node'))
+        log = NodeLog(
+            action=action, user=user, foreign_user=None,
+            params=params, node=project, original_node=original_node
+        )
+        logs.append(log)
+
+    it = iter(logs)
+    while True:
+        batch = list(islice(it, BATCH_SIZE))
+        if not batch:
+            break
+        NodeLog.objects.bulk_create(batch, BATCH_SIZE)
+
+
+async def add_contributor_permission(project, auth):
+    """ Add user to project as administrator """
+    project.add_permission(auth.user, ADMIN, save=False)
+    enqueue_postcommit_task(task_after_add_contributor, (project.id, auth.user.id,), {}, celery=True)
+
+    # enqueue on_node_updated/on_preprint_updated to update DOI metadata when a contributor is added
+    if getattr(project, 'get_identifier_value', None) and project.get_identifier_value('doi'):
+        project.update_or_enqueue_on_resource_updated(auth.user._id, first_save=False, saved_fields=['contributors'])
+
+
+async def update_contributor_permission(project, auth, permission=ADMIN):
+    """ Update exiting user of project """
+    if not project.get_group(permission).user_set.filter(id=auth.user.id).exists():
+        project.set_permissions(auth.user, permission, save=False)
+        permissions_changed = {
+            auth.user._id: permission
+        }
+        params = project.log_params
+        params['contributors'] = permissions_changed
+        project.add_log(
+            action=project.log_class.PERMISSIONS_UPDATED,
+            params=params,
+            auth=auth,
+            save=False
+        )
+        enqueue_postcommit_task(task_after_update_contributor, (project.id, permission,), {}, celery=True)
+
+
+async def after_remove_contributor_permission(project, auth):
+    # contributor_removed signal receiver function from addons/osfstorage/listeners.py
+    enqueue_postcommit_task(checkin_files_task, (project._id, auth.user._id,), {}, celery=True)
+    # Run background tasks to remove this user from project subscriptions
+    enqueue_postcommit_task(task_after_remove_contributor, (project.id, auth.user.id,), {}, celery=True)
+
+    # enqueue on_node_updated/on_preprint_updated to update DOI metadata when a contributor is removed
+    if getattr(project, 'get_identifier_value', None) and project.get_identifier_value('doi'):
+        project.update_or_enqueue_on_resource_updated(auth.user._id, first_save=False, saved_fields=['contributors'])
+
+
+# Task-related functions
+@app.task
+def task_after_add_contributor(node_id, user_id):
+    node = AbstractNode.objects.get(pk=node_id)
+    user = OSFUser.objects.get(pk=user_id)
+    auth = Auth(user=user)
+
+    project_signals.contributors_updated.send(node)
+    if node._id and user:
+        project_signals.contributor_added.send(node,
+                                               contributor=user,
+                                               auth=auth, email_template='false', permissions=[ADMIN])
 
 
 @app.task
-def task_after_remove_contributors(node_id, user_id):
+def task_after_update_contributor(node_id, permission):
+    node = AbstractNode.objects.get(pk=node_id)
+    if permission == READ:
+        project_signals.write_permissions_revoked.send(node)
+
+    project_signals.contributors_updated.send(node)
+
+
+@app.task
+def task_after_remove_contributor(node_id, user_id):
     node = AbstractNode.objects.get(pk=node_id)
     user = OSFUser.objects.get(pk=user_id)
 

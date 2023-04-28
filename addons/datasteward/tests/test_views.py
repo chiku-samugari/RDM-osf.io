@@ -4,16 +4,18 @@ import unittest
 
 from rest_framework import status as http_status
 from nose.tools import (assert_equal, assert_true, assert_false)
+from django.utils import timezone
 
 from addons.datasteward.tests.utils import DataStewardAddonTestCase
-from addons.datasteward.views import disable_datasteward_addon, enable_datasteward_addon, revert_project_permission, set_project_permission_to_admin
+from addons.datasteward.views import disable_datasteward_addon, enable_datasteward_addon
 from framework.auth.core import Auth
+from osf.exceptions import UserStateError, ValidationValueError
+from osf.models.contributor import Contributor
 from osf.utils import permissions
 
-from osf_tests.factories import AuthUserFactory, InstitutionFactory, OSFGroupFactory, ProjectFactory
+from osf_tests.factories import AuthUserFactory, ContributorFactory, InstitutionFactory, ProjectFactory
 from tests.base import OsfTestCase
 from website.util import api_url_for
-from unittest import mock
 
 OSF_NODE = 'osf.node'
 
@@ -123,143 +125,213 @@ class TestDataStewardViews(DataStewardAddonTestCase, OsfTestCase, unittest.TestC
 
         assert_false(result)
 
-    def test_enable_datasteward_addon_success(self):
+    def test_enable_datasteward_addon_update_not_admin_permission_contributor_to_admin_permission_success(self):
+        user = AuthUserFactory(fullname='enabledatasteward@osf', username='enabledatasteward@osf.com')
         institution = InstitutionFactory()
-
         node = ProjectFactory(creator=self.new_user, type=OSF_NODE, is_deleted=False)
-
         institution.nodes.add(node)
         institution.save()
-        self.new_user.affiliated_institutions.add(institution)
-        self.new_user.save()
-        result = enable_datasteward_addon(self.auth)
+        user.affiliated_institutions.add(institution)
+        user.save()
 
+        kwargs = node.contributor_kwargs
+        kwargs['_order'] = 0
+        new_contributor = ContributorFactory(**kwargs)
+        new_contributor.user = user
+        new_contributor.is_data_steward = False
+        new_contributor.visible = True
+        new_contributor.save()
+
+        result = enable_datasteward_addon(Auth(user))
+
+        updated_contributor = Contributor.objects.filter(node=node, user=user)
+        assert_true(updated_contributor.exists() and updated_contributor.first().permission == permissions.ADMIN)
         assert_true(result)
 
-    def test_set_project_permission_to_admin_error(self):
-        mock_project = mock.Mock()
-        mock_project.is_contributor.side_effect = Exception('mock test error')
+    def test_enable_datasteward_addon_add_contributor_success(self):
+        user = AuthUserFactory(fullname='enabledatasteward@osf', username='enabledatasteward@osf.com')
+        institution = InstitutionFactory()
+        node = ProjectFactory(creator=self.new_user, type=OSF_NODE, is_deleted=False)
+        institution.nodes.add(node)
+        institution.save()
+        user.affiliated_institutions.add(institution)
+        user.save()
 
-        set_project_permission_to_admin(mock_project, self.auth, True)
+        result = enable_datasteward_addon(Auth(user))
 
-    async def test_set_project_permission_to_admin_raise_exception(self):
-        mock_project = mock.Mock()
-        mock_project.is_contributor.side_effect = Exception('mock test error')
-        with pytest.raises(Exception):
-            await set_project_permission_to_admin(mock_project, self.auth, False)
+        updated_contributor = Contributor.objects.filter(node=node, user=user)
+        assert_true(updated_contributor.exists() and updated_contributor.first().permission == permissions.ADMIN)
+        assert_true(result)
 
-    async def test_set_project_permission_to_admin_add_new_contributor(self):
-        user = AuthUserFactory(username='new_admin@osf.com', fullname='new_admin')
-        await set_project_permission_to_admin(self.project, Auth(user), False)
+    def test_enable_datasteward_addon_add_contributor_user_is_disabled(self):
+        user = AuthUserFactory(fullname='enabledatasteward@osf', username='enabledatasteward@osf.com')
+        institution = InstitutionFactory()
+        node = ProjectFactory(creator=self.new_user, type=OSF_NODE, is_deleted=False)
+        institution.nodes.add(node)
+        institution.save()
+        user.affiliated_institutions.add(institution)
+        user.date_disabled = timezone.now()
+        user.save()
 
-        contributor = self.project.contributor_class.objects.get(user=user, node=self.project)
-        assert_equal(permissions.ADMIN, contributor.permission)
+        with self.assertRaises(ValidationValueError):
+            enable_datasteward_addon(Auth(user))
 
-    async def test_set_project_permission_to_admin_update_contributor_permission_is_not_admin(self):
-        group_mem = AuthUserFactory(username='test@osf.com', fullname='group_mem')
-        group_mem.is_data_steward = False
-        group_mem.save()
-        group = OSFGroupFactory(creator=group_mem)
-        self.project.add_osf_group(group, permissions.READ)
+    def test_enable_datasteward_addon_add_contributor_user_is_not_registered(self):
+        user = AuthUserFactory(fullname='enabledatasteward@osf', username='enabledatasteward@osf.com')
+        institution = InstitutionFactory()
+        node = ProjectFactory(creator=self.new_user, type=OSF_NODE, is_deleted=False)
+        institution.nodes.add(node)
+        institution.save()
+        user.affiliated_institutions.add(institution)
+        user.is_registered = False
+        user.save()
 
-        self.project.add_contributor(contributor=group_mem, permissions=permissions.READ, log=False, save=False)
-        self.project.save()
-
-        await set_project_permission_to_admin(self.project, Auth(group_mem), False)
-
-        contributor = self.project.contributor_class.objects.get(user=group_mem, node=self.project)
-        assert_equal(permissions.ADMIN, contributor.permission)
+        with self.assertRaises(UserStateError):
+            enable_datasteward_addon(Auth(user))
 
     def test_disable_datasteward_addon_affiliated_institutions_is_empty(self):
         result = disable_datasteward_addon(self.auth)
 
         assert_false(result)
 
-    def test_disable_datasteward_addon_affiliated_institutions(self):
+    def test_disable_datasteward_addon_skip_project_has_only_one_admin(self):
         institution = InstitutionFactory()
-
         node = ProjectFactory(creator=self.new_user, type=OSF_NODE, is_deleted=False)
-
         institution.nodes.add(node)
         institution.save()
         self.new_user.affiliated_institutions.add(institution)
         self.new_user.save()
+
+        contributor = Contributor.objects.filter(user=self.new_user, node=node).first()
+        contributor.is_data_steward = True
+        contributor.data_steward_old_permission = permissions.READ
+        contributor.save()
         result = disable_datasteward_addon(self.auth)
 
-        assert_equal(result, [])
+        assert_true(len(result) == 1)
 
-    async def test_revert_project_permission_error(self):
-        skipped_projects = []
-        self.project.add_contributor(contributor=self.new_user, permissions=permissions.ADMIN, log=False, save=False)
-        self.project.save()
-        with mock.patch('osf.models.mixins.ContributorMixin.is_contributor', side_effect=Exception('mock test error')):
-            await revert_project_permission(self.project, self.auth, skipped_projects)
-            assert_equal(skipped_projects, [self.project])
 
-    def test_revert_project_permission_is_not_contributor(self):
-        user_auth = Auth(AuthUserFactory())
-        skipped_projects = []
-        revert_project_permission(self.project, user_auth, skipped_projects)
+    def test_disable_datasteward_addon_update_permission_success(self):
+        user = AuthUserFactory(fullname='disabledatasteward@osf', username='disabledatasteward@osf.com')
+        institution = InstitutionFactory()
+        node = ProjectFactory(creator=self.new_user, type=OSF_NODE, is_deleted=False)
+        institution.nodes.add(node)
+        institution.save()
+        self.new_user.affiliated_institutions.add(institution)
+        self.new_user.save()
+        user.affiliated_institutions.add(institution)
+        user.save()
 
-        assert_equal(skipped_projects, [])
-
-    def test_revert_project_permission_contributor_is_data_steward_is_false(self):
-        group_mem = AuthUserFactory(username='test@osf.com', fullname='group_mem')
-        group_mem.is_data_steward = False
-        group_mem.save()
-        group = OSFGroupFactory(creator=group_mem)
-        self.project.add_osf_group(group, permissions.READ)
-
-        self.project.add_contributor(contributor=group_mem, permissions=permissions.READ, log=False, save=False)
-        self.project.save()
-
-        skipped_projects = []
-        revert_project_permission(self.project, Auth(group_mem), skipped_projects)
-
-        assert_equal(skipped_projects, [])
-
-    async def test_revert_project_permission_update_contributor(self):
-        self.project.add_contributor(contributor=self.new_user, permissions=permissions.ADMIN, log=False, save=False)
-        self.project.save()
-
-        contributor = self.project.contributor_class.objects.get(user=self.new_user, node=self.project)
-        contributor.data_steward_old_permission = contributor.permission
-        contributor.is_data_steward = True
+        contributor = Contributor.objects.filter(user=self.new_user, node=node).first()
+        contributor.is_data_steward = False
         contributor.save()
 
-        skipped_projects = []
-        await revert_project_permission(self.project, self.auth, skipped_projects)
+        kwargs = node.contributor_kwargs
+        kwargs['_order'] = 0
+        new_contributor = ContributorFactory(**kwargs)
+        new_contributor.user = user
+        new_contributor.is_data_steward = True
+        new_contributor.visible = True
+        new_contributor.data_steward_old_permission = permissions.READ
+        new_contributor.save()
 
-        contributor = self.project.contributor_class.objects.get(user=self.new_user, node=self.project)
-        assert_equal(skipped_projects, [])
-        assert_false(contributor.is_data_steward)
-        assert_false(contributor.data_steward_old_permission)
+        node.add_permission(user, permissions.ADMIN, save=False)
 
-    def test_revert_project_permission_remove_contributor(self):
-        group_mem = AuthUserFactory(username='test@osf.com', fullname='group_mem')
-        group_mem.is_data_steward = False
-        group_mem.save()
-        group = OSFGroupFactory(creator=group_mem)
-        self.project.add_osf_group(group, permissions.READ)
+        result = disable_datasteward_addon(Auth(user))
 
-        self.project.add_contributor(contributor=group_mem, permissions=permissions.READ, log=False, save=False)
-        self.project.save()
+        assert_false(result)
 
-        skipped_projects = []
-        revert_project_permission(self.project, Auth(group_mem), skipped_projects)
 
-        assert_equal(skipped_projects, [])
+    def test_disable_datasteward_addon_contributor_is_data_steward_is_False_skip_project(self):
+        institution = InstitutionFactory()
+        node = ProjectFactory(creator=self.new_user, type=OSF_NODE, is_deleted=False)
+        institution.nodes.add(node)
+        institution.save()
+        self.new_user.affiliated_institutions.add(institution)
+        self.new_user.save()
 
-    async def test_revert_project_permission_remove_contributor_error(self):
-        self.project.add_contributor(contributor=self.new_user, permissions=permissions.ADMIN, log=False, save=False)
-        self.project.save()
-
-        contributor = self.project.contributor_class.objects.get(user=self.new_user, node=self.project)
-        contributor.data_steward_old_permission = None
-        contributor.is_data_steward = True
+        contributor = Contributor.objects.filter(user=self.new_user, node=node).first()
+        contributor.is_data_steward = False
         contributor.save()
 
-        skipped_projects = []
-        await revert_project_permission(self.project, self.auth, skipped_projects)
+        result = disable_datasteward_addon(self.auth)
 
-        assert_equal(skipped_projects, [self.project])
+        assert_false(result)
+
+
+    def test_disable_datasteward_addon_remove_contributor_skip_project(self):
+        user = AuthUserFactory(fullname='disabledatasteward@osf', username='disabledatasteward@osf.com')
+        institution = InstitutionFactory()
+        node = ProjectFactory(creator=self.new_user, type=OSF_NODE, is_deleted=False)
+        institution.nodes.add(node)
+        institution.save()
+        self.new_user.affiliated_institutions.add(institution)
+        self.new_user.save()
+        user.affiliated_institutions.add(institution)
+        user.save()
+
+        contributor = Contributor.objects.filter(user=self.new_user, node=node).first()
+        contributor.visible = False
+        contributor.save()
+
+        kwargs = node.contributor_kwargs
+        kwargs['_order'] = 0
+        new_contributor = ContributorFactory(**kwargs)
+        new_contributor.user = user
+        new_contributor.is_data_steward = True
+        new_contributor.visible = True
+        new_contributor.save()
+
+        node.add_permission(user, permissions.ADMIN, save=False)
+
+        result = disable_datasteward_addon(Auth(user))
+
+        assert_true(len(result) == 1)
+
+
+    def test_disable_datasteward_addon_remove_contributor_success(self):
+        user = AuthUserFactory(fullname='disabledatasteward@osf', username='disabledatasteward@osf.com')
+        institution = InstitutionFactory()
+        node = ProjectFactory(creator=self.new_user, type=OSF_NODE, is_deleted=False)
+        institution.nodes.add(node)
+        institution.save()
+        self.new_user.affiliated_institutions.add(institution)
+        self.new_user.save()
+        user.affiliated_institutions.add(institution)
+        user.unclaimed_records = {}
+        user.unclaimed_records[node._id] = {'name': node.title}
+        user.save()
+
+        contributor = Contributor.objects.filter(user=self.new_user, node=node).first()
+        contributor.visible = True
+        contributor.save()
+
+        kwargs = node.contributor_kwargs
+        kwargs['_order'] = 0
+        new_contributor = ContributorFactory(**kwargs)
+        new_contributor.user = user
+        new_contributor.is_data_steward = True
+        new_contributor.visible = True
+        new_contributor.save()
+
+        node.add_permission(user, permissions.ADMIN, save=False)
+
+        result = disable_datasteward_addon(Auth(user))
+
+        assert_false(result)
+
+
+    def test_disable_datasteward_addon_skip_project_not_have_user_as_contributor(self):
+        user = AuthUserFactory(fullname='disabledatasteward@osf', username='disabledatasteward@osf.com')
+        institution = InstitutionFactory()
+        node = ProjectFactory(creator=self.new_user, type=OSF_NODE, is_deleted=False)
+        institution.nodes.add(node)
+        institution.save()
+        self.new_user.affiliated_institutions.add(institution)
+        self.new_user.save()
+        user.affiliated_institutions.add(institution)
+        user.save()
+
+        result = disable_datasteward_addon(Auth(user))
+
+        assert_false(result)
