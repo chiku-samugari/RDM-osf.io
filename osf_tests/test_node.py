@@ -1303,8 +1303,7 @@ class TestContributorMethods:
             non_admin_contrib,
             ADMIN,
             True,
-            auth=auth,
-            check_admin_permission=False
+            auth=auth
         )
         assert set(node.get_permissions(non_admin_contrib)) == set([permissions.READ, permissions.WRITE, permissions.ADMIN])
         assert node.get_visible(non_admin_contrib) is True
