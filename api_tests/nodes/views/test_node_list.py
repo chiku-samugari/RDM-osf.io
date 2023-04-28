@@ -27,7 +27,6 @@ from osf_tests.factories import (
     DraftNodeFactory,
 )
 from addons.osfstorage.settings import DEFAULT_REGION_ID
-from api.base import settings as api_settings
 from rest_framework import exceptions
 from tests.utils import assert_equals
 from website.views import find_bookmark_collection

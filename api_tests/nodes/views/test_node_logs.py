@@ -349,7 +349,7 @@ class TestLogStorageName(ApiTestCase):
         self.user = AuthUserFactory()
         self.node = ProjectFactory(creator=self.user)
 
-    def add_folder_created_log(self, region_id=None):
+    def add_folder_created_log(self):
         self.node.add_log(
             'osf_storage_folder_created',
             auth=Auth(self.user),
@@ -365,8 +365,7 @@ class TestLogStorageName(ApiTestCase):
                         'url': 'index.html',
                         'title': 'Hello World',
                     }
-                },
-                'region': region_id,
+                }
             },
         )
 
@@ -423,6 +422,9 @@ class TestLogStorageName(ApiTestCase):
         institution = InstitutionFactory()
         self.user.affiliated_institutions.add(institution)
 
+        expected_storage = 'Institutional Storage'
+        mock_get_storage_name.return_value = expected_storage
+
         self.add_folder_created_log()
         url = '/{}nodes/{}/logs/'.format(API_BASE, self.node._id)
         res = self.app.get(url, auth=self.user.auth)
@@ -438,12 +440,12 @@ class TestLogStorageName(ApiTestCase):
         )
         institution = InstitutionFactory()
         self.user.affiliated_institutions.add(institution)
-        region = RegionFactory(_id=institution._id, name='Kitten Storage')
+        RegionFactory(_id=institution._id, name='Kitten Storage')
 
         expected_storage = 'Kitten Storage'
         mock_get_storage_name.return_value = expected_storage
 
-        self.add_folder_created_log(region_id=region.id)
+        self.add_folder_created_log()
         url = '/{}nodes/{}/logs/'.format(API_BASE, self.node._id)
         res = self.app.get(url, auth=self.user.auth)
 

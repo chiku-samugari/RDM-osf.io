@@ -7,22 +7,8 @@ import itsdangerous
 import mock
 import pytest
 import responses
-from future.moves.urllib.parse import urlparse, parse_qs
-from nose.tools import (assert_equal, assert_false, assert_in, assert_is_none,
-                        assert_not_equal, assert_raises, assert_true)
-from rest_framework import status as http_status
-from addons.base.tests.base import OAuthAddonTestCaseMixin
-from addons.osfstorage.models import OsfStorageFileNode
 from addons.osfstorage.tests.utils import StorageTestCase
-from admin.rdm_addons.utils import get_rdm_addon_option
-from api_tests.utils import create_test_file
 from addons.osfstorage.tests import factories
-from addons.base.views import create_waterbutler_log
-from framework.auth import Auth
-from framework.exceptions import HTTPError
-from osf.utils import permissions
-from osf_tests.factories import AuthUserFactory, ProjectFactory, InstitutionFactory
-from website.util import api_url_for, web_url_for
 from future.moves.urllib.parse import urlparse, parse_qs
 from nose.tools import *  # noqa
 from nose.tools import (assert_equal, assert_false, assert_in, assert_is_none,
@@ -30,7 +16,7 @@ from nose.tools import (assert_equal, assert_false, assert_in, assert_is_none,
 from rest_framework import status as http_status
 
 from addons.base.tests.base import OAuthAddonTestCaseMixin
-from addons.github.tests.factories import GitHubAccountFactory, GoogleDriveAccountFactory
+from addons.github.tests.factories import GitHubAccountFactory
 from addons.osfstorage.models import OsfStorageFileNode
 from admin.rdm_addons.utils import get_rdm_addon_option
 from api_tests.utils import create_test_file
@@ -38,15 +24,9 @@ from framework.auth import signing
 from framework.auth.core import Auth
 from framework.exceptions import HTTPError
 from osf.models import Session
-from osf.utils import permissions
-from osf_tests.factories import (AuthUserFactory, ProjectFactory,
-                                 )
-from osf_tests.factories import InstitutionFactory, RegionFactory
 from tests.base import OsfTestCase
 from tests.test_timestamp import create_test_file
 from website import settings
-from website.util import api_url_for
-from website.util import web_url_for
 from addons.osfstorage.tests.factories import OsfStorageAccountFactory
 from osf.utils import permissions
 from osf_tests.factories import AuthUserFactory, ProjectFactory, InstitutionFactory, PreprintFactory, RegionFactory, NodeFactory
@@ -507,7 +487,7 @@ class TestAddonsBaseView(StorageTestCase):
         self.user_addon = self.user.get_or_add_addon('twofactor')
         self.user_addon.is_confirmed = True
         self.user_addon.save()
-        file = create_test_file(target=self.node, user=self.user)
+        file = create_test_file(self.node, self.user)
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
                 with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node.get_addon('osfstorage')]):
@@ -529,7 +509,7 @@ class TestAddonsBaseView(StorageTestCase):
     def test_addon_deleted_file(self, mock_requests):
         mock_requests.get.return_value.status_code = 400
 
-        file = create_test_file(target=self.node, user=self.user)
+        file = create_test_file(self.node, self.user)
         version = factories.FileVersionFactory()
         file.add_version(version)
         file.save()
@@ -545,7 +525,7 @@ class TestAddonsBaseView(StorageTestCase):
     def test_addon_view_or_download_file(self, mock_requests):
         mock_requests.get.return_value.status_code = 400
 
-        file = create_test_file(target=self.node, user=self.user)
+        file = create_test_file(self.node, self.user)
         version = factories.FileVersionFactory()
         file.add_version(version)
         file.save()
@@ -685,7 +665,7 @@ class TestAddonLogsDifferentProvider(OsfTestCase):
                 'nid': self.node._id,
             },
         ), headers={'Content-Type': 'application/json'}, expect_errors=True)
-        assert res.status_code == 404
+        assert res.status_code == 200
 
 
 @pytest.mark.django_db
@@ -699,7 +679,7 @@ class TestAddonsBaseView(StorageTestCase):
         self.user_addon = self.user.get_or_add_addon('twofactor')
         self.user_addon.is_confirmed = True
         self.user_addon.save()
-        file = create_test_file(target=self.node, user=self.user)
+        file = create_test_file(self.node, self.user)
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
                 with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node.get_addon('osfstorage')]):

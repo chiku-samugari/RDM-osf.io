@@ -14,8 +14,6 @@ from osf.models import (
 )
 from django.utils import timezone
 from osf.models.user_storage_quota import UserStorageQuota
-
-from osf.models.user_storage_quota import UserStorageQuota
 from rest_framework import status as http_status
 from framework.exceptions import HTTPError
 

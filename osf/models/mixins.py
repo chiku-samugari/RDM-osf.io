@@ -46,7 +46,6 @@ from website.project import signals as project_signals
 from website import settings, mails, language
 from website.project.licenses import set_license
 from api.base.rdmlogger import RdmLogger, rdmlog
-from django.core.exceptions import MultipleObjectsReturned
 
 
 logger = logging.getLogger(__name__)

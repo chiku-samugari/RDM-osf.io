@@ -1,8 +1,6 @@
 import markupsafe
 from os.path import basename
 from website.settings import MFR_SERVER_URL
-from rest_framework import status as http_status
-from framework.exceptions import HTTPError
 
 from website import settings
 
