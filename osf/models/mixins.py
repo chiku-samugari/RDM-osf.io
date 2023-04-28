@@ -1349,7 +1349,7 @@ class ContributorMixin(models.Model):
         return self.contributor_class.objects.select_related('user').filter(**query_dict)
 
     def add_contributor(self, contributor, permissions=None, visible=True,
-                        send_email=None, auth=None, log=True, save=False, skip_send_email=False):
+                        send_email=None, auth=None, log=True, save=False):
         """Add a contributor to the project.
 
         :param User contributor: The contributor to be added
@@ -1360,7 +1360,6 @@ class ContributorMixin(models.Model):
         :param Auth auth: All the auth information including user, API key
         :param bool log: Add log to self
         :param bool save: Save after adding contributor
-        :param bool skip_send_email: Skip sending email to added contributor
         :returns: Whether contributor was added
         """
         send_email = send_email or self.contributor_email_template
@@ -1408,7 +1407,7 @@ class ContributorMixin(models.Model):
                 self.save()
 
             project_signals.contributors_updated.send(self)
-            if self._id and contrib_to_add and not skip_send_email:
+            if self._id and contrib_to_add:
                 project_signals.contributor_added.send(self,
                                                        contributor=contributor,
                                                        auth=auth, email_template=send_email, permissions=permissions)
