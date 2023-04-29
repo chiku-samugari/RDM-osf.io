@@ -1773,6 +1773,9 @@ class TestNodeCreate:
         region_id = res.json['data']['relationships']['region']['data']['id']
         assert int(region_id) == api_settings.NII_STORAGE_REGION_ID
 
+        institution_two = InstitutionFactory()
+        user_one.affiliated_institutions.add(institution_two)
+
         private_project['data']['relationships'] = {
             'affiliated_institutions': {
                 'data': [
