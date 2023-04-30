@@ -64,6 +64,22 @@
             display: flex;
             justify-content: right;
         }
+
+        .right-button-element {
+            display: flex;
+            justify-content: right;
+        }
+
+        .right-button-element .btn-default {
+            margin-right: 10px;
+        }
+
+        #btn_add_attribute_form {
+            width: 90px;
+            position: absolute;
+            bottom: 7px;
+            left: 7px;
+        }
     </style>
     <h2 style="margin-bottom:40px;">{% trans "Institutional Storage " %}<small>({{ institution.name }})</small></h2>
 
@@ -87,7 +103,7 @@
                     </select>
                 </div>
             </div>
-            <button style="width:90px; margin-bottom:30px; margin-top:10px" class="btn btn-success" type="submit">{% trans "Add" %}</button>
+            <button id="add_storage" style="width:90px; margin-bottom:30px; margin-top:10px" class="btn btn-success">{% trans "Add" %}</button>
         </form>
     </div>
     <div class="col-md-6" style="height: 230px;">
@@ -156,7 +172,7 @@
                             <tr>
                                 <td class="storage_input_content">
                                     <div>
-                                        <input {% if provider_item.provider.short_name != 'osfstorage' %} maxlength="200"
+                                        <input {% if provider_item.provider.short_name != 'osfstorage' and provider_item.provider.short_name != 'onedrivebusiness' %} maxlength="200"
                                                value="{{ provider_item.region.name }}"
                                                {% else %}
                                                disabled
@@ -208,7 +224,7 @@
                                                data-toggle="toggle" data-onstyle="success">
                                     </div>
                                 </td>
-                                <td style="text-align: right; white-space: nowrap;">
+                                <td class="right-button-element">
                                     <button class="btn btn-default" type="reset" data-id="{{ provider_item.region.id }}">{% trans "Cancel" %}</button>
                                     <button class="btn btn-success save_button" data-id="{{ provider_item.region.id }}" type="button">{% trans "Save" %}</button>
                                 </td>
