@@ -58,6 +58,7 @@ from osf.features import (
     SLOAN_DATA_DISPLAY,
     SLOAN_PREREG_DISPLAY
 )
+from website.util.rubeus import check_authentication_attribute
 
 SLOAN_FLAGS = (
     SLOAN_COI_DISPLAY,
@@ -334,10 +335,18 @@ def get_auth(auth, **kwargs):
         if not provider_settings:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
         if provider_name == 'osfstorage':
-            if (provider_settings.region.is_allowed is False) or \
-                    (provider_settings.region.is_readonly is True
-                     and action not in ['metadata', 'download', 'revisions', 'render']):
+            region = provider_settings.region
+            is_allowed = check_authentication_attribute(auth.user,
+                                                        region.allow_expression,
+                                                        region.is_allowed)
+            if is_allowed is False:
                 raise HTTPError(http_status.HTTP_403_FORBIDDEN)
+            else:
+                is_readonly = check_authentication_attribute(auth.user,
+                                                             region.readonly_expression,
+                                                             region.is_readonly)
+                if is_readonly is True and action not in ['metadata', 'download', 'revisions', 'render']:
+                    raise HTTPError(http_status.HTTP_403_FORBIDDEN)
 
     credentials = None
     waterbutler_settings = None
@@ -888,6 +897,14 @@ def addon_view_or_download_file(auth, path, provider, **kwargs):
                 file_node_root_id = file_node_root_id.id
 
         node_addon = target.get_addon(provider, root_id=file_node_root_id)
+
+        if hasattr(node_addon, 'region'):
+            region = node_addon.region
+            is_allowed = check_authentication_attribute(auth.user,
+                                                        region.allow_expression,
+                                                        region.is_allowed)
+            if not is_allowed:
+                raise HTTPError(http_status.HTTP_403_FORBIDDEN)
 
         if not isinstance(node_addon, BaseStorageAddon):
             object_text = markupsafe.escape(getattr(target, 'project_or_component', 'this object'))

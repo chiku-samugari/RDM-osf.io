@@ -20,6 +20,29 @@ var preload_accounts_type2 = ['nextcloudinstitutions',
 
 var NAME_CURRENT = null;
 var NEW_NAME_CURRENT = null;
+var ATTRIBUTE_LIST = [
+    'mail',
+    'sn',
+    'o',
+    'ou',
+    'givenName',
+    'displayName',
+    'eduPersonAffiliation',
+    'eduPersonPrincipalName',
+    'eduPersonEntitlement',
+    'eduPersonScopedAffiliation',
+    'eduPersonTargetedID',
+    'eduPersonAssurance',
+    'eduPersonUniqueId',
+    'eduPersonOrcid',
+    'isMemberOf',
+    'jasn',
+    'jaGivenName',
+    'jaDisplayName',
+    'jao',
+    'jaou',
+    'gakuninScopedPersonalUniqueCode',
+]
 
 function preload(provider, callback) {
     if (preload_accounts_type1.indexOf(provider) >= 0) {
@@ -77,6 +100,10 @@ function toggle_button(element) {
 }
 
 $('button[type=reset]').click(function () {
+    // reset allow checkbox
+    var id = this.dataset.id;
+    resetCheckbox('allow_checkbox', 'allow', id);
+    resetCheckbox('readonly_checkbox', 'readonly', id);
     NEW_NAME_CURRENT = null;
     NAME_CURRENT = null;
 });
@@ -87,27 +114,44 @@ $('button[data-dismiss="modal"]').click(function () {
 });
 
 $('.change_allow').change(function () {
-    let is_allowed = !($(this).val() === 'on');
-    let id = this.dataset.id;
-    let providerShortName = this.dataset.provider;
-    let params = {
-        'id': id,
-        'is_allowed': is_allowed,
-        'provider_short_name': providerShortName
-    };
-    ajaxRequest(params, providerShortName, 'change_allow', toggle_button, this);
+    var is_allow = this.classList.contains('checked');
+    var id = this.dataset.id;
+    changeStatusExpression('allow', id, !is_allow);
+    toggle_button(this);
 });
 
 $('.change_readonly').change(function () {
-    let is_readonly = !($(this).val() === 'on');
-    let id = this.dataset.id;
-    let providerShortName = this.dataset.provider;
-    let params = {
-        'id': id,
-        'is_readonly': is_readonly,
-        'provider_short_name': providerShortName
+    var is_readonly = this.classList.contains('checked');
+    var id = this.dataset.id;
+    changeStatusExpression('readonly', id, !is_readonly);
+    toggle_button(this);
+});
+
+$("#storage_name, input[name*='attribute_value'], input[name*='attribute'], .storage_input_value").on('keyup', function(e){
+    var value = e.target.value;
+    if (value.trim()) {
+        e.target.setCustomValidity('');
+    } else {
+        e.target.setCustomValidity(_('This field is required.'));
+    }
+    e.target.reportValidity();
+});
+
+$("input[name*='attribute_value'], input[name*='attribute']").on('input', function(e) {
+    var length = e.target.value.length;
+    if (length >= 30) {
+        e.target.title = e.target.value;
+    } else {
+        e.target.title = '';
+    }
+});
+
+$('#attribute_authentication').change(function () {
+    var is_attribute_authentication = !($(this).val() === 'on');
+    var params = {
+        'is_active': is_attribute_authentication
     };
-    ajaxRequest(params, providerShortName, 'change_readonly', toggle_button, this);
+    ajaxRequest(params, '', 'change_attribute_authentication', toggle_button, this);
 });
 
 $('#storage_name').on('keyup', function(e){
@@ -166,39 +210,114 @@ $('.storage_input_value').on('keyup', function(e){
 });
 
 $('.save_button').click(function (e) {
-    var id = $(this).attr('id');
-    var element = $(`input[type=text][id=${id}]`);
-    var storageNameElement = document.getElementById(id);
-    var provider = element.attr('name');
-    NEW_NAME_CURRENT = element.val().trim();
-    NAME_CURRENT = element.attr('value').trim();
-    if (NEW_NAME_CURRENT || !NEW_NAME_CURRENT && storageNameElement.disabled) {
-        if ($('#institutional_storage_form_update_' + id)[0].checkValidity()) {
-            preload(provider, null);
-            var showModal = function () {
-                $('#' + provider + '_modal').modal('show');
-                $('body').css('overflow', 'hidden');
-                $('.modal').css('overflow', 'auto');
-                validateRequiredFields(provider);
+    var id = this.dataset.id;
+    var storageNameElement = document.getElementById('storage_name_' + id);
+    var storageName = storageNameElement.value.trim();
+    if (storageName || !storageName && storageNameElement.disabled) {
+        var allowExpressionElement = document.getElementById('allow_' + id);
+        var readonlyExpressionElement = document.getElementById('readonly_' + id);
+        var allowCheckboxElement = document.getElementById('allow_checkbox_' + id);
+        var readonlyCheckboxElement = document.getElementById('readonly_checkbox_' + id);
+        var params = {
+            'region_id': id,
+            'allow': allowCheckboxElement.value === 'on' ? true : false,
+            'readonly': readonlyCheckboxElement.value === 'on' ? true : false,
+            'allow_expression': allowExpressionElement.value.trim(),
+            'readonly_expression': readonlyExpressionElement.value.trim(),
+            'storage_name': storageName.trim()
+        }
+        ajaxRequest(params, null, 'save_institutional_storage', null, this);
+    } else {
+        storageNameElement.setCustomValidity(_('This field is required.'));
+        storageNameElement.reportValidity();
+    }
+});
+
+$('#btn_add_attribute_form').click(function (e) {
+    if (checkAuthenticationAttribute()) {
+        ajaxRequest(null, null, 'add_attribute_form', null, this);
+    } else {
+        this.blur();
+    }
+})
+
+$('.delete_attribute').click(function (e) {
+    if (checkAuthenticationAttribute()) {
+        var id = this.getAttribute('index_attribute');
+        var params = {
+            'id': id
+        };
+        ajaxRequest(params, null, 'delete_attribute_form', null, this);
+    } else {
+        this.blur();
+    }
+})
+
+$('.save_attribute').click(function (e) {
+    if (checkAuthenticationAttribute()) {
+        var id = this.getAttribute('index_attribute');
+        var attributeNameElement = document.getElementsByClassName('attribute_' + id)[0];
+        var attributeValueElement = document.getElementsByClassName('attribute_value_' + id)[0];
+        var attributeName = attributeNameElement.value.trim();
+        var attributeValue = attributeValueElement.value.trim();
+        var is_submitted = true;
+
+        if (!attributeValue) {
+            is_submitted = false;
+            attributeValueElement.setCustomValidity(_('This field is required.'));
+            attributeValueElement.reportValidity();
+        }
+
+        if (!attributeName) {
+            is_submitted = false;
+            attributeNameElement.setCustomValidity(_('This field is required.'));
+        }
+        else if (!ATTRIBUTE_LIST.includes(attributeName)) {
+            is_submitted = false;
+            attributeNameElement.setCustomValidity(_('No matches found.'));
+        }
+        attributeNameElement.reportValidity();
+
+        if (is_submitted) {
+            var params = {
+                'id': id,
+                'attribute': attributeName,
+                'attribute_value': attributeValue
             };
-            if (provider === 'osfstorage') {
-                showModal();
-            } else {
-                $osf.confirmDangerousAction({
-                    title: _('Are you sure you want to change institutional storage?'),
-                    callback: showModal,
-                    buttons: {
-                        success: {
-                            label: _('Change')
-                        }
-                    }
-                });
-            }
-            e.preventDefault();
+            ajaxRequest(params, null, 'save_attribute_form', null, this);
         }
     } else {
-        storageNameElement.setCustomValidity(storageNameElement.dataset.title);
-        storageNameElement.reportValidity();
+        this.blur();
+    }
+})
+
+$(".attribute_name").autocomplete({
+    source: ATTRIBUTE_LIST,
+    select: function(event, ui) {
+        var selected_value = ui.item.value;
+        if (selected_value.length >= 30) {
+            $(this)[0].title = selected_value;
+        } else {
+            $(this)[0].title = '';
+        }
+    }
+});
+
+$(".attribute_name").on('keydown', function(e) {
+    var keyCode = e.keyCode || e.which;
+    if (keyCode == 9) {
+        e.preventDefault();
+        var id = this.getAttribute('id');
+        if (!ATTRIBUTE_LIST.includes(this.value)) {
+            var firstItem = $("#ui-id-" + id[id.length - 1] + " .ui-menu-item").first().text();
+            $(this).val(firstItem);
+        }
+    }
+    var value = e.target.value;
+    if (value.length >= 30) {
+        this.setAttribute('title', value);
+    } else {
+        this.setAttribute('title', '');
     }
 });
 
@@ -492,20 +611,44 @@ var afterRequest = {
             }
         }
     },
-    'change_allow': {
+    'change_attribute_authentication': {
         'success': function (id, data) {
             location.reload(true);
         },
         'fail': function (id, message) {
-            $osf.growl('Failed', _(message));
+            $osf.growl(_('Error'), _(message));
         }
     },
-    'change_readonly': {
+    'add_attribute_form': {
         'success': function (id, data) {
             location.reload(true);
         },
         'fail': function (id, message) {
-            $osf.growl('Failed', _(message));
+            $osf.growl(_('Error'), _(message), 'danger', 5000);
+        }
+    },
+    'delete_attribute_form': {
+        'success': function (id, data) {
+            location.reload(true);
+        },
+        'fail': function (id, message) {
+            $osf.growl(_('Error'), _(message), 'danger', 5000);
+        }
+    },
+    'save_attribute_form': {
+        'success': function (id, data) {
+            location.reload(true);
+        },
+        'fail': function (id, message) {
+            $osf.growl(_('Error'), _(message), 'danger', 5000);
+        }
+    },
+    'save_institutional_storage': {
+        'success': function (id, data) {
+            location.reload(true);
+        },
+        'fail': function (id, message) {
+            $osf.growl(_('Error'), _(message), 'danger', 5000);
         }
     },
     'credentials': {
@@ -542,6 +685,30 @@ var afterRequest = {
         }
     },
 };
+
+function checkAuthenticationAttribute() {
+    return $('#attribute_authentication').val() === 'on';
+}
+
+function changeStatusExpression(type, id, chekboxValue) {
+    if (checkAuthenticationAttribute()) {
+        var expressionElement = document.getElementById(type + '_' + id);
+        expressionElement.disabled = chekboxValue ? false : true;
+    }
+}
+
+function resetCheckbox(typeCheckbox, typeExpression, id) {
+    var allowCheckboxElement = document.getElementById(typeCheckbox +  '_' + id);
+    var allowExpressionElement = document.getElementById(typeExpression + '_' + id);
+    if (allowCheckboxElement.dataset.value == 'true') {
+        allowCheckboxElement.classList.add('checked');
+        changeStatusExpression(typeExpression, id, true);
+    }
+    else {
+        allowCheckboxElement.classList.remove('checked');
+        changeStatusExpression(typeExpression, id, false);
+    }
+}
 
 function getParameters(params) {
     var providerClass = params.provider_short_name + '-params';

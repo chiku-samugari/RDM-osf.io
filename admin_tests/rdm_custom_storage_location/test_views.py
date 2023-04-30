@@ -7,11 +7,13 @@ from framework.exceptions import HTTPError
 from admin_tests.utilities import setup_user_view
 from admin.rdm_custom_storage_location import views
 from addons.osfstorage.models import Region
+from osf.models import AuthenticationAttribute
+from api.base import settings as api_settings
 from tests.base import AdminTestCase
 from osf_tests.factories import (
     AuthUserFactory,
     RegionFactory,
-    InstitutionFactory,
+    InstitutionFactory, AuthenticationAttributeFactory,
 )
 
 
@@ -683,4 +685,473 @@ class TestChangeReadonlyViews(AdminTestCase):
         self.view = setup_user_view(self.view, self.request, user=self.user)
         response = self.view.post(self.request)
 
+        nt.assert_equal(response.status_code, 400)
+
+
+class TestChangeAuthenticationAttributeView(AdminTestCase):
+
+    def setUp(self):
+        self.user = AuthUserFactory()
+        self.institution = InstitutionFactory()
+        self.user.is_staff = True
+        self.user.affiliated_institutions.add(self.institution)
+        self.user.save()
+
+    def test_post_change_authentication_attribute(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:change_attribute_authentication',
+            json.dumps({'is_active': True}),
+            content_type='application/json'
+        )
+
+        self.view = views.ChangeAuthenticationAttributeView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 200)
+
+    def test_post_change_authentication_attribute_missing_param(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:change_attribute_authentication',
+            json.dumps({}),
+            content_type='application/json'
+        )
+        self.view = views.ChangeAuthenticationAttributeView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        with nt.assert_raises(HTTPError) as e:
+            self.view.post(self.request)
+        res = e.exception
+        assert res.code == 400
+
+class TestAddAttributeFormView(AdminTestCase):
+
+    def setUp(self):
+        self.user = AuthUserFactory()
+        self.institution = InstitutionFactory()
+        self.user.is_staff = True
+        self.user.affiliated_institutions.add(self.institution)
+        self.user.save()
+
+    def test_add_first_attribute(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:add_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.view = views.AddAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        attribute = AuthenticationAttribute.objects.get(
+            institution=self.institution,
+            index_number=api_settings.DEFAULT_INDEX_NUMBER
+        )
+        nt.assert_true(attribute is not None)
+        nt.assert_equal(response.status_code, 200)
+
+    def test_add_attribute_with_new_index_number(self):
+        attribute_1 = AuthenticationAttribute.objects.create(
+            institution=self.institution,
+            index_number=api_settings.DEFAULT_INDEX_NUMBER
+        )
+        self.request = RequestFactory().post(
+            'custom_storage_location:add_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.view = views.AddAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        attribute_2 = AuthenticationAttribute.objects.get(
+            institution=self.institution,
+            index_number=api_settings.DEFAULT_INDEX_NUMBER + 1
+        )
+        nt.assert_equal(attribute_1.index_number + 1, attribute_2.index_number)
+        nt.assert_equal(response.status_code, 200)
+
+    def test_add_attribute_restore_renew_index(self):
+        index = 2
+        AuthenticationAttribute.objects.create(
+            institution=self.institution,
+            index_number=index,
+            is_deleted=True
+        )
+        AuthenticationAttribute.objects.create(
+            institution=self.institution,
+            index_number=api_settings.MAX_INDEX_NUMBER,
+        )
+        self.request = RequestFactory().post(
+            'custom_storage_location:add_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.view = views.AddAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        attribute = AuthenticationAttribute.objects.get(
+            institution=self.institution,
+            index_number=index
+        )
+        nt.assert_true(attribute.is_deleted is False)
+        nt.assert_equal(response.status_code, 200)
+
+    def test_add_attribute_reached_limit(self):
+        AuthenticationAttribute.objects.create(
+            institution=self.institution,
+            index_number=api_settings.MAX_INDEX_NUMBER,
+        )
+        self.request = RequestFactory().post(
+            'custom_storage_location:add_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.view = views.AddAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 404)
+
+
+class TestDeleteAttributeFormView(AdminTestCase):
+
+    def setUp(self):
+        self.user = AuthUserFactory()
+        self.institution = InstitutionFactory()
+        self.user.is_staff = True
+        self.user.affiliated_institutions.add(self.institution)
+        self.user.save()
+        self.region = RegionFactory()
+        self.region._id = self.institution._id
+        self.region.save()
+
+    def test_can_delete_attribute(self):
+        index = 2
+        attribute = AuthenticationAttribute.objects.create(
+            institution=self.institution,
+            index_number=index,
+        )
+        self.request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            json.dumps({'id': attribute.id}),
+            content_type='application/json'
+        )
+
+        self.view = views.DeleteAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        deleted_attribute = AuthenticationAttribute.objects.get(
+            institution=self.institution,
+            index_number=index,
+        )
+
+        nt.assert_true(deleted_attribute.is_deleted)
+        nt.assert_equal(response.status_code, 200)
+
+    def test_delete_attribute_missing_param(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+        self.view = views.DeleteAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        with nt.assert_raises(HTTPError) as e:
+            self.view.post(self.request)
+        res = e.exception
+        assert res.code == 400
+
+    def test_delete_attribute_does_not_exist(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            json.dumps({'id': 2}),
+            content_type='application/json'
+        )
+        self.view = views.DeleteAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        with nt.assert_raises(HTTPError) as e:
+            self.view.post(self.request)
+        res = e.exception
+        assert res.code == 404
+
+    def test_delete_attribute_used_in_allow_expression(self):
+        self.region.allow_expression = '1&&2'
+        self.region.save()
+        attribute = AuthenticationAttributeFactory(
+            institution=self.institution,
+            index_number=1
+        )
+        self.request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            json.dumps({'id': attribute.id}),
+            content_type='application/json'
+        )
+        self.view = views.DeleteAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_delete_attribute_used_in_readonly_expression(self):
+        self.region.readonly_expression = '1||2'
+        self.region.save()
+        attribute = AuthenticationAttributeFactory(
+            institution=self.institution,
+            index_number=2
+        )
+        self.request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            json.dumps({'id': attribute.id}),
+            content_type='application/json'
+        )
+        self.view = views.DeleteAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+
+class TestSaveAttributeFormView(AdminTestCase):
+
+    def setUp(self):
+        self.user = AuthUserFactory()
+        self.institution = InstitutionFactory()
+        self.user.is_staff = True
+        self.user.affiliated_institutions.add(self.institution)
+        self.user.save()
+
+    def test_save_attribute_missing_params(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({'id': 2, 'attribute': 'name'}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        with nt.assert_raises(HTTPError) as e:
+            self.view.post(self.request)
+        res = e.exception
+        assert res.code == 400
+
+    def test_save_attribute_not_in_defined_list(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({'id': 2, 'attribute': 'name', 'attribute_value': 'admin'}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_save_attribute_does_not_exist(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({'id': 2, 'attribute': 'mail', 'attribute_value': 'admin'}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        with nt.assert_raises(HTTPError) as e:
+            self.view.post(self.request)
+        res = e.exception
+        assert res.code == 400
+
+    def test_save_attribute_is_not_deleted(self):
+        attribute = AuthenticationAttributeFactory()
+        attribute_name_test = 'mail'
+        attribute_value_test = 'admin'
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({'id': attribute.id, 'attribute': attribute_name_test, 'attribute_value': attribute_value_test}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        updated_attribute = AuthenticationAttribute.objects.get(id=attribute.id)
+        nt.assert_equal(updated_attribute.attribute_name, attribute_name_test)
+        nt.assert_equal(updated_attribute.attribute_value, attribute_value_test)
+        nt.assert_equal(response.status_code, 200)
+
+    def test_save_attribute_is_deleted(self):
+        attribute = AuthenticationAttributeFactory(is_deleted=True)
+        attribute_name_test = 'mail'
+        attribute_value_test = 'admin'
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({'id': attribute.id, 'attribute': attribute_name_test, 'attribute_value': attribute_value_test}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        updated_attribute = AuthenticationAttribute.objects.get(id=attribute.id)
+        nt.assert_not_equal(updated_attribute.attribute_name, attribute_name_test)
+        nt.assert_not_equal(updated_attribute.attribute_value, attribute_value_test)
+        nt.assert_equal(response.status_code, 200)
+
+
+class TestSaveInstitutionalStorageView(AdminTestCase):
+
+    def setUp(self):
+        self.user = AuthUserFactory()
+        self.institution = InstitutionFactory()
+        self.user.is_staff = True
+        self.user.affiliated_institutions.add(self.institution)
+        self.user.save()
+        self.region = RegionFactory()
+        self.region._id = self.institution._id
+        self.region.save()
+        self.attribute_1 = AuthenticationAttributeFactory(
+            institution=self.institution, index_number=1
+        )
+        self.attribute_2 = AuthenticationAttributeFactory(
+            institution=self.institution, index_number=2
+        )
+
+    def test_save_institutional_storage_missing_params(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        with nt.assert_raises(HTTPError) as e:
+            self.view.post(self.request)
+        res = e.exception
+        assert res.code == 400
+
+    def test_save_institutional_storage_allow_expression_invalid(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': self.region.id,
+                        'allow': True,
+                        'readonly': False,
+                        'allow_expression': '1|2',
+                        'readonly_expression': ''}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_save_institutional_storage_readonly_expression_invalid(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': self.region.id,
+                        'allow': True,
+                        'readonly': False,
+                        'allow_expression': '',
+                        'readonly_expression': '(1&3&2)||3'}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_save_institutional_storage_index_number_in_allow_expression_not_found(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': self.region.id,
+                        'allow': True,
+                        'readonly': False,
+                        'allow_expression': '2||5',
+                        'readonly_expression': ''}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_save_institutional_storage_index_number_in_readonly_expression_not_found(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': self.region.id,
+                        'allow': True,
+                        'readonly': False,
+                        'allow_expression': '',
+                        'readonly_expression': '(2&&3)||4'}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_save_institutional_storage_region_not_found(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': self.region.id + 1,
+                        'allow': True,
+                        'readonly': False,
+                        'allow_expression': '',
+                        'readonly_expression': ''}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        with nt.assert_raises(HTTPError) as e:
+            self.view.post(self.request)
+        res = e.exception
+        assert res.code == 400
+
+    def test_save_institutional_storage_with_new_storage_name(self):
+        storage_name_test = self.region.name + 'test'
+        allow_test = True
+        readonly_test = False
+        allow_expression_test = '1&&2'
+        readonly_expression_test = '!1'
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': self.region.id,
+                        'allow': allow_test,
+                        'readonly': readonly_test,
+                        'allow_expression': allow_expression_test,
+                        'readonly_expression': readonly_expression_test,
+                        'storage_name': storage_name_test}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        updated_region = Region.objects.get(id=self.region.id)
+        nt.assert_equal(updated_region.is_allowed, allow_test)
+        nt.assert_equal(updated_region.is_readonly, readonly_test)
+        nt.assert_equal(updated_region.allow_expression, allow_expression_test)
+        nt.assert_equal(updated_region.readonly_expression, readonly_expression_test)
+        nt.assert_equal(response.status_code, 200)
+
+    def test_save_institutional_storage_with_existing_storage_name(self):
+        region_test = RegionFactory()
+        region_test._id = self.institution._id
+        region_test.save()
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': self.region.id,
+                        'allow': True,
+                        'readonly': False,
+                        'allow_expression': '',
+                        'readonly_expression': '',
+                        'storage_name': region_test.name}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
         nt.assert_equal(response.status_code, 400)

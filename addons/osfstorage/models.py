@@ -489,6 +489,8 @@ class Region(models.Model):
     waterbutler_settings = DateTimeAwareJSONField(default=dict)
     is_allowed = models.BooleanField(default=True)
     is_readonly = models.BooleanField(default=False)
+    allow_expression = models.CharField(max_length=200, null=True)
+    readonly_expression = models.CharField(max_length=200, null=True)
 
     def __unicode__(self):
         return '{}'.format(self.name)

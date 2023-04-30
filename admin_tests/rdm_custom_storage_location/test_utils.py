@@ -685,3 +685,31 @@ class TestUtils(AdminTestCase):
 
         nt.assert_equal(res.name, DEFAULT_REGION_NAME)
         nt.assert_equal(res._id, institution._id)
+
+    def test_validate_logic_expression_operator_invalid(self):
+        region = RegionFactory(allow_expression='')
+        res = utils.validate_logic_expression(region.allow_expression)
+        region_1 = RegionFactory(allow_expression='1&2')
+        res_1 = utils.validate_logic_expression(region_1.allow_expression)
+        region_2 = RegionFactory(allow_expression='1&2&3')
+        res_2 = utils.validate_logic_expression(region_2.allow_expression)
+        region_3 = RegionFactory(allow_expression='(1|2)|3')
+        res_3 = utils.validate_logic_expression(region_3.allow_expression)
+        region_4 = RegionFactory(allow_expression='(1&&&&3')
+        res_4 = utils.validate_logic_expression(region_4.allow_expression)
+        nt.assert_true(res)
+        nt.assert_false(res_1)
+        nt.assert_false(res_2)
+        nt.assert_false(res_3)
+        nt.assert_false(res_4)
+
+    def test_check_index_number_exists(self):
+        region = RegionFactory(allow_expression='(1&&2)||3')
+        res = utils.check_index_number_exists(region.allow_expression, '2')
+        nt.assert_true(res)
+
+    def test_validate_index_number_not_found_return_true(self):
+        region = RegionFactory(allow_expression='(1&&2)||3')
+        index_list = [1, 2, 3, 4, 5]
+        res = utils.validate_index_number_not_found(region.allow_expression, index_list)
+        nt.assert_true(res)

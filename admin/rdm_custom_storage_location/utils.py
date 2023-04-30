@@ -9,6 +9,7 @@ from rest_framework import status as http_status
 import requests
 from swiftclient import exceptions as swift_exceptions
 import os
+import re
 import owncloud
 from django.core.exceptions import ValidationError
 
@@ -1133,3 +1134,60 @@ def save_usermap_from_tmp(provider_name, institution):
         rdm_addon_option.extended[KEYNAME_USERMAP] = new_usermap
         del rdm_addon_option.extended[KEYNAME_USERMAP_TMP]
         rdm_addon_option.save()
+
+
+def check_index_number_exists(expression, item):
+    """Check index number exists or not
+
+    :param str expression: logical expression
+    :param int item: index number
+    :return bool: index number exists or not
+
+    """
+
+    result = re.findall(r'\d+', expression)
+    return True if str(item) in result else False
+
+
+def validate_index_number_not_found(expression, index_list):
+    """Check index number is used or not
+
+    :param str expression: logical expression
+    :param list index_list: list of index number
+    :return bool: index number is used or not
+
+    """
+
+    index_number_input = re.findall(r'\d+', expression)
+    return all(int(value) in index_list for value in index_number_input)
+
+
+def validate_logic_expression(expression):
+    """Validate logic expression
+
+    :param str expression: logical expression
+    :return bool: logic expression is valid or not
+
+    """
+
+    if expression:
+        if expression.count('|') % 2 != 0 or \
+                expression.count('&') % 2 != 0:
+            return False
+        expression = expression.\
+            replace('&&', ' and ').\
+            replace('||', ' or ').\
+            replace('!', ' not ')
+
+        if expression.find('&') >= 0:
+            return False
+        if expression.find('|') >= 0:
+            return False
+        try:
+            if not (type(eval(expression)) == int or type(eval(expression)) == bool):
+                return False
+        except SyntaxError:
+            return False
+        except NameError:
+            return False
+    return True
