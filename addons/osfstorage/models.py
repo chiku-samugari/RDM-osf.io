@@ -25,6 +25,7 @@ from website.util import api_url_for
 from website import settings as website_settings
 from addons.osfstorage.settings import DEFAULT_REGION_ID
 from website.util import api_v2_url
+from addons.base.utils import get_root_institutional_storage
 
 settings = apps.get_app_config('addons_osfstorage')
 
@@ -306,7 +307,16 @@ class OsfStorageFile(OsfStorageFileNode, File):
         if metadata:
             version.update_metadata(metadata, save=False)
 
-        version.region = self.target.osfstorage_region
+        if hasattr(self.target, 'get_addon'):
+            root_folder_id = get_root_institutional_storage(self._id)
+            if root_folder_id is not None:
+                root_folder_id = root_folder_id.id
+            region = self.target.get_addon(self._provider, root_id=root_folder_id).region
+            # The region of file version should be region of corresponding addon
+            version.region = region
+        else:
+            version.region = self.target.osfstorage_region
+
         version._find_matching_archive(save=False)
 
         version.save()

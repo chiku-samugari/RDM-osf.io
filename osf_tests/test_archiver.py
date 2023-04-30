@@ -231,6 +231,9 @@ def _mock_get_or_add(name, *args, **kwargs):
     active_addons.add(name)
     return _mock_get_addon(name)
 
+def _mock_has_addon(name, *args, **kwargs):
+    return name in active_addons
+
 def use_fake_addons(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -238,7 +241,8 @@ def use_fake_addons(func):
             mock.patch('osf.models.mixins.AddonModelMixin.add_addon', mock.Mock(side_effect=_mock_get_or_add)),
             mock.patch('osf.models.mixins.AddonModelMixin.get_addon', mock.Mock(side_effect=_mock_get_addon)),
             mock.patch('osf.models.mixins.AddonModelMixin.delete_addon', mock.Mock(side_effect=_mock_delete_addon)),
-            mock.patch('osf.models.mixins.AddonModelMixin.get_or_add_addon', mock.Mock(side_effect=_mock_get_or_add))
+            mock.patch('osf.models.mixins.AddonModelMixin.get_or_add_addon', mock.Mock(side_effect=_mock_get_or_add)),
+            mock.patch('osf.models.mixins.AddonModelMixin.has_addon', mock.Mock(side_effect=_mock_has_addon))
         ):
             ret = func(*args, **kwargs)
             return ret

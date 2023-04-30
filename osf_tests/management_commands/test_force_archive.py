@@ -3,7 +3,6 @@ import mock  # noqa
 import pytest
 
 from addons.osfstorage.tests import factories
-from framework.exceptions import HTTPError
 from osf.management.commands.force_archive import archive
 from osf_tests.factories import RegionFactory, NodeFactory, RegistrationFactory
 from tests.base import OsfTestCase
@@ -30,5 +29,4 @@ class TestArchiveUtils(OsfTestCase):
         comp2 = NodeFactory(parent=proj)
         NodeFactory(parent=comp2)
         reg = RegistrationFactory(project=proj)
-        with pytest.raises(HTTPError):
-            archive(reg, self.region.id)
+        archive(reg, self.region.id)

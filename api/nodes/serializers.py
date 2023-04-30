@@ -856,6 +856,8 @@ class NodeSerializer(TaxonomizableSerializerMixin, JSONAPISerializer):
             except ValidationError as e:
                 raise InvalidModelValueError(detail=str(e.message))
 
+        # If there is no affiliated institution, set the node setting region by the user's default one,
+        # else continue to use the setting of affiliated institutions.
         if not user.affiliated_institutions.exists():
             if not region_id:
                 region_id = self.context.get('region_id')

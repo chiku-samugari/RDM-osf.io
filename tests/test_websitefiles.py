@@ -15,6 +15,9 @@ from osf_tests.factories import AuthUserFactory, ProjectFactory
 from website.files import exceptions
 from website.files.utils import attach_versions
 from osf import models
+from addons.osfstorage.tests import factories
+from osf_tests.factories import ProjectFactory, RegionFactory, NodeFactory
+from website.notifications.events.files import ComplexFileEvent
 
 
 class TestFileNode(BaseFileNode):
@@ -715,10 +718,6 @@ class TestSubclasses(FilesTestCase):
             mock.call(None, version='zyzz', bar='baz'),
         ])
 
-import pytest
-from addons.osfstorage.tests import factories
-from osf_tests.factories import ProjectFactory, RegionFactory, NodeFactory
-from website.notifications.events.files import ComplexFileEvent
 
 class TestComplexFileEvent(FilesTestCase):
     def setUp(self):
@@ -739,33 +738,55 @@ class TestComplexFileEvent(FilesTestCase):
         self.component_node_settings.full_name = self.config['storage']['provider']
         self.component_node_settings.save()
 
-    def test_init(self):
+    def test_init_except(self):
         payload = {
-            'source':{
+            'source': {
                 'node': {
                     '_id': 123
                 }
             },
-            'destination':{
+            'destination': {
                 'provider': 'osfstorage'
             }
         }
         with mock.patch('osf.models.node.AbstractNode.load', return_value=None):
             with mock.patch('osf.models.preprint.Preprint.load', return_value=None):
-                ComplexFileEvent(self.user, self.new_component, 'added', payload)
+                res = ComplexFileEvent(self.user, self.new_component, 'added', payload)
+                assert res is not None
 
-    def test_init_exception(self):
+    def test_init_have_root_id(self):
+        parent = TestFolder(
+            _path='aparent',
+            name='parent',
+            target=self.project,
+            provider='osf_storage',
+            materialized_path='/long/path/to/name',
+            is_root=True,
+        )
+        parent.save()
+        file_child = TestFile(
+            _path='afile',
+            name='child',
+            target=self.project,
+            parent_id=parent.id,
+            provider='osf_storage',
+            materialized_path='/long/path/to/name',
+        )
+        file_child.save()
         payload = {
-            'source':{
+            'source': {
                 'node': {
                     '_id': 123
                 }
             },
-            'destination':{
-                'provider': 'osfstorage'
+            'destination': {
+                'provider': 'osfstorage',
+                'path': '123/'
             }
         }
         with mock.patch('osf.models.node.AbstractNode.load', return_value=None):
             with mock.patch('osf.models.preprint.Preprint.load', return_value=None):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=Exception('mocked error')):
-                    ComplexFileEvent(self.user, self.new_component, 'added', payload)
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', return_value=None):
+                    with mock.patch('website.notifications.events.files.get_root_institutional_storage', return_value=file_child):
+                        res = ComplexFileEvent(self.user, self.new_component, 'added', payload)
+                        assert res is not None

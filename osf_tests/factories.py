@@ -1008,7 +1008,7 @@ generic_location = {
 
 generic_waterbutler_settings = {
     'storage': {
-        'provider': 'glowcloud',
+        'provider': 'osfstorage',
         'container': 'osf_storage',
         'use_public': True,
     }
