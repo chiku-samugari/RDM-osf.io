@@ -258,7 +258,7 @@ class TestUserSerializer:
         req, user_settings = self.set_up()
         user_serializer = UserSerializer(user, context={'request': req})
         res = user_serializer.get_default_region_id(user_settings)
-        assert res.id == user_settings.default_region.id
+        assert res == user_settings.default_region.id
 
     def test_get_default_region_id_exception(self):
         req, user_settings = self.set_up()

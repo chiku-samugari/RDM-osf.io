@@ -11,6 +11,9 @@ from tests.test_websitefiles import TestFolder, TestFile
 from framework.exceptions import HTTPError
 from unittest import mock
 
+from tests.test_websitefiles import TestFolder, TestFile
+from framework.exceptions import HTTPError
+from unittest import mock
 
 class MockFolder(dict, object):
 

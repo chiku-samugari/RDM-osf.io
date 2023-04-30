@@ -128,13 +128,18 @@ WATERBUTLER_JWE_KEY = jwe.kdf(settings.WATERBUTLER_JWE_SECRET.encode('utf-8'), s
 @decorators.must_have_permission(permissions.WRITE)
 @decorators.must_not_be_registration
 def disable_addon(auth, **kwargs):
+    region_id = request.GET.get('region_id', None)
     node = kwargs['node'] or kwargs['project']
 
     addon_name = kwargs.get('addon')
     if addon_name is None:
         raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
-    deleted = node.delete_addon(addon_name, auth)
+    try:
+        # Delete addon by region_id, if region_id is not found then raise 400 error
+        deleted = node.delete_addon(addon_name, auth, region_id=region_id)
+    except Exception:
+        raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
     return {'deleted': deleted}
 
@@ -551,6 +556,9 @@ def create_waterbutler_log(payload, **kwargs):
                 # Using the region to get institutional storage name in recent activity
                 'region': destination.region.id if destination.config.short_name == 'osfstorage' else None
             })
+
+            if destination.config.short_name == 'osfstorage':
+                payload['region'] = destination.region.id
 
             if not payload.get('errors'):
                 destination_node.add_log(

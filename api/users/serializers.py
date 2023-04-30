@@ -220,7 +220,7 @@ class UserSerializer(JSONAPISerializer):
         region_id = Region.objects.first().id
         try:
             # use the annotated value if possible
-            region_id = obj.default_region
+            region_id = obj.default_region.id
         except AttributeError:
             # use computed property if region annotation does not exist
             try:

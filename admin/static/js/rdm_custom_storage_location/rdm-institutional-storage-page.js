@@ -154,10 +154,22 @@ $('#attribute_authentication').change(function () {
     ajaxRequest(params, '', 'change_attribute_authentication', toggle_button, this);
 });
 
-$('#institutional_storage_form').submit(function (e) {
+$('#storage_name').on('keyup', function(e){
+    var value = e.target.value;
+    if (value.trim()) {
+        e.target.setCustomValidity('');
+    } else {
+        e.target.setCustomValidity(e.target.dataset.title);
+    }
+    e.target.reportValidity();
+});
+
+$('#add_storage').click(function (e) {
     NEW_NAME_CURRENT = null;
     NAME_CURRENT = null;
-    if ($('#institutional_storage_form')[0].checkValidity()) {
+    var storageNameElement = document.getElementById('storage_name');
+    var value = storageNameElement.value.trim();
+    if (value || (!value && storageNameElement.disabled)) {
         var provider = selectedProvider();
 
         preload(provider, null);
@@ -181,7 +193,20 @@ $('#institutional_storage_form').submit(function (e) {
             });
         }
         e.preventDefault();
+    } else {
+        storageNameElement.setCustomValidity(storageNameElement.dataset.title);
+        storageNameElement.reportValidity();
     }
+});
+
+$('.storage_input_value').on('keyup', function(e){
+    var value = e.target.value;
+    if (value.trim()) {
+        e.target.setCustomValidity('');
+    } else {
+        e.target.setCustomValidity(e.target.dataset.title);
+    }
+    e.target.reportValidity();
 });
 
 $('.save_button').click(function (e) {
