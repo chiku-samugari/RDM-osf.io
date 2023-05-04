@@ -59,7 +59,8 @@ function ViewModel(url) {
     });
 
     window.onclick = function(event) {
-        if (event.target.id != '#datastewardModal' && self.is_waiting() === false) {
+        var modalContentElement = document.querySelector('#datastewardModal .modal-content');
+        if (!modalContentElement.contains(event.target) && self.is_waiting() === false) {
             $modal.modal('hide');
             self.dialog_closed_by_user(true);
         }
