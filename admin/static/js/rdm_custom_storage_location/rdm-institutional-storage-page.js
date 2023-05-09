@@ -154,16 +154,6 @@ $('#attribute_authentication').change(function () {
     ajaxRequest(params, '', 'change_attribute_authentication', toggle_button, this);
 });
 
-$('#storage_name').on('keyup', function(e){
-    var value = e.target.value;
-    if (value.trim()) {
-        e.target.setCustomValidity('');
-    } else {
-        e.target.setCustomValidity(e.target.dataset.title);
-    }
-    e.target.reportValidity();
-});
-
 $('#add_storage').click(function (e) {
     NEW_NAME_CURRENT = null;
     NAME_CURRENT = null;
@@ -180,7 +170,19 @@ $('#add_storage').click(function (e) {
             validateRequiredFields(provider);
         };
         if (provider === 'osfstorage') {
-            showModal();
+            var route = 'check_existing_nii_storage';
+            $.ajax({
+                url: '../' + route + '/',
+                type: 'GET',
+                contentType: 'application/json; charset=utf-8',
+                timeout: 120000,
+                success: function (data) {
+                    showModal();
+                },
+                error: function (jqXHR) {
+                    $osf.growl(_('Error'), _(jqXHR.responseJSON.message), 'danger', 5000);
+                }
+            });
         } else {
             $osf.confirmDangerousAction({
                 title: _('Are you sure you want to add institutional storage?'),
@@ -194,19 +196,8 @@ $('#add_storage').click(function (e) {
         }
         e.preventDefault();
     } else {
-        storageNameElement.setCustomValidity(storageNameElement.dataset.title);
-        storageNameElement.reportValidity();
+        storageNameElement.setCustomValidity(_('This field is required.'));
     }
-});
-
-$('.storage_input_value').on('keyup', function(e){
-    var value = e.target.value;
-    if (value.trim()) {
-        e.target.setCustomValidity('');
-    } else {
-        e.target.setCustomValidity(e.target.dataset.title);
-    }
-    e.target.reportValidity();
 });
 
 $('.save_button').click(function (e) {
@@ -601,7 +592,7 @@ var afterRequest = {
             location.reload(true);
         },
         'fail': function (id, message) {
-            $('#' + id + '_message').html(message);
+            $('#' + id + '_message').html(_(message));
             $('#' + id + '_save').attr('disabled', true);
             $('#' + id + '_save').removeClass('btn-success').addClass('btn-default');
             $('#' + id + '_connect').removeClass('btn-default').addClass('btn-success');

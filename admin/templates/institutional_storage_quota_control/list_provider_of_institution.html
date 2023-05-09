@@ -7,14 +7,14 @@
 {% endblock %}
 
 {% block title %}
-<title>{{ institution_name }} {% trans 'List Provider of Intitution' %}</title>
+<title>{{ institution_name }} {% trans 'List Provider of Institution' %}</title>
 {% endblock title %}
 
 {% block content %}
 {% if institution.id %}
-<h2>{% trans "Institutional Storages" %}<small>({{ institution.name }})</small></h2>
+<h2>{% trans "Institutional storages " %}<small>({{ institution.name }})</small></h2>
 {% else %}
-<h2>{% trans "Institutional Storages" %}</h2>
+<h2>{% trans "Institutional storages " %}</h2>
 {% endif %}
 {% include "util/pagination.html" with items=page status=direction order=order_by %}
 <table class="table table-striped table-hover table-responsive">
@@ -48,14 +48,14 @@
     <tr>
         <td style="vertical-align:middle">
             <a class="btn btn-primary"
-               href="{% url 'institutional_storage_quota_control:institution_user_list' institution_id=storage.institution_id %}?region={{storage.region_id}}">
+               href="{% url 'institutional_storage_quota_control:institution_user_list' institution_id=storage.institution_id region_id=storage.region_id %}">
                 {{ storage.order_id }}
             </a>
         </td>
         <td style="vertical-align:middle">
             <img src="{{ storage.icon_url_admin }}"/>
             <a style="color: #000000;"
-               href="{% url 'institutional_storage_quota_control:institution_user_list' institution_id=storage.institution_id %}?region={{storage.region_id}}">
+               href="{% url 'institutional_storage_quota_control:institution_user_list' institution_id=storage.institution_id region_id=storage.region_id %}">
                 {{ storage.provider }}
             </a>
         </td>

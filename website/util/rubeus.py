@@ -265,6 +265,7 @@ class NodeFileCollector(object):
         rv = []
         region_disabled = False
         region_provider = None
+        region_provider_set = set()
         osf_addons = node.get_osfstorage_addons()
         data = {}
         for osf_addon in osf_addons:
@@ -275,6 +276,7 @@ class NodeFileCollector(object):
                 storage = region.waterbutler_settings.get('storage', None)
                 if storage:
                     region_provider = storage.get('provider', None)
+                    region_provider_set.add(region_provider)
             region.is_allowed = check_authentication_attribute(self.auth.user,
                                                                region.allow_expression,
                                                                region.is_allowed)
@@ -289,7 +291,7 @@ class NodeFileCollector(object):
                 if addon.short_name == 'osfstorage' and (data[addon.id]['region_disabled'] or not data[addon.id]['is_allowed']):
                     continue  # skip (hide osfstorage)
                 if addon.config.for_institutions:
-                    if data[addon.id]['region_provider'] != addon.config.short_name:
+                    if addon.config.short_name not in region_provider_set:
                         continue  # skip (hide this *institutions)
 
                 # WARNING: get_hgrid_data can return None if the addon is added but has no credentials.

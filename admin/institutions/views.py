@@ -28,9 +28,6 @@ from website.util import quota
 from addons.osfstorage.models import Region
 from api.base import settings as api_settings
 import csv
-from framework.exceptions import HTTPError
-from rest_framework import status as http_status
-from admin.base.utils import reverse_qs
 
 logger = logging.getLogger(__name__)
 
@@ -483,16 +480,15 @@ class InstitutionalStorage(RdmPermissionMixin, ListView):
         return direction
 
     def get(self, request, *args, **kwargs):
+        if not (self.is_admin and self.request.user.affiliated_institutions.exists()):
+            raise Http404
         query_set = self.get_queryset()
         self.object_list = query_set
         ctx = self.get_context_data()
 
         if len(query_set) == 1:
             return redirect(
-                reverse_qs(
-                    'institutions:statistical_status_default_storage',
-                    query_kwargs={'region_id': query_set[0]['region_id']}
-                )
+                'institutions:statistical_status_default_storage', region_id=query_set[0]['region_id']
             )
 
         return self.render_to_response(ctx)
@@ -594,7 +590,7 @@ class StatisticalStatusDefaultInstitutionalStorage(QuotaUserStorageList, RdmPerm
         return self.request.user.affiliated_institutions.first()
 
     def get_region(self):
-        region_id = self.request.GET.get('region_id', None)
+        region_id = self.kwargs['region_id']
         if not region_id:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-        return Region.objects.get(id=region_id)
+            raise Http404
+        return Region.objects.filter(id=region_id).first()

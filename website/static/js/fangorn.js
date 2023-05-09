@@ -2038,6 +2038,8 @@ function _loadTopLevelChildren() {
     for (i = 0; i < this.treeData.children.length; i++) {
         this.updateFolder(null, this.treeData.children[i]);
     }
+    this.select('#tb-tbody > .tb-modal-shade').hide();
+    this.select('#tb-tbody').css('overflow', '');
 }
 
 /**
@@ -3422,9 +3424,6 @@ tbOptions = {
             '<p class="m-t-sm fg-load-message">Loading files...</p>' +
             '</div></div>'
         );
-        // Hide loading
-        tb.select('#tb-tbody > .tb-modal-shade').hide();
-        tb.select('#tb-tbody').css('overflow', '');
     },
     movecheck : function (to, from) { //This method gives the users an option to do checks and define their return
         return true;
@@ -3438,6 +3437,7 @@ tbOptions = {
         var displaySize;
         var msgText;
         var quota;
+        var storage_quota;
         if (_fangornCanDrop(treebeard, item)) {
             if (item.data.accept && item.data.accept.maxSize) {
                 size = file.size / 1000000;
@@ -3453,20 +3453,26 @@ tbOptions = {
                 }
             }
             if (item.data.provider === 'osfstorage') {
+                storage_quota = $.ajax({
+                    async: false,
+                    method: 'GET',
+                    url: item.data.nodeApiUrl + item.data.path.replaceAll('/', '') + '/get_institution_storage_quota/'
+                });
                 quota = $.ajax({
                     async: false,
                     method: 'GET',
                     url: item.data.nodeApiUrl + 'get_creator_quota/'
                 });
-                if (quota.responseJSON) {
+                if (quota.responseJSON || storage_quota.responseJSON) {
                     quota = quota.responseJSON;
-                    if (quota.used + file.size > quota.max) {
+                    storage_quota = storage_quota.responseJSON;
+                    if (quota.used + file.size > quota.max || storage_quota.used + file.size > storage_quota.max) {
                         msgText = gettext('Not enough quota to upload the file.');
                         item.notify.update(msgText, 'warning', undefined, 3000);
                         addFileStatus(treebeard, file, false, msgText, '');
                         return false;
                     }
-                    if (quota.used + file.size > quota.max * window.contextVars.threshold) {
+                    if (quota.used + file.size > quota.max * window.contextVars.threshold || storage_quota.used + file.size > storage_quota.max * window.contextVars.threshold) {
                         $osf.growl(
                             gettext('Quota usage alert'),
                             sprintf(gettext('You have used more than %1$s% of your quota.'),(window.contextVars.threshold * 100)),
