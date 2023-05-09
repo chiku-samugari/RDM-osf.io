@@ -5,7 +5,7 @@
 <form action={% url 'institutions:recalculate_quota_of_users_in_institution' %} method="post">
     <div class="row">
         <div class="col-md-6">
-            {% include "util/pagination.html" with items=page status=direction order=order_by %}
+            {% include "util/pagination.html" with items=page status=direction order=order_by region_id=region_id %}
         </div>
         <div class="col-md-6">
             {% csrf_token %}
@@ -59,7 +59,7 @@
         {% for user in users %}
         <tr>
             <td>
-                <a href="{%  url 'users:user' user.id %}details/"
+                <a href="{%  url 'users:user' user.id %}details/?region_id={{region_id}}"
                    class="btn btn-primary">
                     {{ user.id }}
                 </a>

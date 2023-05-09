@@ -1989,6 +1989,14 @@ def make_url_map(app):
             project_views.quota.get_creator_quota,
             json_renderer,
         ),
+        Rule(
+            [  # For user (browser)
+                '/project/<pid>/<fid>/get_institution_storage_quota/',
+            ],
+            ['get'],
+            project_views.quota.get_institution_storage_quota,
+            json_renderer,
+        ),
 
     ], prefix='/api/v1')
 

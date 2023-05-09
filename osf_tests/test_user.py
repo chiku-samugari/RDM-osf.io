@@ -103,6 +103,18 @@ class TestOSFUser:
         assert user._id
         assert user.given_name == impute_names_model(name)['given_name']
 
+    def test_representative_affiliated_institution(self):
+        name, email = fake.name(), fake_email()
+        user = OSFUser.create(
+            username=email, password='foobar', fullname=name
+        )
+        user.save()
+        institution = InstitutionFactory()
+        user.affiliated_institutions.add(institution)
+        user.save()
+        res = user.representative_affiliated_institution
+        assert res._id == institution._id
+
     def test_create_unconfirmed(self):
         name, email = fake.name(), fake_email()
         user = OSFUser.create_unconfirmed(
@@ -941,14 +953,6 @@ class TestOSFUser:
         user_auth.save()
         mock_idp_attr.side_effect = AttributeError('exception')
         assert_equal(user_auth.is_full_account_required_info, True)
-
-    def test_is_data_steward_true(self):
-        user = UserFactory(is_data_steward=True)
-        assert user.is_data_steward is True
-
-    def test_is_data_steward_default_value_false(self):
-        user = UserFactory()
-        assert user.is_data_steward is False
 
 
 class TestProjectsInCommon:
