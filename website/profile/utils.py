@@ -98,8 +98,7 @@ def serialize_user(user, node=None, admin=False, full=False, is_profile=False, i
             merged_by = None
 
         default_region = user.get_addon('osfstorage').default_region
-        # Add id field
-        available_regions = [region for region in Region.objects.all().values('id', '_id', 'name')]
+        available_regions = [region for region in Region.objects.all().values('_id', 'name')]
 
         storage_type = UserQuota.NII_STORAGE
         institution = user.affiliated_institutions.first()
@@ -129,7 +128,7 @@ def serialize_user(user, node=None, admin=False, full=False, is_profile=False, i
             'is_merged': user.is_merged,
             'available_regions': available_regions,
             'storage_flag_is_active': storage_i18n_flag_active(),
-            'default_region': {'name': default_region.name, '_id': default_region._id, 'id': default_region.id},
+            'default_region': {'name': default_region.name, '_id': default_region._id},
             'merged_by': merged_by,
             'quota': {
                 'max': max_quota,
