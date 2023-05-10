@@ -619,7 +619,6 @@ function doItemOp(operation, to, from, rename, conflict) {
         return;
     }
 
-    var origFrom = Object.assign({}, from);
     if (operation === OPERATIONS.COPY) {
         from = tb.createItem($.extend(true, {status: operation.status}, from.data), to.id);
     } else {
@@ -712,7 +711,6 @@ function doItemOp(operation, to, from, rename, conflict) {
         }
         // no need to redraw because fangornOrderFolder does it
         orderFolder.call(tb, from.parent());
-        resolveconfigOption.call(tb, from, 'onMoveComplete', [from, origFrom, to, moveSpec]);
     }).fail(function(xhr, textStatus) {
         if (to.data.provider === from.provider) {
             tb.pendingFileOps.pop();
@@ -2179,7 +2177,8 @@ function setCurrentFileID(tree, nodeID, file) {
     } else if (tb.fangornFolderIndex !== undefined && tb.fangornFolderArray !== undefined && tb.fangornFolderIndex < tb.fangornFolderArray.length) {
         for (var j = 0; j < tree.children.length; j++) {
             child = tree.children[j];
-            if (nodeID === child.data.nodeId && child.data.provider === file.provider && child.data.name === tb.fangornFolderArray[tb.fangornFolderIndex]) {
+            var isSelectedItem = child.data.id.includes(file.id);
+            if (nodeID === child.data.nodeId && child.data.provider === file.provider && isSelectedItem) {
                 tb.fangornFolderIndex++;
                 if (child.data.kind === 'folder') {
                     tb.updateFolder(null, child);
@@ -3423,6 +3422,9 @@ tbOptions = {
             '<p class="m-t-sm fg-load-message">Loading files...</p>' +
             '</div></div>'
         );
+        // Hide loading
+        tb.select('#tb-tbody > .tb-modal-shade').hide();
+        tb.select('#tb-tbody').css('overflow', '');
     },
     movecheck : function (to, from) { //This method gives the users an option to do checks and define their return
         return true;
@@ -3491,7 +3493,7 @@ tbOptions = {
         clickable : '#treeGrid',
         addRemoveLinks : false,
         previewTemplate : '<div></div>',
-        parallelUploads : 1,
+        parallelUploads : 5,
         acceptDirectories : false,
         createImageThumbnails : false,
         fallback: function(){},
