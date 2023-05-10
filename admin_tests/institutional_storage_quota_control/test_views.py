@@ -162,16 +162,16 @@ class TestUserListByInstitutionStorageID(AdminTestCase):
 
         self.view = views.UserListByInstitutionStorageID()
 
+    @mock.patch('admin.institutional_storage_quota_control.views.UserListByInstitutionStorageID.get_region')
     @mock.patch('admin.institutions.views.QuotaUserStorageList.get_user_storage_quota_info')
     @mock.patch('admin.institutions.views.QuotaUserList.get_queryset')
-    def test_get_user_list(self, mock_get_queryset, mock_quota):
+    def test_get_user_list(self, mock_get_queryset, mock_quota, mock_region):
         request = RequestFactory().get(
             reverse(
                 'institutional_storage_quota_control:institution_user_list',
-                kwargs={'institution_id': self.institution.id}
-            ),
-            {'region': self.region.id}
+                kwargs={'institution_id': self.institution, 'region_id': self.region.id})
         )
+        mock_region.return_value = self.region
         mock_quota.return_value = {}
         mock_get_queryset.return_value = []
         request.user = self.user
@@ -182,14 +182,14 @@ class TestUserListByInstitutionStorageID(AdminTestCase):
 
         nt.assert_equal(len(user_list), 1)
 
-    def test_get_institution(self):
+    @mock.patch('admin.institutional_storage_quota_control.views.UserListByInstitutionStorageID.get_region')
+    def test_get_institution(self, mock_region):
         request = RequestFactory().get(
             reverse(
                 'institutional_storage_quota_control:institution_user_list',
-                kwargs={'institution_id': self.institution.id}
-            ),
-            {'region_id': self.region.id}
+                kwargs={'institution_id': self.institution, 'region_id': self.region.id})
         )
+        mock_region.return_value = self.region
         request.user = self.user
 
         view = setup_view(self.view, request,
@@ -198,17 +198,18 @@ class TestUserListByInstitutionStorageID(AdminTestCase):
 
         nt.assert_equal(institution.storage_name, self.region.name)
 
+    @mock.patch('admin.institutional_storage_quota_control.views.UserListByInstitutionStorageID.get_region')
     @mock.patch('admin.institutions.views.QuotaUserStorageList.get_user_storage_quota_info')
     @mock.patch('admin.institutions.views.QuotaUserList.get_queryset')
-    def test_get_context_data_has_storage_name(self, mock_get_queryset, mock_quota):
+    def test_get_context_data_has_storage_name(self, mock_get_queryset, mock_quota, mock_region):
         request = RequestFactory().get(
             reverse(
                 'institutional_storage_quota_control:institution_user_list',
-                kwargs={'institution_id': self.institution.id}),
-            {'region_id': self.region.id}
+                kwargs={'institution_id': self.institution, 'region_id': self.region.id})
         )
         mock_quota.return_value = {}
         mock_get_queryset.return_value = []
+        mock_region.return_value = self.region
         request.user = self.user
         view = setup_view(self.view, request,
                           institution_id=self.institution.id)
@@ -218,20 +219,21 @@ class TestUserListByInstitutionStorageID(AdminTestCase):
         nt.assert_is_instance(res, dict)
         nt.assert_equal(res['institution_storage_name'], self.region.name)
 
-    def test_get_institution_not_found(self):
+    @mock.patch('admin.institutional_storage_quota_control.views.UserListByInstitutionStorageID.get_region')
+    def test_get_institution_not_found(self, mock_region):
         region = RegionFactory()
         request = RequestFactory().get(
             reverse(
                 'institutional_storage_quota_control:institution_user_list',
-                kwargs={'institution_id': self.institution.id}),
-            {'region_id': region.id}
+                kwargs={'institution_id': self.institution.id, 'region_id': region.id})
         )
+        mock_region.return_value = region
         request.user = self.user
         view = setup_view(self.view, request,
                           institution_id=self.institution.id)
-        with pytest.raises(HTTPError):
-            institution = view.get_institution()
-            nt.assert_equal(institution.storage_name, self.region.name)
+
+        institution = view.get_institution()
+        nt.assert_equal(institution.storage_name, None)
 
 
 class TestInstitutionStorageListByAdmin(AdminTestCase):
@@ -432,6 +434,7 @@ class TestProviderListByInstitution(AdminTestCase):
                 kwargs={'institution_id': self.institution.id}
             )
         )
+        request.user = self.user
         self.view(
             request,
             institution_id=self.institution.id
@@ -445,6 +448,7 @@ class TestProviderListByInstitution(AdminTestCase):
             ),
             {'order_by': 'provider', 'status': 'abc'}
         )
+        request.user = self.user
         self.view(
             request,
             institution_id=self.institution.id

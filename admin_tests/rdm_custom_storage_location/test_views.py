@@ -27,6 +27,10 @@ class TestInstitutionDefaultStorage(AdminTestCase):
 
         self.user = AuthUserFactory()
         self.user.affiliated_institutions.add(self.institution1)
+        self.user.is_active = True
+        self.user.is_registered = True
+        self.user.is_superuser = False
+        self.user.is_staff = True
         self.user.save()
         self.request = RequestFactory().get('/fake_path')
         self.view = views.InstitutionalStorageView()

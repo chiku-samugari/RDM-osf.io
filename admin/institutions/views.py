@@ -451,13 +451,14 @@ class RecalculateQuota(RdmPermissionMixin, RedirectView):
 class RecalculateQuotaOfUsersInInstitution(RdmPermissionMixin, RedirectView):
 
     def dispatch(self, request, *args, **kwargs):
+        region_id = self.request.GET.get('region_id', None)
         if self.is_admin:
             institution = self.request.user.affiliated_institutions.first()
             if institution is not None and Region.objects.filter(_id=institution._id).exists():
                 for user in OSFUser.objects.filter(affiliated_institutions=institution.id):
                     quota.update_user_used_quota(user, UserQuota.CUSTOM_STORAGE)
 
-        return redirect('institutions:statistical_status_default_storage')
+        return redirect('institutions:statistical_status_default_storage', region_id=region_id)
 
 
 class InstitutionalStorage(RdmPermissionMixin, ListView):

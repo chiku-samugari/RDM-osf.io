@@ -26,6 +26,7 @@ from admin.institutions import views
 from admin.institutions.forms import InstitutionForm
 from admin.base.forms import ImportFileForm
 from addons.osfstorage.models import Region
+from django.http import Http404
 
 
 class TestInstitutionList(AdminTestCase):
@@ -903,6 +904,10 @@ class TestInstitutionalStorage(AdminTestCase):
             _id=self.institution._id)
 
         self.user.affiliated_institutions.add(self.institution)
+        self.user.is_active = True
+        self.user.is_registered = True
+        self.user.is_staff = True
+        self.user.is_superuser = False
         self.user.save()
 
         self.request = RequestFactory().get('/fake_path')
@@ -1160,21 +1165,30 @@ class TestStatisticalStatusDefaultInstitutionalStorage(AdminTestCase):
         nt.assert_equal(response.status_code, 200)
 
     def test_get_region(self):
-        self.region = RegionFactory(name='Storage')
-        # UserStorageQuota.objects.create(user=self.user, region=self.region, max_quota=150, used=22)
-        with nt.assert_raises(HTTPError) as exc_info:
-            self.view.get_region()
-        nt.assert_equal(exc_info.exception.code, 400)
+        region = RegionFactory(name='Storage')
+        request = RequestFactory().get('/fake_path', kwargs={'region_id': region.id})
+
+        view = setup_view(
+            views.StatisticalStatusDefaultInstitutionalStorage(),
+            request,
+            user=self.user,
+            institution_id=self.institution.id,
+            region_id=''
+        )
+        with nt.assert_raises(Http404) as exc_info:
+            view.get_region()
 
     def test_get_region_have_region_id(self):
         region = RegionFactory(id=10, name='Storage')
-        request = RequestFactory().get('/fake_path?region_id={}'.format('10'))
+        # request = RequestFactory().get('/fake_path?region_id={}'.format('10'))
+        request = RequestFactory().get('/fake_path', kwargs={'region_id': region.id})
         request.user = self.user
         view = setup_view(
             views.StatisticalStatusDefaultInstitutionalStorage(),
             request,
             user=self.user,
-            institution_id=self.institution.id
+            institution_id=self.institution.id,
+            region_id=region.id
         )
         res = view.get_region()
 
