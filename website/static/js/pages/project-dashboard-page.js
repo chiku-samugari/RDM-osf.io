@@ -607,7 +607,6 @@ $(document).ready(function () {
                     // Hide loading
                     tb.select('#tb-tbody > .tb-modal-shade').hide();
                     tb.select('#tb-tbody').css('overflow', '');
-                    Fangorn.DefaultOptions.onload.call(this);
                 }
             };
             var filebrowser = new Fangorn(fangornOpts);

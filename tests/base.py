@@ -133,11 +133,7 @@ class AppTestCase(unittest.TestCase):
         if not self.PUSH_CONTEXT:
             return
         with mock.patch('website.mailchimp_utils.get_mailchimp_api'):
-            try:
-                self.context.pop()
-            except Exception:
-                pass
-                # do nothing
+            self.context.pop()
         for signal in self.DISCONNECTED_SIGNALS:
             for receiver in self.DISCONNECTED_SIGNALS[signal]:
                 signal.connect(receiver)

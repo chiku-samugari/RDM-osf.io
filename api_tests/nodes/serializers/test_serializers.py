@@ -13,14 +13,11 @@ from osf_tests.factories import (
     UserFactory,
     NodeFactory,
     RegistrationFactory,
-    ProjectFactory,
-    RegionFactory
+    ProjectFactory
 )
 from tests.base import assert_datetime_equal
 from tests.utils import make_drf_request_with_version
 from api.base import settings as api_settings
-from api.nodes.serializers import RegionRelationshipField
-from rest_framework import exceptions
 
 
 @pytest.fixture()
@@ -303,16 +300,3 @@ class TestSparseRegistrationSerializer:
         assert 'forked_from' not in relationships
         assert 'sparse' not in relationships['detail']['links']['related']['href']
         assert 'sparse' in relationships['children']['links']['related']['href']
-
-
-@pytest.mark.django_db
-class TestRegionRelationshipField:
-
-    def test_to_internal_value(self):
-        region = RegionFactory(name='Storage')
-        res = RegionRelationshipField.to_internal_value(None, region.id)
-        assert res['region_id'] == region.id
-
-    def test_to_internal_value_exception(self):
-        with pytest.raises(exceptions.ValidationError):
-            RegionRelationshipField.to_internal_value(None, 123)

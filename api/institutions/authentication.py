@@ -12,9 +12,10 @@ from rest_framework.exceptions import AuthenticationFailed
 
 from api.base.authentication import drf
 from api.base import exceptions, settings
+from addons.datasteward.views import enable_datasteward_addon
 
 from framework import sentry
-from framework.auth import get_or_create_user
+from framework.auth import get_or_create_user, Auth
 from framework.auth.core import get_user
 
 from osf import features
@@ -164,8 +165,6 @@ class InstitutionAuthentication(BaseAuthentication):
         organization_name_ja = get_next(p_user, 'jao', 'jaOrganizationName')
         # affiliation: 'jaou' is friendlyName
         organizational_unit_ja = get_next(p_user, 'jaou', 'jaOrganizationalUnitName')
-        # isMemberOf for mAP
-        groups = get_next(p_user, 'isMemberOf', 'groups')
 
         # Use given name and family name to build full name if it is not provided
         if given_name and family_name and not fullname:
@@ -396,7 +395,6 @@ class InstitutionAuthentication(BaseAuthentication):
                 'organizational_unit': organizational_unit,
                 'organization_name_ja': organization_name_ja,
                 'organizational_unit_ja': organizational_unit_ja,
-                'groups': groups,
             },
         )
 
@@ -410,6 +408,24 @@ class InstitutionAuthentication(BaseAuthentication):
             user.affiliated_institutions.add(institution)
             user.save()
             update_default_storage(user)
+
+        # Update DataSteward status after every time user login
+        if entitlement and 'GakuNinRDMDataSteward' in entitlement:
+            if not user.is_data_steward:
+                # Set user.is_data_steward to True
+                user.is_data_steward = True
+                user.save()
+
+            # Get user DataSteward add-on setings
+            addon_user_settings = user.get_addon('datasteward')
+            if addon_user_settings and addon_user_settings.enabled:
+                # If user enabled DataSteward add-on, start enable Datasteward add-on process
+                auth = Auth(user=user)
+                enable_datasteward_addon(auth, is_authenticating=True)
+        else:
+            # Set user.is_data_steward to False
+            user.is_data_steward = False
+            user.save()
 
         # update every login. (for mAP API v1)
         init_cloud_gateway_groups(user, provider)
