@@ -232,7 +232,18 @@ msgstr ""
 msgid "This field can't be blank."
 msgstr "このフィールドは必須項目です。"
 
-#: addons/metadata/static/metadata-fields.js:207
+#: addons/metadata/static/metadata-fields.js:191
+#: addons/metadata/static/metadata-fields.js:219
+msgid "Please enter the correct value. "
+msgstr "正しい値を入力してください。 "
+
+#: addons/metadata/static/metadata-fields.js:240
+msgid ""
+"Contacts of data manager can't be blank. Please fill mail address, or "
+"organization name, address and phone number."
+msgstr "データ管理者は必須項目です。メールアドレスを入力するか、所属機関名・連絡先住所・連絡先電話番号を入力してください。"
+
+#: addons/metadata/static/metadata-fields.js:260
 msgid "(Not Modified)"
 msgstr "(変更なし)"
 
@@ -5363,7 +5374,7 @@ msgstr "コンポーネント"
 
 #: website/static/js/js_messages.js:21
 msgid "Registrations"
-msgstr "登録"
+msgstr "プロジェクトメタデータ"
 
 #: website/static/js/js_messages.js:21
 msgid "Users"
@@ -5396,6 +5407,10 @@ msgstr "Wiki"
 #: website/static/js/js_messages.js:21
 msgid "Comments"
 msgstr "コメント"
+
+#: website/static/js/js_messages.js:21
+msgid "Metadata"
+msgstr "ファイルメタデータ"
 
 #: website/static/js/js_messages.js:23
 msgid "Default Notification Settings"

@@ -230,6 +230,7 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
                     data.get('s3_access_key'),
                     data.get('s3_secret_key'),
                     data.get('s3_bucket'),
+                    server_side_encryption=bool(strtobool(data.get('s3_server_side_encryption'))),
                     new_storage_name=new_storage_name,
                 )
             elif provider_short_name == 's3compat':
@@ -262,6 +263,7 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
                     data.get('s3compatinstitutions_secret_key'),
                     data.get('s3compatinstitutions_bucket'),
                     provider_short_name,
+                    server_side_encryption=bool(strtobool(data.get('s3compatinstitutions_server_side_encryption'))),
                     new_storage_name=new_storage_name,
                 )
             elif provider_short_name == 'ociinstitutions':
