@@ -1114,14 +1114,17 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
         assert res.code == 400
 
     def test_save_institutional_storage_with_new_storage_name(self):
-        storage_name_test = self.region.name + 'test'
+        region = RegionFactory()
+        region._id = self.institution._id
+        region.save()
+        storage_name_test = region.name + 'test'
         allow_test = True
         readonly_test = False
         allow_expression_test = '1&&2'
         readonly_expression_test = '!1'
         self.request = RequestFactory().post(
             'custom_storage_location:save_institutional_storage',
-            json.dumps({'region_id': self.region.id,
+            json.dumps({'region_id': region.id,
                         'allow': allow_test,
                         'readonly': readonly_test,
                         'allow_expression': allow_expression_test,
@@ -1133,7 +1136,7 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
         self.view = views.SaveInstitutionalStorageView()
         self.view = setup_user_view(self.view, self.request, user=self.user)
         response = self.view.post(self.request)
-        updated_region = Region.objects.get(id=self.region.id)
+        updated_region = Region.objects.get(id=region.id)
         nt.assert_equal(updated_region.is_allowed, allow_test)
         nt.assert_equal(updated_region.is_readonly, readonly_test)
         nt.assert_equal(updated_region.allow_expression, allow_expression_test)
