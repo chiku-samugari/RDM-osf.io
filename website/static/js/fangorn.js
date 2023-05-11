@@ -2040,8 +2040,6 @@ function _loadTopLevelChildren() {
     for (i = 0; i < this.treeData.children.length; i++) {
         this.updateFolder(null, this.treeData.children[i]);
     }
-    this.select('#tb-tbody > .tb-modal-shade').hide();
-    this.select('#tb-tbody').css('overflow', '');
 }
 
 /**
@@ -2181,8 +2179,7 @@ function setCurrentFileID(tree, nodeID, file) {
     } else if (tb.fangornFolderIndex !== undefined && tb.fangornFolderArray !== undefined && tb.fangornFolderIndex < tb.fangornFolderArray.length) {
         for (var j = 0; j < tree.children.length; j++) {
             child = tree.children[j];
-            var isSelectedItem = child.data.id.includes(file.id);
-            if (nodeID === child.data.nodeId && child.data.provider === file.provider && isSelectedItem) {
+            if (nodeID === child.data.nodeId && child.data.provider === file.provider && child.data.name === tb.fangornFolderArray[tb.fangornFolderIndex]) {
                 tb.fangornFolderIndex++;
                 if (child.data.kind === 'folder') {
                     tb.updateFolder(null, child);
@@ -3439,7 +3436,6 @@ tbOptions = {
         var displaySize;
         var msgText;
         var quota;
-        var storage_quota;
         if (_fangornCanDrop(treebeard, item)) {
             if (item.data.accept && item.data.accept.maxSize) {
                 size = file.size / 1000000;
@@ -3455,26 +3451,20 @@ tbOptions = {
                 }
             }
             if (item.data.provider === 'osfstorage') {
-                storage_quota = $.ajax({
-                    async: false,
-                    method: 'GET',
-                    url: item.data.nodeApiUrl + item.data.path.replaceAll('/', '') + '/get_institution_storage_quota/'
-                });
                 quota = $.ajax({
                     async: false,
                     method: 'GET',
                     url: item.data.nodeApiUrl + 'get_creator_quota/'
                 });
-                if (quota.responseJSON || storage_quota.responseJSON) {
+                if (quota.responseJSON) {
                     quota = quota.responseJSON;
-                    storage_quota = storage_quota.responseJSON;
-                    if (quota.used + file.size > quota.max || storage_quota.used + file.size > storage_quota.max) {
+                    if (quota.used + file.size > quota.max) {
                         msgText = gettext('Not enough quota to upload the file.');
                         item.notify.update(msgText, 'warning', undefined, 3000);
                         addFileStatus(treebeard, file, false, msgText, '');
                         return false;
                     }
-                    if (quota.used + file.size > quota.max * window.contextVars.threshold || storage_quota.used + file.size > storage_quota.max * window.contextVars.threshold) {
+                    if (quota.used + file.size > quota.max * window.contextVars.threshold) {
                         $osf.growl(
                             gettext('Quota usage alert'),
                             sprintf(gettext('You have used more than %1$s% of your quota.'),(window.contextVars.threshold * 100)),

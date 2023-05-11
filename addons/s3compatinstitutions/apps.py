@@ -21,10 +21,7 @@ def s3compatinstitutions_root(addon_config, node_settings, auth, **kwargs):
     node = node_settings.owner
     institution = node_settings.addon_option.institution
     if Region.objects.filter(_id=institution._id).exists():
-        region = Region.objects.filter(
-            _id=institution._id,
-            waterbutler_settings__storage__provider=SHORT_NAME
-        ).first()
+        region = Region.objects.get(_id=institution._id)
         if region:
             node_settings.region = region
     root = rubeus.build_addon_root(

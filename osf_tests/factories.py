@@ -30,8 +30,6 @@ from osf.models.storage import PROVIDER_ASSET_NAME_CHOICES
 from osf.utils.names import impute_names_model
 from osf.utils.workflows import DefaultStates, DefaultTriggers
 from addons.osfstorage.models import OsfStorageFile, Region
-from api.base import settings as api_settings
-
 
 fake = Factory.create()
 
@@ -253,14 +251,12 @@ class NodeFactory(BaseNodeFactory):
 
 
 class InstitutionFactory(DjangoModelFactory):
-    _id = factory.Sequence(lambda n: 'us_east_{0}'.format(n))
     name = factory.Faker('company')
     login_url = factory.Faker('url')
     logout_url = factory.Faker('url')
     domains = FakeList('url', n=3)
     email_domains = FakeList('domain_name', n=1)
     logo_name = factory.Faker('file_name')
-    is_authentication_attribute = True
 
     class Meta:
         model = models.Institution
@@ -280,24 +276,6 @@ class InstitutionEntitlementFactory(DjangoModelFactory):
 
         return super(InstitutionEntitlementFactory, cls)._create(target_class, institution=institution, login_availability=login_availability,
                                                                  modifier=modifier, *args, **kwargs)
-
-
-class AuthenticationAttributeFactory(DjangoModelFactory):
-    class Meta:
-        model = models.AuthenticationAttribute
-
-    @classmethod
-    def _create(cls, target_class, institution=None, index_number=None, attribute_name=None, attribute_value=None,
-                *args, **kwargs):
-        institution = institution or InstitutionFactory()
-        index_number = index_number or api_settings.DEFAULT_INDEX_NUMBER
-        attribute_name = attribute_name
-        attribute_value = attribute_value
-
-        return super(AuthenticationAttributeFactory, cls)._create(target_class, institution=institution,
-                                                                  index_number=index_number,
-                                                                  attribute_name=attribute_name,
-                                                                  attribute_value=attribute_value, *args, **kwargs)
 
 
 class NodeLicenseRecordFactory(DjangoModelFactory):
@@ -1030,7 +1008,7 @@ generic_location = {
 
 generic_waterbutler_settings = {
     'storage': {
-        'provider': 'osfstorage',
+        'provider': 'glowcloud',
         'container': 'osf_storage',
         'use_public': True,
     }
@@ -1054,10 +1032,6 @@ class RegionFactory(DjangoModelFactory):
     waterbutler_credentials = generic_waterbutler_credentials
     waterbutler_settings = generic_waterbutler_settings
     waterbutler_url = 'http://123.456.test.woo'
-    is_allowed = True
-    is_readonly = False
-    allow_expression = None
-    readonly_expression = None
 
 
 class ProviderAssetFileFactory(DjangoModelFactory):
@@ -1127,24 +1101,10 @@ class BrandFactory(DjangoModelFactory):
     class Meta:
         model = models.Brand
 
-    name = factory.LazyAttribute(lambda n: fake.sentence()[:10])
+    name = factory.Faker('company')
     hero_logo_image = factory.Faker('url')
     topnav_logo_image = factory.Faker('url')
     hero_background_image = factory.Faker('url')
 
     primary_color = factory.Faker('hex_color')
     secondary_color = factory.Faker('hex_color')
-
-
-class RegionExtraFactory:
-    def __init__(self, institution_id, name):
-        self.institution_id = institution_id
-        self.name = name
-
-
-class UserQuotaFactory(DjangoModelFactory):
-    class Meta:
-        model = models.UserQuota
-
-    max_quota = 1000000
-    used = 10
