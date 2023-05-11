@@ -839,7 +839,7 @@ class TestRecalculateQuotaOfUsersInInstitution(AdminTestCase):
         self.request = RequestFactory().get('/fake_path')
         self.request.user = self.user
 
-        self.url = reverse('institutions:statistical_status_default_storage',  kwargs={'region_id': None})
+        self.url = reverse('institutions:statistical_status_default_storage', kwargs={'region_id': None})
         self.view = views.RecalculateQuotaOfUsersInInstitution()
         self.view.request = self.request
 
