@@ -42,14 +42,14 @@
     <tr>
         <td style="vertical-align:middle">
             <a class="btn btn-primary"
-               href="{% url 'institutions:statistical_status_default_storage' %}?region_id={{storage.region_id}}">
+               href="{% url 'institutions:statistical_status_default_storage' region_id=storage.region_id %}">
                 {{ storage.order_id }}
             </a>
         </td>
         <td style="vertical-align:middle">
             <img src="{{ storage.icon_url }}"/>
             <a style="color: #000000;"
-               href="{% url 'institutions:statistical_status_default_storage' %}?region_id={{storage.region_id}}">
+               href="{% url 'institutions:statistical_status_default_storage' region_id=storage.region_id %}">
                 {{ storage.provider }}
             </a>
         </td>

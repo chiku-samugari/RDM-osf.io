@@ -293,7 +293,16 @@ class OsfStorageFile(OsfStorageFileNode, File):
 
     def update_region_from_latest_version(self, destination_parent):
         most_recent_fileversion = self.versions.select_related('region').order_by('-created').first()
-        if most_recent_fileversion and most_recent_fileversion.region != destination_parent.target.osfstorage_region:
+        if hasattr(destination_parent.target, 'get_addon'):
+            file_id = destination_parent._id.strip('/').split('/')[0]
+            file_node_root_id = get_root_institutional_storage(file_id)
+            if file_node_root_id is not None:
+                file_node_root_id = file_node_root_id.id
+            addon = destination_parent.target.get_addon('osfstorage', root_id=file_node_root_id)
+            if addon is not None and most_recent_fileversion:
+                most_recent_fileversion.region = addon.region
+                most_recent_fileversion.save()
+        elif most_recent_fileversion and most_recent_fileversion.region != destination_parent.target.osfstorage_region:
             most_recent_fileversion.region = destination_parent.target.osfstorage_region
             most_recent_fileversion.save()
 

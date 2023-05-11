@@ -6,6 +6,7 @@ from django.db import connection
 from admin.institutions.views import QuotaUserStorageList
 from osf.models import Institution, OSFUser
 from admin.base import settings
+from django.core.exceptions import PermissionDenied
 from addons.osfstorage.models import Region
 from django.views.generic import ListView, View
 from django.shortcuts import redirect
@@ -13,7 +14,6 @@ from admin.rdm.utils import RdmPermissionMixin
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, Http404
 from rest_framework import status as http_status
-from admin.base.utils import reverse_qs
 from admin.rdm_custom_storage_location import utils
 from framework.exceptions import HTTPError
 from website.util.quota import update_institutional_storage_max_quota
@@ -59,7 +59,7 @@ class ProviderListByInstitution(RdmPermissionMixin, ListView):
         institution_id = self.kwargs.get('institution_id')
         institution = Institution.objects.filter(id=institution_id).first()
         if institution is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+            raise Http404
         return institution
 
     def get(self, request, *args, **kwargs):
@@ -70,11 +70,8 @@ class ProviderListByInstitution(RdmPermissionMixin, ListView):
         if len(query_set) == 1:
             institution = self.get_institution()
             return redirect(
-                reverse_qs(
-                    'institutional_storage_quota_control:institution_user_list',
-                    kwargs={'institution_id': institution.id},
-                    query_kwargs={'region_id': query_set[0]['region_id']}
-                )
+                'institutional_storage_quota_control:institution_user_list',
+                institution_id=institution.id, region_id=query_set[0]['region_id']
             )
 
         return self.render_to_response(ctx)
@@ -86,7 +83,7 @@ class ProviderListByInstitution(RdmPermissionMixin, ListView):
         institution_id = self.kwargs.get('institution_id')
         inst_obj = Institution.objects.filter(id=institution_id).first()
         if inst_obj is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+            raise Http404
         list_region = Region.objects.filter(_id=inst_obj._id)
 
         for region in list_region:
@@ -110,12 +107,19 @@ class ProviderListByInstitution(RdmPermissionMixin, ListView):
         return list_provider
 
     def get_context_data(self, **kwargs):
+        user = self.request.user
+        inst_obj = self.get_institution()
+        if self.is_admin:
+            institution = user.affiliated_institutions.first()
+            if inst_obj.id != institution.id:
+                raise PermissionDenied
+        elif not self.is_super_admin:
+            raise PermissionDenied
+
         query_set = self.get_queryset()
         page_size = self.get_paginate_by(query_set)
         paginator, page, query_set, is_paginated = self.paginate_queryset(query_set, page_size)
         kwargs.setdefault('page', page)
-
-        inst_obj = self.get_institution()
         kwargs['institution'] = inst_obj
         kwargs['list_storage'] = query_set
         kwargs['order_by'] = self.get_order_by()
@@ -248,12 +252,12 @@ class UserListByInstitutionStorageID(RdmPermissionMixin, QuotaUserStorageList):
         return user_list
 
     def get_region(self):
-        region_id = self.request.GET.get('region_id', None)
+        region_id = self.kwargs['region_id']
         institution_id = self.kwargs['institution_id']
-        region = Region.objects.get(id=region_id)
-        institution = Institution.objects.get(id=institution_id)
+        region = Region.objects.filter(id=region_id).first()
+        institution = Institution.objects.filter(id=institution_id).first()
         if not region or not institution or institution._id != region._id:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+            raise Http404
         return region
 
 
@@ -275,9 +279,6 @@ class UpdateQuotaUserListByInstitutionStorageID(RdmPermissionMixin, View):
             update_institutional_storage_max_quota(user, region, max_quota)
 
         return redirect(
-            reverse_qs(
-                'institutional_storage_quota_control:institution_user_list',
-                kwargs={'institution_id': institution_id},
-                query_kwargs={'region_id': region.id}
-            )
+            'institutional_storage_quota_control:institution_user_list',
+            institution_id=institution_id, region_id=region_id
         )

@@ -804,7 +804,7 @@ class UserDetailsView(RdmPermissionMixin, UserPassesTestMixin, GuidView):
                     region
                 )
             else:
-                raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+                raise Http404
         else:
             max_quota, _ = quota.get_quota_info(user, UserQuota.CUSTOM_STORAGE)
         return {

@@ -720,7 +720,8 @@ def addon_view_or_download_file_legacy(**kwargs):
         node_settings = node.get_addon('osfstorage', root_id=file_node_root_id)
 
         try:
-            path = node_settings.get_root().find_child_by_name(path)._id
+            if node_settings is not None:
+                path = node_settings.get_root().find_child_by_name(path)._id
         except OsfStorageFileNode.DoesNotExist:
             raise HTTPError(
                 404, data=dict(
