@@ -3,7 +3,6 @@ from operator import itemgetter
 from django.urls import reverse
 from nose import tools as nt
 import mock
-from framework.exceptions import HTTPError
 from django.test import RequestFactory
 from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied
@@ -840,7 +839,7 @@ class TestRecalculateQuotaOfUsersInInstitution(AdminTestCase):
         self.request = RequestFactory().get('/fake_path')
         self.request.user = self.user
 
-        self.url = reverse('institutions:statistical_status_default_storage')
+        self.url = reverse('institutions:statistical_status_default_storage',  kwargs={'region_id': None})
         self.view = views.RecalculateQuotaOfUsersInInstitution()
         self.view.request = self.request
 
@@ -1175,7 +1174,7 @@ class TestStatisticalStatusDefaultInstitutionalStorage(AdminTestCase):
             institution_id=self.institution.id,
             region_id=''
         )
-        with nt.assert_raises(Http404) as exc_info:
+        with nt.assert_raises(Http404):
             view.get_region()
 
     def test_get_region_have_region_id(self):

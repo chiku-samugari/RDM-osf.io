@@ -827,7 +827,10 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
 
         institution = request.user.affiliated_institutions.first()
         index_numbers = list(AuthenticationAttribute.objects.filter(
-            institution=institution, is_deleted=False).values_list('index_number', flat=True))
+            institution=institution,
+            is_deleted=False,
+            attribute_name__isnull=False,
+            attribute_value__isnull=False).values_list('index_number', flat=True))
         is_valid_allow = utils.validate_index_number_not_found(allow_expression, index_numbers)
         is_valid_readonly = utils.validate_index_number_not_found(readonly_expression, index_numbers)
 
