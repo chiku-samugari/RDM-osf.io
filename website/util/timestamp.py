@@ -664,8 +664,9 @@ def file_node_moved(uid, project_id, src_provider, dest_provider, src_path, dest
         inspection_result_status=api_settings.FILE_NOT_EXISTS
     ).all()
 
-    for deleted_file in deleted_files:
-        file_node_overwitten(project_id, target_object_id, dest_provider, dest_path)
+    if not (src_provider == 'osfstorage' and dest_provider == 'osfstorage'):
+        for deleted_file in deleted_files:
+            file_node_overwitten(project_id, target_object_id, dest_provider, dest_path)
     moved_files = RdmFileTimestamptokenVerifyResult.objects.filter(
         path__startswith=src_path,
         project_id=project_id,
@@ -718,16 +719,22 @@ def file_node_moved(uid, project_id, src_provider, dest_provider, src_path, dest
                 provider_change_update_timestampverification(uid, file_node, src_provider, dest_provider)
 
     else:  # "any file -> any file" OR "osfstorage folder -> any folder"
+        path = metadata.get('path', None)
+        if path is not None:
+            path = path.strip('/').split('/')[0]
         file_nodes = BaseFileNode.objects.filter(target_object_id=target_object_id,
                                                  provider=src_provider,
                                                  deleted_on__isnull=True,
                                                  _materialized_path=src_path).all()
+        if not file_nodes:
+            file_nodes = BaseFileNode.objects.filter(_id=path).all()
         for file_node in file_nodes:
             file_node._path = dest_path
             file_node._materialized_path = dest_path
             file_node = move_file_node_update(file_node, src_provider, dest_provider, metadata)
             if dest_provider == 'osfstorage':
-                file_node.delete()
+                if not src_provider == 'osfstorage':
+                    file_node.delete()
                 rft = RdmFileTimestamptokenVerifyResult.objects.filter(file_id=file_node._id).first()
                 if rft is not None:
                     temp_path = rft.path

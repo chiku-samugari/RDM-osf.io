@@ -448,7 +448,6 @@ class OSFUser(DirtyFieldsMixin, GuidMixin, BaseModel, AbstractBaseUser, Permissi
 
     is_active = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
-    is_data_steward = models.BooleanField(default=False)
 
     # ePPN, eduPersonTargetedID and isMemberOf from Shibboleth
     # for Cloud Gateway
@@ -1799,6 +1798,11 @@ class OSFUser(DirtyFieldsMixin, GuidMixin, BaseModel, AbstractBaseUser, Permissi
         token = unclaimed_record['token']
         return '{base_url}user/{uid}/{project_id}/claim/?token={token}'\
                     .format(**locals())
+
+    @property
+    def representative_affiliated_institution(self):
+        """Return representative ``institution`` this user is affiliated with."""
+        return self.affiliated_institutions.first()
 
     def is_affiliated_with_institution(self, institution):
         """Return if this user is affiliated with ``institution``."""
