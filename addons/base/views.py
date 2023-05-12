@@ -18,7 +18,7 @@ from django.db import transaction
 from django.contrib.contenttypes.models import ContentType
 from elasticsearch import exceptions as es_exceptions
 
-from api.base.settings.defaults import SLOAN_ID_COOKIE_NAME
+from api.base.settings.defaults import SLOAN_ID_COOKIE_NAME, ADDON_METHOD_PROVIDER
 
 from addons.base.models import BaseStorageAddon
 from addons.osfstorage.models import OsfStorageFile
@@ -336,17 +336,15 @@ def get_auth(auth, **kwargs):
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
         if provider_name == 'osfstorage':
             region = provider_settings.region
-            is_allowed = check_authentication_attribute(auth.user,
-                                                        region.allow_expression,
-                                                        region.is_allowed)
-            if is_allowed is False:
-                raise HTTPError(http_status.HTTP_403_FORBIDDEN)
-            else:
-                is_readonly = check_authentication_attribute(auth.user,
-                                                             region.readonly_expression,
-                                                             region.is_readonly)
-                if is_readonly is True and action not in ['metadata', 'download', 'revisions', 'render']:
-                    raise HTTPError(http_status.HTTP_403_FORBIDDEN)
+            check_permission_by_attribute(auth.user, action, region)
+        elif provider_name in ADDON_METHOD_PROVIDER:
+            institution = auth.user.affiliated_institutions.first()
+            region = Region.objects.filter(
+                _id=institution._id,
+                waterbutler_settings__storage__provider=provider_name
+            ).first()
+            if region is not None:
+                check_permission_by_attribute(auth.user, action, region)
 
     credentials = None
     waterbutler_settings = None
@@ -1140,3 +1138,17 @@ def get_archived_from_url(node, file_node):
         if not trashed:
             return node.registered_from.web_url_for('addon_view_or_download_file', provider=file_node.provider, path=file_node.copied_from._id)
     return None
+
+
+def check_permission_by_attribute(user, action, region):
+    is_allowed = check_authentication_attribute(user,
+                                                region.allow_expression,
+                                                region.is_allowed)
+    if is_allowed is False:
+        raise HTTPError(http_status.HTTP_403_FORBIDDEN)
+    else:
+        is_readonly = check_authentication_attribute(user,
+                                                     region.readonly_expression,
+                                                     region.is_readonly)
+        if is_readonly is True and action not in ['metadata', 'download', 'revisions', 'render']:
+            raise HTTPError(http_status.HTTP_403_FORBIDDEN)

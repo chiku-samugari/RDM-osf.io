@@ -526,3 +526,12 @@ ATTRIBUTE_LIST = {
     'jaou': 'organizational_unit_ja',
     'gakuninScopedPersonalUniqueCode': '',
 }
+
+# Institutional storage provider (addon method type)
+ADDON_METHOD_PROVIDER = [
+    'nextcloudinstitutions',
+    'dropboxbusiness',
+    's3compatinstitutions',
+    'onedrivebusiness',
+    'ociinstitutions'
+]

@@ -72,6 +72,8 @@ def build_addon_root(node_settings, name, permissions=None,
 
     """
     from osf.utils.permissions import check_private_key_for_anonymized_link
+    from addons.osfstorage.models import Region
+    from api.base.settings import ADDON_METHOD_PROVIDER
 
     permissions = permissions or DEFAULT_PERMISSIONS
     if name and not check_private_key_for_anonymized_link(private_key):
@@ -135,6 +137,21 @@ def build_addon_root(node_settings, name, permissions=None,
                 'view': True,
                 'edit': False
             }})
+    else:
+        if node_settings.config.short_name in ADDON_METHOD_PROVIDER:
+            institution = auth.user.affiliated_institutions.first()
+            region = Region.objects.filter(
+                    _id=institution._id,
+                    waterbutler_settings__storage__provider=node_settings.config.short_name
+                ).first()
+            is_readonly = check_authentication_attribute(auth.user,
+                                                         region.readonly_expression,
+                                                         region.is_readonly)
+            if is_readonly:
+                ret.update({'permissions': {
+                    'view': True,
+                    'edit': False
+                }})
 
     return ret
 
@@ -262,14 +279,17 @@ class NodeFileCollector(object):
         return self._serialize_node(node, children=data)
 
     def _collect_addons(self, node):
+        from addons.osfstorage.models import Region
         rv = []
         region_disabled = False
         region_provider = None
         region_provider_set = set()
         osf_addons = node.get_osfstorage_addons()
         data = {}
+        institution_id = None
         for osf_addon in osf_addons:
             region = osf_addon.region
+            institution_id = region._id
             if region and region.waterbutler_settings:
                 region_disabled = region.waterbutler_settings.get(
                     'disabled', False)
@@ -291,9 +311,19 @@ class NodeFileCollector(object):
                 if addon.short_name == 'osfstorage' and (data[addon.id]['region_disabled'] or not data[addon.id]['is_allowed']):
                     continue  # skip (hide osfstorage)
                 if addon.config.for_institutions:
-                    if addon.config.short_name not in region_provider_set:
+                    if (addon.config.short_name not in region_provider_set):
                         continue  # skip (hide this *institutions)
-
+                    if institution_id is not None:
+                        region = Region.objects.filter(
+                            _id=institution_id,
+                            waterbutler_settings__storage__provider=addon.short_name).first()
+                        if region is not None:
+                            region.is_allowed = check_authentication_attribute(self.auth.user,
+                                                                               region.allow_expression,
+                                                                               region.is_allowed)
+                            if not region.is_allowed:
+                                continue
+                # temp = addon.config.get_hgrid_data(addon, self.auth, **self.extra)
                 # WARNING: get_hgrid_data can return None if the addon is added but has no credentials.
                 try:
                     temp = addon.config.get_hgrid_data(addon, self.auth, **self.extra)
