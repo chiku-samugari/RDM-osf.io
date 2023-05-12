@@ -1114,6 +1114,12 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
         assert res.code == 400
 
     def test_save_institutional_storage_with_new_storage_name(self):
+        self.attribute_1.attribute_name = 'given_name'
+        self.attribute_1.attribute_value = 'test'
+        self.attribute_2.attribute_name = 'username'
+        self.attribute_2.attribute_value = 'test@gmail.com'
+        self.attribute_1.save()
+        self.attribute_2.save()
         region = RegionFactory()
         region._id = self.institution._id
         region.save()
