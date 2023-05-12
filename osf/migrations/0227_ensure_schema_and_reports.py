@@ -19,7 +19,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('osf', '0226_alter_filelog_path'),
-        ('osf', '0226_auto_20230323_0918'),
     ]
 
     operations = [

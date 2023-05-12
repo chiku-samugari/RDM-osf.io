@@ -258,8 +258,7 @@ class TestSaveCredentials(AdminTestCase):
         nt.assert_in('OAuth was set successfully', response.content.decode())
 
     @mock.patch('boxsdk.Client.folder')
-    @mock.patch('admin.rdm_custom_storage_location.utils.update_storage')
-    def test_connection_success_update_account(self, mock_region, mock_folder):
+    def test_connection_success_update_account(self, mock_folder):
         region = RegionFactory(_id=self.institution._id)
         previous_external_account = ExternalAccountFactory(provider='box')
         RegionExternalAccount.objects.create(
@@ -280,7 +279,6 @@ class TestSaveCredentials(AdminTestCase):
             _id=self.seed_data['_id'],
             provider_id=self.seed_data['provider_id'],
         )
-        mock_region.return_value = region
         response = self.view_post({
             'provider_short_name': 'box',
             'storage_name': 'Cardboard Box',

@@ -24,13 +24,7 @@ def download_file(osf_cookie, file_node, download_path, **kwargs):
 
     try:
         response = requests.get(
-            url=waterbutler_api_url_for(
-                file_node.target._id,
-                file_node.provider,
-                path=file_node.path,
-                _internal=True,
-                meta=''
-            ),
+            file_node.generate_waterbutler_url(action='download', direct=None, **kwargs),
             cookies={settings.COOKIE_NAME: osf_cookie},
             stream=True
         )
