@@ -139,17 +139,18 @@ def build_addon_root(node_settings, name, permissions=None,
             }})
     else:
         if node_settings.config.short_name in ADDON_METHOD_PROVIDER:
-            institution = auth.user.affiliated_institutions.first()
-            region = Region.objects.filter(_id=institution._id,
-                                           waterbutler_settings__storage__provider=node_settings.config.short_name).first()
-            is_readonly = check_authentication_attribute(auth.user,
-                                                         region.readonly_expression,
-                                                         region.is_readonly)
-            if is_readonly:
-                ret.update({'permissions': {
-                    'view': True,
-                    'edit': False
-                }})
+            if isinstance(auth, Auth):
+                institution = auth.user.affiliated_institutions.first()
+                region = Region.objects.filter(_id=institution._id,
+                                               waterbutler_settings__storage__provider=node_settings.config.short_name).first()
+                is_readonly = check_authentication_attribute(auth.user,
+                                                             region.readonly_expression,
+                                                             region.is_readonly)
+                if is_readonly:
+                    ret.update({'permissions': {
+                        'view': True,
+                        'edit': False
+                    }})
 
     return ret
 
@@ -309,7 +310,7 @@ class NodeFileCollector(object):
                 if addon.short_name == 'osfstorage' and (data[addon.id]['region_disabled'] or not data[addon.id]['is_allowed']):
                     continue  # skip (hide osfstorage)
                 if addon.config.for_institutions:
-                    if (addon.config.short_name not in region_provider_set):
+                    if addon.config.short_name not in region_provider_set:
                         continue  # skip (hide this *institutions)
                     if institution_id is not None:
                         region = Region.objects.filter(
