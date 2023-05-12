@@ -533,5 +533,5 @@ ADDON_METHOD_PROVIDER = [
     'dropboxbusiness',
     's3compatinstitutions',
     'onedrivebusiness',
-    'ociinstitutions'
+    'ociinstitutions',
 ]

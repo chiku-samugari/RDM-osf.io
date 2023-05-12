@@ -140,10 +140,8 @@ def build_addon_root(node_settings, name, permissions=None,
     else:
         if node_settings.config.short_name in ADDON_METHOD_PROVIDER:
             institution = auth.user.affiliated_institutions.first()
-            region = Region.objects.filter(
-                    _id=institution._id,
-                    waterbutler_settings__storage__provider=node_settings.config.short_name
-                ).first()
+            region = Region.objects.filter(_id=institution._id,
+                                           waterbutler_settings__storage__provider=node_settings.config.short_name).first()
             is_readonly = check_authentication_attribute(auth.user,
                                                          region.readonly_expression,
                                                          region.is_readonly)
