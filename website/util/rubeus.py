@@ -86,6 +86,7 @@ def build_addon_root(node_settings, name, permissions=None,
         urls = default_urls(node_settings.owner.api_url, node_settings.config.short_name)
 
     forbid_edit = DISK_SAVING_MODE if node_settings.config.short_name == 'osfstorage' else False
+    auth = None
     if isinstance(permissions, Auth):
         auth = permissions
         permissions = {
@@ -138,19 +139,20 @@ def build_addon_root(node_settings, name, permissions=None,
                 'edit': False
             }})
     else:
-        if node_settings.config.short_name in ADDON_METHOD_PROVIDER:
-            if isinstance(auth, Auth):
-                institution = auth.user.affiliated_institutions.first()
-                region = Region.objects.filter(_id=institution._id,
-                                               waterbutler_settings__storage__provider=node_settings.config.short_name).first()
-                is_readonly = check_authentication_attribute(auth.user,
-                                                             region.readonly_expression,
-                                                             region.is_readonly)
-                if is_readonly:
-                    ret.update({'permissions': {
-                        'view': True,
-                        'edit': False
-                    }})
+        if node_settings.config.short_name in ADDON_METHOD_PROVIDER and isinstance(auth, Auth):
+            institution = auth.user.affiliated_institutions.first()
+            region = Region.objects.filter(
+                _id=institution._id,
+                waterbutler_settings__storage__provider=node_settings.config.short_name
+            ).first()
+            is_readonly = check_authentication_attribute(auth.user,
+                                                         region.readonly_expression,
+                                                         region.is_readonly)
+            if is_readonly:
+                ret.update({'permissions': {
+                    'view': True,
+                    'edit': False
+                }})
 
     return ret
 
