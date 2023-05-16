@@ -24,32 +24,25 @@ function getLocalizedText(text) {
   return texts[1];
 }
 
-function createField(erad, question, valueEntry, options, onChange) {
+function createField(erad, question, valueEntry, options, callback) {
   if (question.type == 'string') {
-    return createStringField(erad, question, (valueEntry || {}).value, options, onChange);
+    return createStringField(erad, question, (valueEntry || {}).value, options, callback);
   }
   if (question.type == 'choose') {
-    return createChooseField(erad, question, (valueEntry || {}).value, options, onChange);
+    return createChooseField(erad, question, (valueEntry || {}).value, options, callback);
   }
   throw new Error('Unsupported type: ' + question.type);
 }
 
 function validateField(erad, question, value, fieldSetAndValues, options) {
-  const multiple = (options || {}).multiple;
-  if (!multiple && question.qid == 'grdm-file:available-date') {
+  if (question.qid == 'grdm-file:available-date') {
     return validateAvailableDateField(erad, question, value, fieldSetAndValues);
   }
-  if (!multiple && question.qid == 'grdm-file:data-man-email') {
-    return validateContactManagerField(erad, question, value, fieldSetAndValues);
-  }
-  if (!value) {
-    if (question.required && !multiple) {
+  if (!value && !((options || {}).multiple)) {
+    if (question.required) {
       throw new Error(_("This field can't be blank."))
     }
     return;
-  }
-  if (question.qid == 'grdm-file:creators') {
-    return validateCreators(erad, question, value);
   }
   if (question.type == 'string') {
     return validateStringField(erad, question, value);
@@ -60,28 +53,28 @@ function validateField(erad, question, value, fieldSetAndValues, options) {
   throw new Error('Unsupported type: ' + question.type);
 }
 
-function createStringField(erad, question, value, options, onChange) {
+function createStringField(erad, question, value, options, callback) {
   if (question.format == 'text') {
     return new SingleElementField(
       createFormElement(function() {
         return $('<input></input>');
-      }, question, options),
+      }, options),
       (options && options.multiple) ? createClearFormElement(question) : null,
       question,
       value,
       options,
-      onChange
+      callback
     );
   } else if (question.format == 'textarea') {
     return new SingleElementField(
       createFormElement(function() {
         return $('<textarea></textarea>');
-      }, question, options),
+      }, options),
       (options && options.multiple) ? createClearFormElement(question) : null,
       question,
       value,
       options,
-      onChange
+      callback
     );
   } else if (question.format == 'date') {
     return new SingleElementField(
@@ -89,12 +82,12 @@ function createStringField(erad, question, value, options, onChange) {
         const elem = $('<input></input>').addClass('datepicker');
         datepicker.mount(elem, null);
         return elem;
-      }, question, options),
+      }, options),
       (options && options.multiple) ? createClearFormElement(question) : null,
       question,
       value,
       options,
-      onChange
+      callback
     );
   } else if (question.format == 'file-creators') {
     return new SingleElementField(
@@ -103,7 +96,7 @@ function createStringField(erad, question, value, options, onChange) {
       question,
       value,
       options,
-      onChange
+      callback
     );
   } else if (question.format == 'e-rad-researcher-number') {
     return new SingleElementField(
@@ -112,22 +105,23 @@ function createStringField(erad, question, value, options, onChange) {
       question,
       value,
       options,
-      onChange
+      callback
     );
   } else if (
     question.format == 'e-rad-researcher-name-ja' ||
     question.format == 'e-rad-researcher-name-en' ||
-    question.format == 'file-institution-identifier'
+    question.format == 'file-institution-ja' ||
+    question.format == 'file-institution-en'
   ) {
     return new SingleElementField(
       createFormElement(function() {
         return $('<input></input>').addClass(question.format);
-      }, question, options),
+      }, options),
       (options && options.multiple) ? createClearFormElement(question) : null,
       question,
       value,
       options,
-      onChange
+      callback
     );
   } else if (question.format == 'file-capacity') {
     return new SingleElementField(
@@ -138,7 +132,7 @@ function createStringField(erad, question, value, options, onChange) {
       question,
       value,
       options,
-      onChange
+      callback
     );
   } else if (question.format == 'file-url') {
     return new SingleElementField(
@@ -149,62 +143,47 @@ function createStringField(erad, question, value, options, onChange) {
       question,
       value,
       options,
-      onChange
-    );
-  } else if (
-    question.format == 'file-institution-ja' ||
-    question.format == 'file-institution-en'
-  ) {
-    return new SingleElementField(
-      createFileInstitutionFieldElement(options, question.format),
-      (options && options.multiple) ? createClearFormElement(question) : null,
-      question,
-      value,
-      options,
-      onChange
+      callback
     );
   }
   return new SingleElementField(
     createFormElement(function() {
       return $('<input></input>');
-    }, question, options),
+    }, options),
     (options && options.multiple) ? createClearFormElement(question) : null,
     question,
     value,
     options,
-    onChange
+    callback
   );
 }
 
-function createChooseField(erad, question, value, options, onChange) {
+function createChooseField(erad, question, value, options, callback) {
   if (question.format == 'singleselect') {
     return new SingleElementField(
       createFormElement(function() {
         return createChooser(question, options);
-      }, question, options),
+      }, options),
       null,
       question,
       value,
       options,
-      onChange
+      callback
     );
   }
   return new SingleElementField(
     createFormElement(function() {
       return $('<input></input>');
-    }, question, options),
+    }, options),
     null,
     question,
     value,
     options,
-    onChange
+    callback
   );
 }
 
 function validateStringField(erad, question, value) {
-  if (question.pattern && !(new RegExp(question.pattern).test(value))) {
-    throw new Error(_("Please enter the correct value. ") + getLocalizedText(question.help));
-  }
 }
 
 function validateChooseField(erad, question, value) {
@@ -218,39 +197,6 @@ function validateAvailableDateField(erad, question, value, fieldSetAndValues) {
   const requiredDateAccessRights = ['embargoed access'];
   if (requiredDateAccessRights.includes(accessRightsPair.value) && !value) {
     throw new Error(_("This field can't be blank."));
-  }
-}
-
-function validateContactManagerField(erad, question, value, fieldSetAndValues) {
-  function getFieldValue(qid) {
-    const field = fieldSetAndValues.find(function(fieldSetAndValue) {
-      return fieldSetAndValue.fieldSet.question.qid === qid;
-    });
-    if (!field) return null;
-    return field.value;
-  }
-
-  const email = value;
-  const tel = getFieldValue('grdm-file:data-man-tel');
-  const address = getFieldValue('grdm-file:data-man-address-ja') &&
-    getFieldValue('grdm-file:data-man-address-en');
-  const org = getFieldValue('grdm-file:data-man-org-ja') &&
-    getFieldValue('grdm-file:data-man-org-en');
-
-  if (!email && !(tel && address && org)) {
-    throw new Error(_("Contacts of data manager can't be blank. Please fill mail address, or organization name, address and phone number."));
-  }
-}
-
-function validateCreators(erad, question, value) {
-  const creators = JSON.parse(value);
-  if (!creators) {
-    return;
-  }
-  if (creators.some(function(creator) {
-    return ! /^[0-9a-zA-Z]*$/.test(creator.number || '');
-  })) {
-    throw new Error(_("Please enter the correct value. ") + getLocalizedText(question.help));
   }
 }
 
@@ -288,28 +234,16 @@ function createChooser(question, options) {
   return select;
 }
 
-function normalize(value) {
-  return value.replace(/\s+/g, ' ').trim();
-}
-
-function createFormElement(createHandler, question, options) {
+function createFormElement(createHandler, options) {
   return {
-    create: function(addToContainer, onChange) {
-      const self = this;
+    create: function(addToContainer, callback) {
       const elem = createHandler();
       if (options && options.readonly) {
         elem.attr('readonly', true);
       }
-      if (onChange) {
+      if (callback) {
         elem.change(function(event) {
-          const value = event.target.value
-          if (value && question.space_normalization) {
-            const normalized = normalize(value);
-            if (value !== normalized) {
-              self.setValue(elem, normalized);
-            }
-          }
-          onChange(event, options);
+          callback(event, options);
         });
       }
       elem.addClass('form-control');
@@ -363,7 +297,7 @@ function createClearFormElement(question) {
 }
 
 
-function SingleElementField(formField, clearField, question, defaultValue, options, onChange) {
+function SingleElementField(formField, clearField, question, defaultValue, options, callback) {
   if (!question.qid) {
     throw new Error('No labels');
   }
@@ -459,7 +393,7 @@ function SingleElementField(formField, clearField, question, defaultValue, optio
       function(child) {
         parent.append(self.createFormGroup(child, errorContainer));
       },
-      onChange
+      callback
     );
     if (self.defaultValue) {
       formField.setValue(input, self.defaultValue);
@@ -488,7 +422,7 @@ function createFileCapacityFieldElement(createHandler, options) {
       return new Promise(function (resolve, reject) {
         const totalSize = contextVars.file.size || 0;
         console.log(logPrefix, 'totalSize: ', totalSize);
-        input.val(sizeofFormat(totalSize)).change();
+        input.val(sizeofFormat(totalSize));
         resolve();
       });
     }
@@ -514,7 +448,7 @@ function createFileCapacityFieldElement(createHandler, options) {
     return task
       .then(function (totalSize) {
         console.log(logPrefix, 'totalSize: ', totalSize);
-        input.val(sizeofFormat(totalSize)).change();
+        input.val(sizeofFormat(totalSize));
       })
       .catch(function (err) {
         console.error(err);
@@ -531,14 +465,14 @@ function createFileCapacityFieldElement(createHandler, options) {
   }
 
   return {
-    create: function(addToContainer, onChange) {
+    create: function(addToContainer, callback) {
       const input = createHandler();
       if (options && options.readonly) {
         input.attr('readonly', true);
       }
-      if (onChange) {
+      if (callback) {
         input.change(function(event) {
-          onChange(event, options);
+          callback(event, options);
         });
       }
       input.addClass('form-control');
@@ -593,14 +527,14 @@ function createFileCapacityFieldElement(createHandler, options) {
 
 function createFileURLFieldElement(createHandler, options) {
   return {
-    create: function(addToContainer, onChange) {
+    create: function(addToContainer, callback) {
       const input = createHandler();
       if (options && options.readonly) {
         input.attr('readonly', true);
       }
-      if (onChange) {
+      if (callback) {
         input.change(function(event) {
-          onChange(event, options);
+          callback(event, options);
         });
       }
       input.addClass('form-control');
@@ -615,7 +549,7 @@ function createFileURLFieldElement(createHandler, options) {
           .append(fillButton);
         fillButton.on('click', function (e) {
           e.preventDefault();
-          input.val(fangorn.getPersistentLinkFor(options.fileitem)).change();
+          input.val(fangorn.getPersistentLinkFor(options.fileitem));
         });
         container.append(fillContainer)
       }
@@ -655,9 +589,9 @@ function createFileCreatorsFieldElement(erad, options) {
       nameEnInput.attr('readonly', true);
     }
     if (defaultValues) {
-      numberInput.val(defaultValues.number).change();
-      nameJaInput.val(defaultValues.name_ja).change();
-      nameEnInput.val(defaultValues.name_en).change();
+      numberInput.val(defaultValues.number);
+      nameJaInput.val(defaultValues.name_ja);
+      nameEnInput.val(defaultValues.name_en);
     }
     const tr = $('<tr>')
       .append($('<td>').append(numberInput))
@@ -698,15 +632,15 @@ function createFileCreatorsFieldElement(erad, options) {
       const names = data.kenkyusha_shimei.split('|');
       const jaNames = names.slice(0, Math.floor(names.length / 2))
       const enNames = names.slice(Math.floor(names.length / 2))
-      nameJaInput.val(jaNames.join('')).change();
-      nameEnInput.val(enNames.reverse().join(' ')).change();
+      nameJaInput.val(jaNames.join(''));
+      nameEnInput.val(enNames.reverse().join(' '));
     });
     tbody.find('.twitter-typeahead').css('width', '100%');
     emptyLine.hide();
   }
 
   return {
-    create: function(addToContainer, onChange) {
+    create: function(addToContainer, callback) {
       const thead = $('<thead>')
         .append($('<tr>')
           .append($('<th>' + _('e-Rad Researcher Number') + '</th>'))
@@ -737,21 +671,14 @@ function createFileCreatorsFieldElement(erad, options) {
           if (container.find('tbody tr').length === 0) {
             emptyLine.show();
           }
-          if (onChange) {
-            onChange(e, options);
+          if (callback) {
+            callback(e, options);
           }
         });
       }
-      tbody.on('change', 'input', function (e) {
-        const value = e.target.value
-        if (value && e.target.getAttribute('name').startsWith('file-creator-name')) {
-          const normalized = normalize(value);
-          if (value !== normalized) {
-            e.target.value = normalized;
-          }
-        }
-        if (onChange) {
-          onChange(e, options);
+      tbody.on('change', '.input', function (e) {
+        if (callback) {
+          callback(e, options);
         }
       });
       addToContainer(container);
@@ -765,7 +692,7 @@ function createFileCreatorsFieldElement(erad, options) {
           'name_en': $(this).find('[name=file-creator-name-en]').val()
         };
       }).toArray().filter(function (researcher) {
-        return Object.values(researcher).some(function (v) { return v && v.trim().length > 0; });
+        return Object.values(researcher).every(function (v) { return v && v.trim().length > 0; });
       });
       if (researchers.length === 0) {
         return '';
@@ -794,7 +721,7 @@ function createFileCreatorsFieldElement(erad, options) {
 
 function createERadResearcherNumberFieldElement(erad, options) {
   return {
-    create: function(addToContainer, onChange) {
+    create: function(addToContainer, callback) {
       const input = $('<input></input>').addClass('erad-researcher-number');
       if (options && options.readonly) {
         input.attr('readonly', true);
@@ -831,115 +758,21 @@ function createERadResearcherNumberFieldElement(erad, options) {
           const names = data.kenkyusha_shimei.split('|');
           const jaNames = names.slice(0, Math.floor(names.length / 2))
           const enNames = names.slice(Math.floor(names.length / 2))
-          $('.e-rad-researcher-name-ja').val(jaNames.join('')).change();
-          $('.e-rad-researcher-name-en').val(enNames.reverse().join(' ')).change();
+          $('.e-rad-researcher-name-ja').val(jaNames.join(''));
+          $('.e-rad-researcher-name-en').val(enNames.reverse().join(' '));
         }
         if (data.kenkyukikan_mei) {
           const names = data.kenkyukikan_mei.split('|');
           const jaNames = names.slice(0, Math.floor(names.length / 2))
           const enNames = names.slice(Math.floor(names.length / 2))
-          $('.file-institution-ja').typeahead('val', jaNames.join('')).change();
-          $('.file-institution-en').typeahead('val', enNames.join(' ')).change();
+          $('.file-institution-ja').val(jaNames.join(''));
+          $('.file-institution-en').val(enNames.join(' '));
         }
       });
       container.find('.twitter-typeahead').css('width', '100%');
-      if (onChange) {
+      if (callback) {
         input.change(function(event) {
-          onChange(event, options);
-        });
-      }
-      return container;
-    },
-    getValue: function(container) {
-      return container.find('input').val();
-    },
-    setValue: function(container, value) {
-      container.find('input').val(value);
-    },
-    reset: function(container) {
-      container.find('input').val(null);
-    },
-    disable: function(container, disabled) {
-      container.find('input').attr('disabled', disabled);
-    },
-  };
-}
-
-
-function createFileInstitutionFieldElement(options, format) {
-  return {
-    create: function(addToContainer, onChange) {
-      const input = $('<input></input>').addClass(format);
-      if (options && options.readonly) {
-        input.attr('readonly', true);
-      }
-      const container = $('<div></div>')
-        .addClass('erad-file-institution')
-        .append(input.addClass('form-control'));
-      addToContainer(container);
-      function getJaName(data) {
-        if (data && data.labels && data.labels.length) {
-          const ja = data.labels.filter(function(label) {
-            return label.iso639 === 'ja';
-          });
-          if (ja.length) {
-            return ja[0].label;
-          }
-        }
-        return null;
-      }
-      input.typeahead(
-        {
-          hint: false,
-          highlight: true,
-          minLength: 0
-        },
-        {
-          display: function(data) {
-            const ja = getJaName(data);
-            if (format.endsWith('ja') && ja) {
-              return ja;
-            }
-            return data.name;
-          },
-          templates: {
-            suggestion: function(data) {
-              const ja = getJaName(data);
-              return '<div style="background-color: white;"><span>' + $osf.htmlEscape(data.name) + '</span> ' +
-                '<span><small class="m-l-md text-muted">'+
-                (ja ? $osf.htmlEscape(ja) : '')
-                + '</small></span></div>';
-            }
-          },
-          source: $osf.throttle(function (q, cb) {
-            $.ajax({
-              method: 'GET',
-              url: 'https://api.ror.org/organizations',
-              data: {
-                query: q
-              },
-              cache: true,
-            }).then(function(result) {
-              cb(result && result.items || []);
-            }).catch(function(error) {
-              console.error(error);
-              cb([]);
-            });
-          }, 500, {leading: false}),
-        }
-      );
-      input.bind('typeahead:selected', function(event, data) {
-        const en = data.name;
-        const ja = getJaName(data) || en;
-        const id = data.id;
-        $('.file-institution-en').typeahead('val', en).change();
-        $('.file-institution-ja').typeahead('val', ja).change();
-        $('.file-institution-identifier').val(id).change();
-      });
-      container.find('.twitter-typeahead').css('width', '100%');
-      if (onChange) {
-        input.change(function(event) {
-          onChange(event, options);
+          callback(event, options);
         });
       }
       return container;
