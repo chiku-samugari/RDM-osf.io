@@ -1171,6 +1171,8 @@ def validate_logic_expression(expression):
     """
 
     if expression:
+        if has_special_character(expression):
+            return False
         if expression.count('|') % 2 != 0 or \
                 expression.count('&') % 2 != 0:
             return False
@@ -1191,3 +1193,11 @@ def validate_logic_expression(expression):
         except NameError:
             return False
     return True
+
+
+def has_special_character(expression):
+    valid_characters = [' ', '!', '(', ')', '|', '&']
+    for item in expression:
+        if not (item.isalpha() or item.isdigit() or item in valid_characters):
+            return True
+    return False
