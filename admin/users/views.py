@@ -755,7 +755,7 @@ class BaseUserQuotaView(View):
         if region_id != '' and region_id is not None:
             user = OSFUser.load(self.kwargs.get('guid'))
             institution = user.affiliated_institutions.first()
-            region = Region.objects.get(id=int(region_id))
+            region = Region.objects.filter(id=int(region_id)).first()
             if not region or not institution or institution._id != region._id:
                 raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
