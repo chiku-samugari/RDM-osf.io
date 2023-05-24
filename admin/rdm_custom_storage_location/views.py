@@ -699,7 +699,8 @@ class AddAttributeFormView(RdmPermissionMixin, View):
                 deleted_first_attribute = AuthenticationAttribute.objects.filter(
                     institution=institution, is_deleted=True
                 ).order_by('index_number').first()
-                if deleted_first_attribute is not None:
+                if deleted_first_attribute is not None and \
+                        deleted_first_attribute.index_number <= api_settings.MAX_INDEX_NUMBER:
                     index_number = deleted_first_attribute.index_number
                     is_deleted = True
                 else:
