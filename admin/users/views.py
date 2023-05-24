@@ -796,7 +796,7 @@ class UserDetailsView(RdmPermissionMixin, UserPassesTestMixin, GuidView):
         region_id = self.request.GET.get('region_id', None)
         if region_id:
             institution = user.affiliated_institutions.first()
-            region = Region.objects.get(id=region_id)
+            region = Region.objects.filter(id=region_id).first()
             if region and institution and institution._id == region._id:
                 max_quota, _ = quota.get_storage_quota_info(
                     institution,
