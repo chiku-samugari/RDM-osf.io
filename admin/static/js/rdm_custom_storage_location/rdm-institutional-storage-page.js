@@ -99,7 +99,7 @@ function toggle_button(element) {
     element.checked = true;
 }
 
-$('button[type=reset]').click(function () {
+$('#multi-inst-storage button[type=reset]').click(function () {
     // reset allow checkbox
     var id = this.dataset.id;
     resetCheckbox('allow_checkbox', 'allow', id);
@@ -201,7 +201,7 @@ $('#add_storage').click(function (e) {
     }
 });
 
-$('.save_button').click(function (e) {
+$('#multi-inst-storage .save_button').click(function (e) {
     var id = this.dataset.id;
     var storageNameElement = document.getElementById('storage_name_' + id);
     var storageName = storageNameElement.value.trim();
@@ -283,7 +283,7 @@ $('.save_attribute').click(function (e) {
     }
 })
 
-$(".attribute_name").autocomplete({
+$('.attribute_name').autocomplete({
     source: ATTRIBUTE_LIST,
     select: function(event, ui) {
         var selected_value = ui.item.value;
@@ -295,7 +295,7 @@ $(".attribute_name").autocomplete({
     }
 });
 
-$(".attribute_name").on('keydown', function(e) {
+$('.attribute_name').on('keydown', function(e) {
     var keyCode = e.keyCode || e.which;
     if (keyCode == 9) {
         e.preventDefault();

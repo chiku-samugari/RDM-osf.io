@@ -142,28 +142,28 @@
         </fieldset>
     </div>
 </div>
-<div class="row">
+<div class="row" id="multi-inst-storage">
     <div class="col-md-12">
         <div class="panel panel-default">
             <div class="panel-heading">
                 <h3 class="panel-title label-large">{% trans "Institutional Storage Configurations" %}</h3>
             </div>
             <div class="panel-body">
-                <table class="table table-condensed">
-                    <thead>
-                        <tr>
-                            <th style="width: 20%; text-align: left;">{% trans "Name" %}</th>
-                            <th style="width: 17%; text-align: left;">{% trans "Provider" %}</th>
-                            <th style="width: 7%;"></th>
-                            <th style="width: 5%; text-align: left;">{% trans "Allow" %}</th>
-                            <th style="width: 7%"></th>
-                            <th style="width: 5%; text-align: left;">{% trans "Read only" %}</th>
-                            <th style="width: 20%;"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for provider_item in providers_configured %}
-                        <form role="form">
+                <form role="form">
+                    <table class="table table-condensed">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%; text-align: left;">{% trans "Name" %}</th>
+                                <th style="width: 17%; text-align: left;">{% trans "Provider" %}</th>
+                                <th style="width: 7%;"></th>
+                                <th style="width: 5%; text-align: left;">{% trans "Allow" %}</th>
+                                <th style="width: 7%"></th>
+                                <th style="width: 5%; text-align: left;">{% trans "Read only" %}</th>
+                                <th style="width: 20%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for provider_item in providers_configured %}
                             <tr>
                                 <td class="storage_input_content">
                                     <div>
@@ -224,10 +224,10 @@
                                     <button class="btn btn-success save_button" data-id="{{ provider_item.region.id }}" type="button">{% trans "Save" %}</button>
                                 </td>
                             </tr>
-                        </form>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </form>
             </div>
         </div>
     </div>
