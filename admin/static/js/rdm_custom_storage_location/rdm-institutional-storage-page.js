@@ -169,11 +169,12 @@ $('#add_storage').click(function (e) {
             $('.modal').css('overflow', 'auto');
             validateRequiredFields(provider);
         };
-        if (provider === 'osfstorage') {
-            var route = 'check_existing_nii_storage';
+        if (provider === 'osfstorage' || provider === 'onedrivebusiness') {
+            var route = 'check_existing_storage';
             $.ajax({
                 url: '../' + route + '/',
-                type: 'GET',
+                type: 'POST',
+                data: JSON.stringify({'provider': provider === 'osfstorage' ? 'filesystem' : provider}),
                 contentType: 'application/json; charset=utf-8',
                 timeout: 120000,
                 success: function (data) {

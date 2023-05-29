@@ -270,9 +270,10 @@ class UpdateQuotaUserListByInstitutionStorageID(RdmPermissionMixin, View):
         max_quota = min(int(self.request.POST.get('maxQuota')), max_value)
 
         region_id = self.request.POST.get('region_id', None)
-        if region_id is None:
+        region = Region.objects.filter(id=region_id).first()
+        institution = Institution.objects.filter(id=institution_id).first()
+        if not region or not institution or institution._id != region._id:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-        region = Region.objects.get(id=region_id)
 
         for user in OSFUser.objects.filter(
                 affiliated_institutions=institution_id):
