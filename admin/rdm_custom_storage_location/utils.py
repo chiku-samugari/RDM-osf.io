@@ -114,13 +114,6 @@ def change_allowed_for_institutions(institution, provider_name):
     if provider_name in enabled_providers_forinstitutions_list:
         set_allowed(institution, provider_name, True)
 
-    # disable other storages for Institutions
-    for p in get_providers():
-        if p.short_name == provider_name:
-            continue  # skip this provider
-        if p.for_institutions:
-            set_allowed(institution, p.short_name, False)
-
 def set_default_storage(institution_id):
     default_region = Region.objects.first()
     try:

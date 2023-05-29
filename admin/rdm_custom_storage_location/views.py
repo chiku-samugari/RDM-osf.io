@@ -48,7 +48,7 @@ class InstitutionalStorageView(InstitutionalStorageBaseView, TemplateView):
             raise Http404
         institution = self.request.user.representative_affiliated_institution
 
-        list_region = institution.get_institutional_storage()
+        list_region = Region.objects.filter(_id=institution._id).order_by('pk')
         if not list_region:
             region = Region.objects.first()
             region.name = ''
@@ -641,13 +641,15 @@ class ChangeAllowedViews(InstitutionalStorageBaseView, View):
         return JsonResponse({}, status=http_status.HTTP_200_OK)
 
 
-class CheckExistingNIIStorage(InstitutionalStorageBaseView, View):
+class CheckExistingStorage(InstitutionalStorageBaseView, View):
 
-    def get(self, request):
+    def post(self, request):
         institution = request.user.affiliated_institutions.first()
+        data = json.loads(request.body)
+        provider_name = data.get('provider')
         region = Region.objects.filter(
             _id=institution._id,
-            waterbutler_settings__storage__provider='filesystem'
+            waterbutler_settings__storage__provider=provider_name
         ).first()
 
         if region is None:
@@ -721,7 +723,8 @@ class AddAttributeFormView(RdmPermissionMixin, View):
                 deleted_first_attribute = AuthenticationAttribute.objects.filter(
                     institution=institution, is_deleted=True
                 ).order_by('index_number').first()
-                if deleted_first_attribute is not None:
+                if deleted_first_attribute is not None and \
+                        deleted_first_attribute.index_number <= api_settings.MAX_INDEX_NUMBER:
                     index_number = deleted_first_attribute.index_number
                     is_deleted = True
                 else:
