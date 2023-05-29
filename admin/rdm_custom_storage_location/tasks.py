@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 from celery.contrib.abortable import AbortableTask
@@ -17,7 +17,7 @@ __all__ = [
 
 @celery_app.task(bind=True, base=AbortableTask, track_started=True)
 def run_export_data_process(self, cookies, export_data_id, **kwargs):
-    export.export_data_process(self, cookies, export_data_id, **kwargs)
+    return export.export_data_process(self, cookies, export_data_id, **kwargs)
 
 
 @celery_app.task(bind=True, base=AbortableTask, track_started=True)
