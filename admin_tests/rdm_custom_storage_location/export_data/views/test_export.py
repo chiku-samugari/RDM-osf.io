@@ -26,21 +26,21 @@ EXPORT_DATA_PATH = 'admin.rdm_custom_storage_location.export_data.views.export'
 EXPORT_DATA_TASK_PATH = 'admin.rdm_custom_storage_location.tasks'
 FAKE_TASK_ID = '00000000-0000-0000-0000-000000000000'
 FAKE_EXPORT_DATA_JSON = {
-  'institution': {
-    'id': 66,
-    'guid': 'wustl',
-    'name': 'Washington University in St. Louis [Test]'
-  },
-  'process_start': '2023-05-09 09:14:44',
-  'process_end': '2023-05-09 09:25:18',
-  'storage': {
-    'name': 'United States',
-    'type': 'NII Storage'
-  },
-  'projects_numb': 1,
-  'files_numb': 3,
-  'size': 1470,
-  'file_path': '/export_66_1683623684/file_info_wustl_1683623684.json'
+      'institution': {
+          'id': 66,
+          'guid': 'wustl',
+          'name': 'Washington University in St. Louis [Test]'
+      },
+      'process_start': '2023-05-09 09:14:44',
+      'process_end': '2023-05-09 09:25:18',
+      'storage': {
+          'name': 'United States',
+          'type': 'NII Storage'
+      },
+      'projects_numb': 1,
+      'files_numb': 3,
+      'size': 1470,
+      'file_path': '/export_66_1683623684/file_info_wustl_1683623684.json'
 }
 
 
