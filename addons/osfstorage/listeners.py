@@ -51,4 +51,4 @@ def delete_files_task(node_id):
             is_root=True
         )
         for root_folder in root_folders:
-            root_folder.delete(True)
+            root_folder.delete(save=True)
