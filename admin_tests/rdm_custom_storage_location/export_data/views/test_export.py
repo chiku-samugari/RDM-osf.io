@@ -467,12 +467,13 @@ def test_export_data_process_aborted_before_read_data_file_from_source(mock_extr
 
 @pytest.mark.feature_202210
 @pytest.mark.django_db
+@mock.patch(f'{EXPORT_DATA_PATH}.ExportData.upload_export_data_file')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.get_source_file_versions_min')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.create_export_data_files_folder')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.create_export_data_folder')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.extract_file_information_json_from_source_storage')
 def test_export_data_process_read_data_file_from_source_error(mock_extract_json, mock_create_export_data_folder, mock_create_export_data_files_folder,
-                                                              mock_get_source_file_versions_min):
+                                                              mock_get_source_file_versions_min, mock_upload_export_data_file):
     export_data = ExportDataFactory()
     fake_task = FakeTask(states.SUCCESS, {}, check_abort=False)
 
@@ -489,6 +490,7 @@ def test_export_data_process_read_data_file_from_source_error(mock_extract_json,
     mock_read_data_file_from_source.return_value = error_response
     mock_rollback_export_data = mock.MagicMock()
     mock_rollback_export_data.return_value = None
+    mock_upload_export_data_file.return_value = created_response
 
     with mock.patch(f'{EXPORT_DATA_PATH}.ExportData.read_data_file_from_source', mock_read_data_file_from_source):
         with mock.patch(f'{EXPORT_DATA_PATH}.export_data_rollback_process', mock_rollback_export_data):
@@ -498,19 +500,19 @@ def test_export_data_process_read_data_file_from_source_error(mock_extract_json,
             mock_create_export_data_files_folder.assert_called()
             mock_get_source_file_versions_min.assert_called()
             mock_read_data_file_from_source.assert_called()
-            mock_rollback_export_data.assert_called()
-            nt.assert_is_none(result)
+            nt.assert_is_not_none(result)
 
 
 @pytest.mark.feature_202210
 @pytest.mark.django_db
+@mock.patch(f'{EXPORT_DATA_PATH}.ExportData.upload_export_data_file')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.get_source_file_versions_min')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.create_export_data_files_folder')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.create_export_data_folder')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.extract_file_information_json_from_source_storage')
 def test_export_data_process_continue_excuting_read_data_file_from_source_error(mock_extract_json, mock_create_export_data_folder,
                                                                                 mock_create_export_data_files_folder,
-                                                                                mock_get_source_file_versions_min):
+                                                                                mock_get_source_file_versions_min, mock_upload_export_data_file):
     export_data = ExportDataFactory()
     fake_task = FakeTask(states.SUCCESS, {}, check_abort=False)
 
@@ -531,6 +533,7 @@ def test_export_data_process_continue_excuting_read_data_file_from_source_error(
     mock_read_data_file_from_source.return_value = error_response
     mock_rollback_export_data = mock.MagicMock()
     mock_rollback_export_data.return_value = None
+    mock_upload_export_data_file.return_value = created_response
 
     with mock.patch(f'{EXPORT_DATA_PATH}.ExportData.read_data_file_from_source', mock_read_data_file_from_source):
         with mock.patch(f'{EXPORT_DATA_PATH}.export_data_rollback_process', mock_rollback_export_data):
@@ -540,8 +543,7 @@ def test_export_data_process_continue_excuting_read_data_file_from_source_error(
             mock_create_export_data_files_folder.assert_called()
             mock_get_source_file_versions_min.assert_called()
             mock_read_data_file_from_source.assert_called()
-            mock_rollback_export_data.assert_called()
-            nt.assert_is_none(result)
+            nt.assert_is_not_none(result)
 
 
 @pytest.mark.feature_202210
@@ -585,12 +587,13 @@ def test_export_data_process_aborted_before_transfer_export_data_file_to_locatio
 
 @pytest.mark.feature_202210
 @pytest.mark.django_db
+@mock.patch(f'{EXPORT_DATA_PATH}.ExportData.upload_export_data_file')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.get_source_file_versions_min')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.create_export_data_files_folder')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.create_export_data_folder')
 @mock.patch(f'{EXPORT_DATA_PATH}.ExportData.extract_file_information_json_from_source_storage')
 def test_export_data_process_transfer_export_data_file_to_location_error(mock_extract_json, mock_create_export_data_folder,
-                                                                         mock_create_export_data_files_folder, mock_get_source_file_versions_min):
+                                                                         mock_create_export_data_files_folder, mock_get_source_file_versions_min, mock_upload_export_data_file):
     export_data = ExportDataFactory()
     fake_task = FakeTask(states.SUCCESS, {}, check_abort=False)
 
@@ -611,6 +614,7 @@ def test_export_data_process_transfer_export_data_file_to_location_error(mock_ex
     mock_transfer_export_data_file_to_location.return_value = error_response
     mock_rollback_export_data = mock.MagicMock()
     mock_rollback_export_data.return_value = None
+    mock_upload_export_data_file.return_value = created_response
 
     with mock.patch(f'{EXPORT_DATA_PATH}.ExportData.read_data_file_from_source', mock_read_data_file_from_source):
         with mock.patch(f'{EXPORT_DATA_PATH}.ExportData.transfer_export_data_file_to_location', mock_transfer_export_data_file_to_location):
@@ -622,8 +626,7 @@ def test_export_data_process_transfer_export_data_file_to_location_error(mock_ex
                 mock_get_source_file_versions_min.assert_called()
                 mock_read_data_file_from_source.assert_called()
                 mock_transfer_export_data_file_to_location.assert_called()
-                mock_rollback_export_data.assert_called()
-                nt.assert_is_none(result)
+                nt.assert_is_not_none(result)
 
 
 @pytest.mark.django_db
