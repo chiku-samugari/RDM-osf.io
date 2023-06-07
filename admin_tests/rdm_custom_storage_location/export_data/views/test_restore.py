@@ -1,4 +1,4 @@
-﻿import json
+import json
 
 import mock
 import pytest
