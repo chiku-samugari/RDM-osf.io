@@ -755,7 +755,7 @@ $('.delete-location').click(function () {
         title: _('Are you sure you want to delete this export data storage location?'),
         callback: function() {
             deleteLocation(id);
-        }, 
+        },
         buttons: {
             success: {
                 label: _('Delete')
