@@ -1387,7 +1387,8 @@ function checkTaskStatus(task_id, task_type) {
                     file_name_restore_fail = result.file_name_restore_fail;
                     list_file_info_restore_fail = [['project_id', 'project_name', 'owner', 'file_id',
                                                     'file_path', 'file_name', 'versions', 'size', 'stamper']];
-                    data_res.forEach(function (file) {
+                    const data_res_unique = [...new Map(data_res.map((d) => [d.id, d])).values()];
+                    data_res_unique.forEach(function (file) {
                         file.version.forEach(function(version) {
                             list_file_info_restore_fail.push([file.project.id, file.project.name, version.contributor,
                                                 file.id, file.materialized_path, file.name, version.identifier,
