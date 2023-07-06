@@ -23,6 +23,8 @@ from admin.base import settings
 from admin.base.forms import ImportFileForm
 from admin.institutions.forms import InstitutionForm, InstitutionalMetricsAdminRegisterForm
 from django.contrib.auth.models import Group
+
+from api.base.settings import NII_STORAGE_REGION_ID
 from osf.models import Institution, Node, OSFUser, UserQuota, Email
 from website.util import quota
 from addons.osfstorage.models import Region
@@ -429,6 +431,7 @@ class UpdateQuotaUserListByInstitutionID(PermissionRequiredMixin, View):
                 affiliated_institutions=institution_id):
             UserQuota.objects.update_or_create(
                 user=user, storage_type=UserQuota.NII_STORAGE,
+                region_id=NII_STORAGE_REGION_ID,
                 defaults={'max_quota': max_quota})
         return redirect('institutions:institution_user_list',
                         institution_id=institution_id)

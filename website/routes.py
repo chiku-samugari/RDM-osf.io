@@ -1990,11 +1990,19 @@ def make_url_map(app):
             json_renderer,
         ),
         Rule(
-            [  # For user (browser)
-                '/project/<pid>/<fid>/get_institution_storage_quota/',
+            [  # For waterbutler
+                '/project/<pid>/institution_storage_user_quota/',
             ],
-            ['get'],
-            project_views.quota.get_institution_storage_quota,
+            ['post'],
+            project_views.quota.waterbutler_institution_storage_user_quota,
+            json_renderer,
+        ),
+        Rule(
+            [  # For user (browser)
+                '/project/<pid>/get_institution_storage_user_quota/',
+            ],
+            ['post'],
+            project_views.quota.get_institution_storage_user_quota,
             json_renderer,
         ),
 

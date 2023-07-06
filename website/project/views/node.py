@@ -704,7 +704,7 @@ def component_remove(auth, node, **kwargs):
         for user in user_list:
             quota.update_user_used_quota(user, storage_type=storage_type)
             # Update used quota for user-per-storage after removing the project
-            recalculate_used_quota_by_user(user._id)
+            recalculate_used_quota_by_user(user._id, storage_type=storage_type)
 
     id = '{}_deleted'.format(node.project_or_component)
     status.push_status_message(message, kind='success', trust=False, id=id)
@@ -844,9 +844,6 @@ def _view_project(node, auth, primary=False,
             for message in messages:
                 status.push_status_message(message, kind='info', dismissible=False, trust=True)
     NodeRelation = apps.get_model('osf.NodeRelation')
-    max_quota, used_quota = quota.get_quota_info(
-        node.creator, quota.get_project_storage_type(node)
-    )
     is_registration = node.is_registration
     timestamp_pattern = get_timestamp_pattern_division(auth, node)
     data = {

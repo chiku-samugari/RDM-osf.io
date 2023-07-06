@@ -16,6 +16,7 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.core.paginator import Paginator
 
+from api.base.settings import NII_STORAGE_REGION_ID
 from osf.exceptions import UserStateError
 from osf.models.base import Guid
 from osf.models.user import OSFUser
@@ -743,7 +744,7 @@ class BaseUserQuotaView(View):
     """Base class for UserQuotaView and UserInstitutionQuotaView.
     """
 
-    def update_quota(self, max_quota, storage_type, region_id=''):
+    def update_quota(self, max_quota, storage_type, region_id=NII_STORAGE_REGION_ID):
         try:
             max_quota = int(max_quota)
         except (ValueError, TypeError):
@@ -752,20 +753,27 @@ class BaseUserQuotaView(View):
         if max_quota <= 0:
             max_quota = 1
 
-        if region_id != '' and region_id is not None:
+        if region_id != '' and region_id is not None and storage_type == UserQuota.CUSTOM_STORAGE:
             user = OSFUser.load(self.kwargs.get('guid'))
             institution = user.affiliated_institutions.first()
             region = Region.objects.filter(id=int(region_id)).first()
             if not region or not institution or institution._id != region._id:
                 raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
-            update_institutional_storage_max_quota(user, region, max_quota)
-        else:
             UserQuota.objects.update_or_create(
                 user=OSFUser.load(self.kwargs.get('guid')),
                 storage_type=storage_type,
+                region=region,
                 defaults={'max_quota': max_quota}
             )
+        else:
+            if storage_type == UserQuota.NII_STORAGE:
+                UserQuota.objects.update_or_create(
+                    user=OSFUser.load(self.kwargs.get('guid')),
+                    storage_type=storage_type,
+                    region_id=region_id,
+                    defaults={'max_quota': max_quota}
+                )
 
 
 class UserQuotaView(BaseUserQuotaView):
@@ -826,7 +834,7 @@ class UserInstitutionQuotaView(RdmPermissionMixin, UserPassesTestMixin, BaseUser
             and self.request.user.affiliated_institutions.exists()
 
     def post(self, request, *args, **kwargs):
-        region_id = request.POST.get('region_id')
+        region_id = request.POST.get('region_id', None)
 
         self.update_quota(
             request.POST.get('maxQuota'),

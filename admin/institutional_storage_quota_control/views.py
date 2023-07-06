@@ -4,7 +4,7 @@ from mimetypes import MimeTypes
 from django.db import connection
 
 from admin.institutions.views import QuotaUserStorageList
-from osf.models import Institution, OSFUser
+from osf.models import Institution, OSFUser, UserQuota
 from admin.base import settings
 from django.core.exceptions import PermissionDenied
 from addons.osfstorage.models import Region
@@ -16,7 +16,6 @@ from django.http import HttpResponse, Http404
 from rest_framework import status as http_status
 from admin.rdm_custom_storage_location import utils
 from framework.exceptions import HTTPError
-from website.util.quota import update_institutional_storage_max_quota
 
 
 class IconView(View):
@@ -168,17 +167,7 @@ class InstitutionStorageList(RdmPermissionMixin, ListView):
                 self.object_list = self.object_list.exclude(id=item.id)
 
         ctx = self.get_context_data()
-
-        if self.is_super_admin:
-            return self.render_to_response(ctx)
-        elif self.is_admin:
-            # if count == 1:
-            #     return redirect(reverse(
-            #         'institutional_storage_quota_control:'
-            #         'institutional_storages',
-            #         kwargs={'institution_id': institution_id}
-            #     ))
-            return self.render_to_response(ctx)
+        return self.render_to_response(ctx)
 
     def get_queryset(self):
         if self.is_super_admin:
@@ -277,7 +266,12 @@ class UpdateQuotaUserListByInstitutionStorageID(RdmPermissionMixin, View):
 
         for user in OSFUser.objects.filter(
                 affiliated_institutions=institution_id):
-            update_institutional_storage_max_quota(user, region, max_quota)
+            UserQuota.objects.update_or_create(
+                user=user,
+                region=region,
+                storage_type=UserQuota.CUSTOM_STORAGE,
+                defaults={'max_quota': max_quota}
+            )
 
         return redirect(
             'institutional_storage_quota_control:institution_user_list',

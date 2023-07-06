@@ -296,6 +296,7 @@ class NodeSettings(InstitutionsNodeSettings, InstitutionsStorageAddon):
 
     def serialize_waterbutler_settings_impl(self):
         return {
+            'nid': self.owner._id,
             'folder': self.root_folder_fullpath,
             'verify_ssl': settings.USE_SSL
         }

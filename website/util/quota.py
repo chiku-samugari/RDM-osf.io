@@ -8,6 +8,7 @@ from api.base import settings as api_settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
+from api.base.settings import ADDON_METHOD_PROVIDER, NII_STORAGE_REGION_ID
 from osf.models import (
     AbstractNode, BaseFileNode, FileLog, FileInfo, Guid, OSFUser, UserQuota,
     ProjectStorageType
@@ -17,7 +18,7 @@ from osf.models.user_storage_quota import UserStorageQuota
 from rest_framework import status as http_status
 from framework.exceptions import HTTPError
 
-PROVIDERS = ['s3', 's3compat']
+PROVIDERS = []
 
 # import inspect
 logger = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ def update_user_used_quota(user, storage_type=UserQuota.NII_STORAGE):
         user_quota = UserQuota.objects.get(
             user=user,
             storage_type=storage_type,
+            region_id=NII_STORAGE_REGION_ID
         )
         user_quota.used = used
         user_quota.save()
@@ -84,13 +86,13 @@ def abbreviate_size(size):
 
 def get_quota_info(user, storage_type=UserQuota.NII_STORAGE):
     try:
-        user_quota = user.userquota_set.get(storage_type=storage_type)
+        user_quota = user.userquota_set.get(storage_type=storage_type, region_id=NII_STORAGE_REGION_ID)
         return (user_quota.max_quota, user_quota.used)
     except UserQuota.DoesNotExist:
         return (api_settings.DEFAULT_MAX_QUOTA, used_quota(user._id, storage_type))
 
 
-def get_storage_quota_info(institution, user, region):
+def get_storage_quota_info(institution, user, region, storage_type=UserQuota.CUSTOM_STORAGE):
     """ Get the per-user-per-storage info of institution
 
     :param Object institution: Institution of user
@@ -100,9 +102,9 @@ def get_storage_quota_info(institution, user, region):
 
     """
     try:
-        user_storage_quota = user.userstoragequota_set.get(region=region)
+        user_storage_quota = user.userquota_set.get(region=region, storage_type=storage_type)
         return user_storage_quota.max_quota, user_storage_quota.used
-    except UserStorageQuota.DoesNotExist:
+    except UserQuota.DoesNotExist:
         return (
             api_settings.DEFAULT_MAX_QUOTA,
             user_per_storage_used_quota(institution, user, region)
@@ -159,18 +161,19 @@ def update_used_quota(self, target, user, event_type, payload):
             lastest_node.save()
     data = dict(payload.get('metadata')) if payload.get('metadata') else None
     metadata_provider = data.get('provider') if payload.get('metadata') else None
-    if metadata_provider in PROVIDERS or metadata_provider == 'osfstorage':
+    if metadata_provider in PROVIDERS or\
+            metadata_provider == 'osfstorage' or\
+            metadata_provider in ADDON_METHOD_PROVIDER:
         file_node = None
         action_payload = dict(payload).get('action')
         try:
-            if metadata_provider in PROVIDERS:
+            if metadata_provider in ADDON_METHOD_PROVIDER:
                 if data.get('kind') == 'folder' and action_payload == 'create_folder':
                     base_file_node = BaseFileNode(
                         type='osf.{}folder'.format(metadata_provider),
                         provider=metadata_provider,
                         _path=data.get('materialized'),
                         _materialized_path=data.get('materialized'),
-                        parent_id=target.id,
                         target_object_id=target.id,
                         target_content_type=ContentType.objects.get_for_model(AbstractNode)
                     )
@@ -178,6 +181,7 @@ def update_used_quota(self, target, user, event_type, payload):
                 else:
                     file_node = BaseFileNode.objects.filter(
                         _path=data.get('materialized'),
+                        name=data.get('name'),
                         provider=metadata_provider,
                         target_object_id=target.id,
                         deleted=None,
@@ -196,34 +200,35 @@ def update_used_quota(self, target, user, event_type, payload):
         if event_type == FileLog.FILE_ADDED:
             file_added(target, payload, file_node, storage_type)
         elif event_type == FileLog.FILE_REMOVED:
-            if metadata_provider in PROVIDERS and data.get('kind') == 'file':
-                file_node.is_deleted = True
-                file_node.deleted = timezone.now()
-                file_node.deleted_on = file_node.deleted
-                file_node.type = 'osf.trashedfile'
-                file_node.deleted_by_id = user.id
-                file_node.save()
-                node_removed(target, user, payload, file_node, storage_type)
-            elif metadata_provider in PROVIDERS and data.get('kind') == 'folder':
-                list_file_node = BaseFileNode.objects.filter(
-                    _path__startswith=data.get('materialized'),
-                    target_object_id=target.id,
-                    provider=metadata_provider,
-                    deleted=None,
-                    target_content_type_id=ContentType.objects.get_for_model(AbstractNode),
-                ).all()
-                for file_node_remove in list_file_node:
-                    file_node_remove.is_deleted = True
-                    if file_node_remove.type == 'osf.{}file'.format(metadata_provider):
-                        file_node_remove.type = 'osf.trashedfile'
-                    elif file_node_remove.type == 'osf.{}folder'.format(metadata_provider):
-                        file_node_remove.type = 'osf.trashedfolder'
-                    file_node_remove.deleted = timezone.now()
-                    file_node_remove.deleted_on = file_node_remove.deleted
-                    file_node_remove.deleted_by_id = user.id
-                    file_node_remove.save()
-                    if file_node_remove.type == 'osf.trashedfile':
-                        node_removed(target, user, payload, file_node_remove, storage_type)
+            if metadata_provider in PROVIDERS or metadata_provider in ADDON_METHOD_PROVIDER:
+                if data.get('kind') == 'file':
+                    file_node.is_deleted = True
+                    file_node.deleted = timezone.now()
+                    file_node.deleted_on = file_node.deleted
+                    file_node.type = 'osf.trashedfile'
+                    file_node.deleted_by_id = user.id
+                    file_node.save()
+                    node_removed(target, user, payload, file_node, storage_type)
+                elif data.get('kind') == 'folder':
+                    list_file_node = BaseFileNode.objects.filter(
+                        _materialized_path__startswith=data.get('materialized'),
+                        target_object_id=target.id,
+                        provider=metadata_provider,
+                        deleted=None,
+                        target_content_type_id=ContentType.objects.get_for_model(AbstractNode),
+                    ).all()
+                    for file_node_remove in list_file_node:
+                        file_node_remove.is_deleted = True
+                        if file_node_remove.type == 'osf.{}file'.format(metadata_provider):
+                            file_node_remove.type = 'osf.trashedfile'
+                        elif file_node_remove.type == 'osf.{}folder'.format(metadata_provider):
+                            file_node_remove.type = 'osf.trashedfolder'
+                        file_node_remove.deleted = timezone.now()
+                        file_node_remove.deleted_on = file_node_remove.deleted
+                        file_node_remove.deleted_by_id = user.id
+                        file_node_remove.save()
+                        if file_node_remove.type == 'osf.trashedfile':
+                            node_removed(target, user, payload, file_node_remove, storage_type)
             else:
                 node_removed(target, user, payload, file_node, storage_type)
         elif event_type == FileLog.FILE_UPDATED:
@@ -238,10 +243,17 @@ def file_added(target, payload, file_node, storage_type):
     file_size = int(payload['metadata']['size'])
     if file_size < 0:
         return
+
+    region_id = get_region_id_of_institutional_storage_by_path(target, payload['provider'], payload['metadata']['path'], storage_type)
+    if region_id is None:
+        logging.error('Institutional storage not found, cannot update used quota!')
+        return
+
     try:
-        user_quota = UserQuota.objects.get(
+        user_quota = UserQuota.objects.select_for_update().get(
             user=target.creator,
-            storage_type=storage_type
+            storage_type=storage_type,
+            region_id=region_id
         )
         user_quota.used += file_size
         user_quota.save()
@@ -253,26 +265,34 @@ def file_added(target, payload, file_node, storage_type):
             used=file_size
         )
 
-    if payload['provider'] == 'osfstorage' and storage_type == ProjectStorageType.CUSTOM_STORAGE:
-        node_addon = get_addon_osfstorage_by_path(target, payload['metadata']['path'], payload['provider'])
-        if node_addon is not None:
-            update_institutional_storage_used_quota(target.creator, node_addon.region, payload['provider'], file_size)
+    user_storage_quota, _ = UserStorageQuota.objects.select_for_update().get_or_create(
+        user=target.creator,
+        defaults={'max_quota': api_settings.DEFAULT_MAX_QUOTA},
+        region_id=region_id
+    )
+
+    user_storage_quota.used += file_size
+    user_storage_quota.save()
 
     FileInfo.objects.create(file=file_node, file_size=file_size)
 
 def node_removed(target, user, payload, file_node, storage_type):
+    region_id = get_region_id_of_institutional_storage_by_path(target, payload['provider'], payload['metadata']['path'], storage_type)
+    if region_id is None:
+        logging.error('Institutional storage not found, cannot update used quota!')
+        return
+
     user_quota = UserQuota.objects.filter(
         user=target.creator,
-        storage_type=storage_type
-    ).first()
+        storage_type=storage_type,
+        region_id=region_id
+    ).select_for_update().first()
 
-    user_storage_quota = None
-    if payload['provider'] == 'osfstorage' and storage_type == ProjectStorageType.CUSTOM_STORAGE:
-        node_addon = get_addon_osfstorage_by_path(target, payload['metadata']['path'], payload['provider'])
-        user_storage_quota = UserStorageQuota.objects.filter(
-            user=target.creator,
-            region=node_addon.region
-        ).select_for_update().first()
+    user_storage_quota, _ = UserStorageQuota.objects.select_for_update().get_or_create(
+        user=target.creator,
+        defaults={'max_quota': api_settings.DEFAULT_MAX_QUOTA},
+        region_id=region_id
+    )
 
     if user_quota is not None:
         if 'osf.trashed' not in file_node.type:
@@ -286,24 +306,34 @@ def node_removed(target, user, payload, file_node, storage_type):
                 logging.error('FileInfo not found, cannot update used quota!')
                 continue
 
-            if user_storage_quota is not None:
-                file_size = min(file_info.file_size, user_storage_quota.used)
-                user_storage_quota.used -= file_size
+            file_size = min(file_info.file_size, user_storage_quota.used)
+            user_storage_quota.used -= file_size
             file_size = min(file_info.file_size, user_quota.used)
             user_quota.used -= file_size
         user_quota.save()
-        if user_storage_quota is not None:
-            user_storage_quota.save()
+        user_storage_quota.save()
 
 def file_modified(target, user, payload, file_node, storage_type):
     file_size = int(payload['metadata']['size'])
     if file_size < 0:
         return
 
-    user_quota, _ = UserQuota.objects.get_or_create(
+    region_id = get_region_id_of_institutional_storage_by_path(target, payload['provider'], payload['metadata']['path'], storage_type)
+    if region_id is None:
+        logging.error('Institutional storage not found, cannot update used quota!')
+        return
+
+    user_quota, _ = UserQuota.objects.select_for_update().get_or_create(
         user=target.creator,
         storage_type=storage_type,
-        defaults={'max_quota': api_settings.DEFAULT_MAX_QUOTA}
+        defaults={'max_quota': api_settings.DEFAULT_MAX_QUOTA},
+        region_id=region_id
+    )
+
+    user_storage_quota, _ = UserStorageQuota.objects.select_for_update().get_or_create(
+        user=target.creator,
+        defaults={'max_quota': api_settings.DEFAULT_MAX_QUOTA},
+        region_id=region_id
     )
 
     try:
@@ -311,17 +341,14 @@ def file_modified(target, user, payload, file_node, storage_type):
     except FileInfo.DoesNotExist:
         file_info = FileInfo(file=file_node, file_size=0)
 
-    used = file_size - file_info.file_size
-
-    if payload['provider'] == 'osfstorage' and storage_type == ProjectStorageType.CUSTOM_STORAGE:
-        node_addon = get_addon_osfstorage_by_path(target, payload['metadata']['path'], payload['provider'])
-        if node_addon is not None:
-            update_institutional_storage_used_quota(target.creator, node_addon.region, payload['provider'], used)
-
-    user_quota.used += used
+    user_quota.used += file_size - file_info.file_size
+    user_storage_quota.used += file_size - file_info.file_size
     if user_quota.used < 0:
         user_quota.used = 0
+    if user_storage_quota.used < 0:
+        user_storage_quota.used = 0
     user_quota.save()
+    user_storage_quota.save()
 
     file_info.file_size = file_size
     file_info.save()
@@ -411,6 +438,30 @@ def get_node_file_list(file_node):
 
     return file_list
 
+
+def get_region_id_of_institutional_storage_by_path(target, provider, path, storage_type):
+    region_id = NII_STORAGE_REGION_ID
+    if storage_type == ProjectStorageType.CUSTOM_STORAGE:
+        if provider == 'osfstorage':
+            osf_node_setting = get_addon_osfstorage_by_path(target, path, provider)
+            if osf_node_setting:
+                region_id = osf_node_setting.region.id
+            else:
+                return None
+        elif provider in ADDON_METHOD_PROVIDER:
+            institution = target.creator.affiliated_institutions.first()
+            if institution:
+                region = Region.objects.filter(
+                    _id=institution._id,
+                    waterbutler_settings__storage__provider=provider).first()
+                if region is None:
+                    return None
+                region_id = region.id
+            else:
+                return None
+    return region_id
+
+
 def get_addon_osfstorage_by_path(target, path, provider):
     """Get addon of project by path and provider name
 
@@ -430,6 +481,7 @@ def get_addon_osfstorage_by_path(target, path, provider):
         return node_addon
     else:
         return None
+
 
 def update_institutional_storage_used_quota(creator, region, provider, size, add=True):
     """Update used per-user-per-storage
@@ -473,7 +525,8 @@ def update_institutional_storage_used_quota(creator, region, provider, size, add
         user_quota.max_quota += storage_max_quota
         user_quota.save()
 
-def recalculate_used_quota_by_user(user_id):
+
+def recalculate_used_quota_by_user(user_id, storage_type=UserQuota.NII_STORAGE):
     """Recalculate used per-user-per-storage
 
     :param str user_id: The user is recalculated
@@ -484,7 +537,7 @@ def recalculate_used_quota_by_user(user_id):
         content_type_id=ContentType.objects.get_for_model(OSFUser).id
     )
     projects = AbstractNode.objects.filter(
-        projectstoragetype__storage_type=UserQuota.CUSTOM_STORAGE,
+        projectstoragetype__storage_type=storage_type,
         is_deleted=False,
         creator_id=guid.object_id
     )
@@ -497,7 +550,7 @@ def recalculate_used_quota_by_user(user_id):
             for addon in addons:
                 sum = calculate_used_quota_by_institutional_storage(
                     project.id,
-                    addon.root_node_id
+                    addon
                 )
                 if addon.region_id in used_quota_result.keys():
                     used_quota_result[addon.region_id] += sum
@@ -505,16 +558,17 @@ def recalculate_used_quota_by_user(user_id):
                     used_quota_result[addon.region_id] = sum
 
         # Update used quota for each institutional storage
-        for id in used_quota_result:
+        for region_id in used_quota_result:
             try:
                 storage_quota = UserStorageQuota.objects.select_for_update().get(
                     user_id=guid.object_id,
-                    region_id=id
+                    region_id=region_id
                 )
-                storage_quota.used = used_quota_result[id]
+                storage_quota.used = used_quota_result[region_id]
                 storage_quota.save()
             except UserStorageQuota.DoesNotExist:
                 pass
+
 
 def get_file_ids_by_institutional_storage(result, project_id, root_id):
     """ Get all file ids of institutional storage in a project
@@ -543,40 +597,88 @@ def get_file_ids_by_institutional_storage(result, project_id, root_id):
                     project_id, item.id
                 )
 
-def calculate_used_quota_by_institutional_storage(project_id, root_id):
+
+def calculate_used_quota_by_institutional_storage(project_id, osf_node_setting):
     """Calculate the total size of institutional storage in a project
 
     :param str project_id: Id of project
-    :param str root_id: Id of storage root folder
+    :param object osf_node_setting: Osf node setting
     :return int: Total size of all files in storage
 
     """
     files_ids = []
-    get_file_ids_by_institutional_storage(files_ids, project_id, root_id)
+    provider = osf_node_setting.region.waterbutler_settings__storage__provider
+    if provider in ADDON_METHOD_PROVIDER:
+        file_nodes = BaseFileNode.objects.filter(
+            target_object_id=project_id,
+            target_content_type_id=ContentType.objects.get_for_model(AbstractNode),
+            deleted_on=None,
+            deleted_by_id=None,
+            provider=provider,
+            parent_id=osf_node_setting.id
+        )
+        for item in file_nodes:
+            if 'file' in item.type:
+                files_ids.append(item)
+    else:
+        get_file_ids_by_institutional_storage(files_ids, project_id, osf_node_setting.root_node_id)
 
     db_sum = FileInfo.objects.filter(file_id__in=files_ids).aggregate(
         filesize_sum=Coalesce(Sum('file_size'), 0))
     return db_sum['filesize_sum'] if db_sum['filesize_sum'] is not None else 0
 
-def user_per_storage_used_quota(institution, user, region_id):
+
+def calculate_size_of_all_files_by_provider_name(projects, provider):
+    """Calculate size of all addon method files in projects by provider name
+
+    :param list projects: All projects
+    :param string provider: provider name of addon storage
+    :return int: Result
+
+    """
+    files_ids = []
+    for project in projects:
+        # get all files by provider name
+        addon_method_file_ids = BaseFileNode.objects.filter(
+            target_object_id=project.id,
+            target_content_type_id=ContentType.objects.get_for_model(AbstractNode),
+            deleted_on=None,
+            deleted_by_id=None,
+            provider=provider
+        )
+        for file in addon_method_file_ids:
+            files_ids.append(file.id)
+
+    db_sum = FileInfo.objects.filter(file_id__in=files_ids).aggregate(
+        filesize_sum=Coalesce(Sum('file_size'), 0))
+    return db_sum['filesize_sum'] if db_sum['filesize_sum'] is not None else 0
+
+
+def user_per_storage_used_quota(institution, user, region):
     """Calculate per-user-per-storage used quota
 
     :param Institution institution: The institution of user
     :param Object user: The user are using the storage
-    :param str region_id: Id of institutional storage
+    :param str region: Id of institutional storage
     :return int: Result
 
     """
     projects = institution.nodes.filter(creator_id=user.id)
     result = 0
-    for project in projects:
-        addon = project.get_addon('osfstorage', region_id=region_id)
-        if addon is not None:
-            result += calculate_used_quota_by_institutional_storage(
-                project.id,
-                addon.root_node_id
-            )
+    provider = region.waterbutler_settings['storage']['provider']
+
+    if provider in ADDON_METHOD_PROVIDER:
+        result = calculate_size_of_all_files_by_provider_name(projects, provider)
+    else:
+        for project in projects:
+            addon = project.get_addon('osfstorage', region_id=region.id)
+            if addon is not None:
+                result += calculate_used_quota_by_institutional_storage(
+                    project.id,
+                    addon
+                )
     return result
+
 
 def update_institutional_storage_max_quota(user, region, max_quota):
     """ Update max quota for per-user-per-storage

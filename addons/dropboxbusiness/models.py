@@ -276,6 +276,7 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
             logger.info('Addon is not configured: node={}'.format(self.owner._id))
             return None
         return {
+            'nid': self.owner._id,
             'folder': '/',
             'admin_dbmid': self.admin_dbmid,
             'team_folder_id': self.team_folder_id

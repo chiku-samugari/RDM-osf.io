@@ -89,6 +89,14 @@ var OPERATIONS = {
     }
 };
 
+var ADDON_METHOD_PROVIDER = [
+    'nextcloudinstitutions',
+    'dropboxbusiness',
+    's3compatinstitutions',
+    'onedrivebusiness',
+    'ociinstitutions',
+]
+
 // Cross browser key codes for the Command key
 var COMMAND_KEYS = [224, 17, 91, 93];
 var ESCAPE_KEY = 27;
@@ -1184,27 +1192,6 @@ function _uploadFolderEvent(event, item, mode, col) {
             return;
         }
 
-        // call api get used quota and max quota
-        quota = $.ajax({
-            async: false,
-            method: 'GET',
-            url: item.data.nodeApiUrl + 'get_creator_quota/',
-        });
-
-        if (!quota.responseJSON) {
-            return;
-        }
-
-        quota = quota.responseJSON;
-
-        // check upload quota for upload folder
-        if (parseFloat(quota.used) + parseFloat(total_files_size) > quota.max) {
-            $osf.growl('Error', sprintf(gettext('Not enough quota to upload. The total size of the folder %1$s.'),
-            formatProperUnit(total_files_size)),
-            'danger', 5000);
-            return;
-        }
-
         var created_folders = [];
         var created_path = [];
 
@@ -1339,7 +1326,7 @@ function _uploadFolderEvent(event, item, mode, col) {
                 var next_folder_index = ++index;
                 return next(node_parent, next_folder_index, list_paths, file, file_index, next);
             }, function (data) {
-                if (data && data.code === 409) {
+                if (data && (data.code === 409 || data.code === 406)) {
                     $osf.growl(data.message);
                     m.redraw();
                 } else {
@@ -2180,7 +2167,8 @@ function setCurrentFileID(tree, nodeID, file) {
         for (var j = 0; j < tree.children.length; j++) {
             child = tree.children[j];
             var isSelectedItem = child.data.id.includes(file.id);
-            if (nodeID === child.data.nodeId && child.data.provider === file.provider && isSelectedItem) {
+            // find selected item on detail file page
+            if (nodeID === child.data.nodeId && child.data.provider === file.provider && (isSelectedItem || file.path === child.data.path)) {
                 tb.fangornFolderIndex++;
                 if (child.data.kind === 'folder') {
                     tb.updateFolder(null, child);
@@ -2341,12 +2329,14 @@ var FGItemButtons = {
                         className: 'text-success'
                     }, gettext('Create Folder')));
                 if (item.data.path) {
-                    rowButtons.push(
+                    if (!item.data.hasOwnProperty('isAddonRoot')) {
+                        rowButtons.push(
                         m.component(FGButton, {
                             onclick: function(event) {_removeEvent.call(tb, event, [item]); },
                             icon: 'fa fa-trash',
                             className : 'text-danger'
                         }, gettext('Delete Folder')));
+                    }
                 }
             }
             if (item.kind === 'file') {
@@ -3436,7 +3426,6 @@ tbOptions = {
         var maxSize;
         var displaySize;
         var msgText;
-        var quota;
         var storage_quota;
         if (_fangornCanDrop(treebeard, item)) {
             if (item.data.accept && item.data.accept.maxSize) {
@@ -3450,35 +3439,6 @@ tbOptions = {
                     addFileStatus(treebeard, file, false, msgText, '');
                     removeFromUI(file, treebeard);
                     return false;
-                }
-            }
-            if (item.data.provider === 'osfstorage') {
-                storage_quota = $.ajax({
-                    async: false,
-                    method: 'GET',
-                    url: item.data.nodeApiUrl + item.data.path.replaceAll('/', '') + '/get_institution_storage_quota/'
-                });
-                quota = $.ajax({
-                    async: false,
-                    method: 'GET',
-                    url: item.data.nodeApiUrl + 'get_creator_quota/'
-                });
-                if (quota.responseJSON || storage_quota.responseJSON) {
-                    quota = quota.responseJSON;
-                    storage_quota = storage_quota.responseJSON;
-                    if (quota.used + file.size > quota.max || storage_quota.used + file.size > storage_quota.max) {
-                        msgText = gettext('Not enough quota to upload the file.');
-                        item.notify.update(msgText, 'warning', undefined, 3000);
-                        addFileStatus(treebeard, file, false, msgText, '');
-                        return false;
-                    }
-                    if (quota.used + file.size > quota.max * window.contextVars.threshold || storage_quota.used + file.size > storage_quota.max * window.contextVars.threshold) {
-                        $osf.growl(
-                            gettext('Quota usage alert'),
-                            sprintf(gettext('You have used more than %1$s% of your quota.'),(window.contextVars.threshold * 100)),
-                            'warning'
-                        );
-                    }
                 }
             }
             return true;

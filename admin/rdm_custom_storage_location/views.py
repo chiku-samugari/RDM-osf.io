@@ -362,9 +362,9 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
             result = ({'message': 'The name of institutional storage already exists.'},
                       http_status.HTTP_400_BAD_REQUEST)
         status = result[1]
-        if status == http_status.HTTP_200_OK:
-            utils.change_allowed_for_institutions(
-                institution, provider_short_name)
+        # if status == http_status.HTTP_200_OK:
+        #     utils.change_allowed_for_institutions(
+        #         institution, provider_short_name)
         return JsonResponse(result[0], status=status)
 
 
