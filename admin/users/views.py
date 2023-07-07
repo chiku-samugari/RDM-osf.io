@@ -753,7 +753,7 @@ class BaseUserQuotaView(View):
         if max_quota <= 0:
             max_quota = 1
 
-        if region_id != '' and region_id is not None and storage_type == UserQuota.CUSTOM_STORAGE:
+        if region_id:
             user = OSFUser.load(self.kwargs.get('guid'))
             institution = user.affiliated_institutions.first()
             region = Region.objects.filter(id=int(region_id)).first()
@@ -762,18 +762,11 @@ class BaseUserQuotaView(View):
 
             UserStorageQuota.objects.update_or_create(
                 user=OSFUser.load(self.kwargs.get('guid')),
-                storage_type=storage_type,
                 region=region,
                 defaults={'max_quota': max_quota}
             )
         else:
-            if storage_type == UserStorageQuota.NII_STORAGE:
-                UserQuota.objects.update_or_create(
-                    user=OSFUser.load(self.kwargs.get('guid')),
-                    storage_type=storage_type,
-                    region_id=region_id,
-                    defaults={'max_quota': max_quota}
-                )
+            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
 
 class UserQuotaView(BaseUserQuotaView):

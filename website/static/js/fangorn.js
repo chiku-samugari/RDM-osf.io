@@ -89,14 +89,6 @@ var OPERATIONS = {
     }
 };
 
-var ADDON_METHOD_PROVIDER = [
-    'nextcloudinstitutions',
-    'dropboxbusiness',
-    's3compatinstitutions',
-    'onedrivebusiness',
-    'ociinstitutions',
-]
-
 // Cross browser key codes for the Command key
 var COMMAND_KEYS = [224, 17, 91, 93];
 var ESCAPE_KEY = 27;
@@ -3426,7 +3418,6 @@ tbOptions = {
         var maxSize;
         var displaySize;
         var msgText;
-        var storage_quota;
         if (_fangornCanDrop(treebeard, item)) {
             if (item.data.accept && item.data.accept.maxSize) {
                 size = file.size / 1000000;

@@ -279,7 +279,11 @@ class QuotaUserList(ListView):
         return size, abbr
 
     def get_user_quota_info(self, user, storage_type):
-        max_quota, used_quota = quota.get_quota_info(user, storage_type)
+        max_quota, used_quota = quota.get_storage_quota_info(
+            self.get_institution(),
+            user,
+            self.get_region()
+        )
         max_quota_bytes = max_quota * api_settings.SIZE_UNIT_GB
         remaining_quota = max_quota_bytes - used_quota
         used_quota_abbr = self.custom_size_abbreviation(*quota.abbreviate_size(used_quota))
@@ -416,7 +420,7 @@ class UserListByInstitutionID(PermissionRequiredMixin, QuotaUserList):
         return Institution.objects.get(id=self.kwargs['institution_id'])
 
     def get_region(self):
-        return None
+        return Region.objects.first()
 
 
 class UpdateQuotaUserListByInstitutionID(PermissionRequiredMixin, View):
@@ -430,7 +434,7 @@ class UpdateQuotaUserListByInstitutionID(PermissionRequiredMixin, View):
         for user in OSFUser.objects.filter(
                 affiliated_institutions=institution_id):
             UserStorageQuota.objects.update_or_create(
-                user=user, storage_type=UserQuota.NII_STORAGE,
+                user=user,
                 region_id=NII_STORAGE_REGION_ID,
                 defaults={'max_quota': max_quota})
         return redirect('institutions:institution_user_list',

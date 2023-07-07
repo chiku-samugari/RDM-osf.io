@@ -4,7 +4,7 @@ from mimetypes import MimeTypes
 from django.db import connection
 
 from admin.institutions.views import QuotaUserStorageList
-from osf.models import Institution, OSFUser, UserQuota
+from osf.models import Institution, OSFUser
 from osf.models.user_storage_quota import UserStorageQuota
 from admin.base import settings
 from django.core.exceptions import PermissionDenied
@@ -270,7 +270,6 @@ class UpdateQuotaUserListByInstitutionStorageID(RdmPermissionMixin, View):
             UserStorageQuota.objects.update_or_create(
                 user=user,
                 region=region,
-                storage_type=UserQuota.CUSTOM_STORAGE,
                 defaults={'max_quota': max_quota}
             )
 

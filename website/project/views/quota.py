@@ -1,6 +1,6 @@
 from framework.auth.decorators import must_be_signed
 from osf.models import AbstractNode
-from osf.models.user_quota import UserQuota
+from osf.models.user_storage_quota import UserStorageQuota
 from website.project.decorators import must_be_contributor_or_public
 from website.util import quota
 from api.base import settings as api_settings
@@ -54,15 +54,14 @@ def get_institution_user_quota_from_pid(pid, provider, fid):
     region_id = get_region_id_of_institutional_storage_by_path(node, provider, fid, node.projectstoragetype.storage_type)
     if region_id is not None:
         try:
-            user_storage_quota = node.creator.userquota_set.get(
-                storage_type=node.projectstoragetype.storage_type,
+            user_storage_quota = node.creator.userstoragequota_set.get(
                 region_id=region_id
             )
             return {
                 'max': user_storage_quota.max_quota * api_settings.SIZE_UNIT_GB,
                 'used': user_storage_quota.used
             }
-        except UserQuota.DoesNotExist:
+        except UserStorageQuota.DoesNotExist:
             pass
 
     return {
