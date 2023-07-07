@@ -702,7 +702,7 @@ def component_remove(auth, node, **kwargs):
         contributor_ids = Contributor.objects.filter(node=node).values_list('user', flat=True)
         user_list = OSFUser.objects.filter(id__in=contributor_ids)
         for user in user_list:
-            quota.update_user_used_quota(user, storage_type=storage_type)
+            # quota.update_user_used_quota(user, storage_type=storage_type)
             # Update used quota for user-per-storage after removing the project
             recalculate_used_quota_by_user(user._id, storage_type=storage_type)
 
@@ -853,8 +853,6 @@ def _view_project(node, auth, primary=False,
             'title': sanitize.unescape_entities(node.title),
             'category': node.category_display,
             'category_short': node.category,
-            'used_quota': used_quota,
-            'max_quota': max_quota * api_settings.SIZE_UNIT_GB,
             'threshold': api_settings.WARNING_THRESHOLD,
             'node_type': node.project_or_component,
             'description': node.description or '',

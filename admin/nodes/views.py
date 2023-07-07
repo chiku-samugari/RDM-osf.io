@@ -196,7 +196,7 @@ class NodeDeleteView(PermissionRequiredMixin, NodeDeleteBase):
                 contributor_ids = Contributor.objects.filter(node=node).values_list('user', flat=True)
                 user_list = OSFUser.objects.filter(id__in=contributor_ids)
                 for user in user_list:
-                    quota.update_user_used_quota(user, storage_type=storage_type)
+                    quota.recalculate_used_quota_by_user(user._id, storage_type=storage_type)
 
         except AttributeError:
             return page_not_found(

@@ -5,6 +5,7 @@ from django.db import connection
 
 from admin.institutions.views import QuotaUserStorageList
 from osf.models import Institution, OSFUser, UserQuota
+from osf.models.user_storage_quota import UserStorageQuota
 from admin.base import settings
 from django.core.exceptions import PermissionDenied
 from addons.osfstorage.models import Region
@@ -266,7 +267,7 @@ class UpdateQuotaUserListByInstitutionStorageID(RdmPermissionMixin, View):
 
         for user in OSFUser.objects.filter(
                 affiliated_institutions=institution_id):
-            UserQuota.objects.update_or_create(
+            UserStorageQuota.objects.update_or_create(
                 user=user,
                 region=region,
                 storage_type=UserQuota.CUSTOM_STORAGE,

@@ -18,7 +18,7 @@ from django.views.generic.edit import FormView
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin, UserPassesTestMixin
 from admin.rdm.utils import RdmPermissionMixin
-
+from osf.models.user_storage_quota import UserStorageQuota
 from admin.base import settings
 from admin.base.forms import ImportFileForm
 from admin.institutions.forms import InstitutionForm, InstitutionalMetricsAdminRegisterForm
@@ -429,7 +429,7 @@ class UpdateQuotaUserListByInstitutionID(PermissionRequiredMixin, View):
         max_quota = min(int(self.request.POST.get('maxQuota')), max_value)
         for user in OSFUser.objects.filter(
                 affiliated_institutions=institution_id):
-            UserQuota.objects.update_or_create(
+            UserStorageQuota.objects.update_or_create(
                 user=user, storage_type=UserQuota.NII_STORAGE,
                 region_id=NII_STORAGE_REGION_ID,
                 defaults={'max_quota': max_quota})
@@ -446,7 +446,7 @@ class RecalculateQuota(RdmPermissionMixin, RedirectView):
             for institution in institutions_list:
                 user_list = OSFUser.objects.filter(affiliated_institutions=institution)
                 for user in user_list:
-                    quota.update_user_used_quota(user)
+                    quota.recalculate_used_quota_by_user(user._id)
 
         return redirect('institutions:institution_list')
 
@@ -454,12 +454,12 @@ class RecalculateQuota(RdmPermissionMixin, RedirectView):
 class RecalculateQuotaOfUsersInInstitution(RdmPermissionMixin, RedirectView):
 
     def dispatch(self, request, *args, **kwargs):
-        region_id = self.request.GET.get('region_id', None)
+        region_id = kwargs['region_id']
         if self.is_admin:
             institution = self.request.user.affiliated_institutions.first()
             if institution is not None and Region.objects.filter(_id=institution._id).exists():
                 for user in OSFUser.objects.filter(affiliated_institutions=institution.id):
-                    quota.update_user_used_quota(user, UserQuota.CUSTOM_STORAGE)
+                    quota.recalculate_used_quota_by_user(user._id, UserQuota.CUSTOM_STORAGE)
 
         return redirect('institutions:statistical_status_default_storage', region_id=region_id)
 

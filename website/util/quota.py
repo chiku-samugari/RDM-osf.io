@@ -59,8 +59,7 @@ def update_user_used_quota(user, storage_type=UserQuota.NII_STORAGE):
     try:
         user_quota = UserQuota.objects.get(
             user=user,
-            storage_type=storage_type,
-            region_id=NII_STORAGE_REGION_ID
+            storage_type=storage_type
         )
         user_quota.used = used
         user_quota.save()
@@ -86,7 +85,7 @@ def abbreviate_size(size):
 
 def get_quota_info(user, storage_type=UserQuota.NII_STORAGE):
     try:
-        user_quota = user.userquota_set.get(storage_type=storage_type, region_id=NII_STORAGE_REGION_ID)
+        user_quota = user.userquota_set.get(storage_type=storage_type)
         return (user_quota.max_quota, user_quota.used)
     except UserQuota.DoesNotExist:
         return (api_settings.DEFAULT_MAX_QUOTA, used_quota(user._id, storage_type))
@@ -249,22 +248,6 @@ def file_added(target, payload, file_node, storage_type):
         logging.error('Institutional storage not found, cannot update used quota!')
         return
 
-    try:
-        user_quota = UserQuota.objects.select_for_update().get(
-            user=target.creator,
-            storage_type=storage_type,
-            region_id=region_id
-        )
-        user_quota.used += file_size
-        user_quota.save()
-    except UserQuota.DoesNotExist:
-        UserQuota.objects.create(
-            user=target.creator,
-            storage_type=storage_type,
-            max_quota=api_settings.DEFAULT_MAX_QUOTA,
-            used=file_size
-        )
-
     user_storage_quota, _ = UserStorageQuota.objects.select_for_update().get_or_create(
         user=target.creator,
         defaults={'max_quota': api_settings.DEFAULT_MAX_QUOTA},
@@ -282,19 +265,13 @@ def node_removed(target, user, payload, file_node, storage_type):
         logging.error('Institutional storage not found, cannot update used quota!')
         return
 
-    user_quota = UserQuota.objects.filter(
-        user=target.creator,
-        storage_type=storage_type,
-        region_id=region_id
-    ).select_for_update().first()
-
     user_storage_quota, _ = UserStorageQuota.objects.select_for_update().get_or_create(
         user=target.creator,
         defaults={'max_quota': api_settings.DEFAULT_MAX_QUOTA},
         region_id=region_id
     )
 
-    if user_quota is not None:
+    if user_storage_quota is not None:
         if 'osf.trashed' not in file_node.type:
             logging.error('FileNode is not trashed, cannot update used quota!')
             return
@@ -308,9 +285,6 @@ def node_removed(target, user, payload, file_node, storage_type):
 
             file_size = min(file_info.file_size, user_storage_quota.used)
             user_storage_quota.used -= file_size
-            file_size = min(file_info.file_size, user_quota.used)
-            user_quota.used -= file_size
-        user_quota.save()
         user_storage_quota.save()
 
 def file_modified(target, user, payload, file_node, storage_type):
@@ -323,13 +297,6 @@ def file_modified(target, user, payload, file_node, storage_type):
         logging.error('Institutional storage not found, cannot update used quota!')
         return
 
-    user_quota, _ = UserQuota.objects.select_for_update().get_or_create(
-        user=target.creator,
-        storage_type=storage_type,
-        defaults={'max_quota': api_settings.DEFAULT_MAX_QUOTA},
-        region_id=region_id
-    )
-
     user_storage_quota, _ = UserStorageQuota.objects.select_for_update().get_or_create(
         user=target.creator,
         defaults={'max_quota': api_settings.DEFAULT_MAX_QUOTA},
@@ -341,13 +308,9 @@ def file_modified(target, user, payload, file_node, storage_type):
     except FileInfo.DoesNotExist:
         file_info = FileInfo(file=file_node, file_size=0)
 
-    user_quota.used += file_size - file_info.file_size
     user_storage_quota.used += file_size - file_info.file_size
-    if user_quota.used < 0:
-        user_quota.used = 0
     if user_storage_quota.used < 0:
         user_storage_quota.used = 0
-    user_quota.save()
     user_storage_quota.save()
 
     file_info.file_size = file_size
@@ -607,7 +570,7 @@ def calculate_used_quota_by_institutional_storage(project_id, osf_node_setting):
 
     """
     files_ids = []
-    provider = osf_node_setting.region.waterbutler_settings__storage__provider
+    provider = osf_node_setting.region.waterbutler_settings['storage']['provider']
     if provider in ADDON_METHOD_PROVIDER:
         file_nodes = BaseFileNode.objects.filter(
             target_object_id=project_id,

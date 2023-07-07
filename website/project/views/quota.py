@@ -1,5 +1,5 @@
 from framework.auth.decorators import must_be_signed
-from osf.models import AbstractNode, BaseFileNode
+from osf.models import AbstractNode
 from osf.models.user_quota import UserQuota
 from website.project.decorators import must_be_contributor_or_public
 from website.util import quota

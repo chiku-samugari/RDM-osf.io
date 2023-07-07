@@ -2,10 +2,10 @@
 <h2 id="title">{% trans "Statistical Status of Institutional Storage" %}</h2>
 <h3 id="sub-title">{% blocktrans %}Institutional Storage > {{ institution_name }}{% endblocktrans %}</h3>
 
-<form action={% url 'institutions:recalculate_quota_of_users_in_institution' %}/?region_id={{region_id}} method="post">
+<form action={% url 'institutions:recalculate_quota_of_users_in_institution' region_id %} method="post">
     <div class="row">
         <div class="col-md-6">
-            {% include "util/pagination.html" with items=page status=direction order=order_by region_id=region_id %}
+            {% include "util/pagination.html" with items=page status=direction order=order_by %}
         </div>
         <div class="col-md-6">
             {% csrf_token %}

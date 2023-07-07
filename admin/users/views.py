@@ -26,7 +26,7 @@ from osf.models import UserQuota
 from framework.auth import get_user
 from framework.auth.utils import impute_names
 from framework.auth.core import generate_verification_key
-
+from osf.models.user_storage_quota import UserStorageQuota
 from website.mailchimp_utils import subscribe_on_confirm
 from website import search
 from website.util import quota
@@ -760,14 +760,14 @@ class BaseUserQuotaView(View):
             if not region or not institution or institution._id != region._id:
                 raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
-            UserQuota.objects.update_or_create(
+            UserStorageQuota.objects.update_or_create(
                 user=OSFUser.load(self.kwargs.get('guid')),
                 storage_type=storage_type,
                 region=region,
                 defaults={'max_quota': max_quota}
             )
         else:
-            if storage_type == UserQuota.NII_STORAGE:
+            if storage_type == UserStorageQuota.NII_STORAGE:
                 UserQuota.objects.update_or_create(
                     user=OSFUser.load(self.kwargs.get('guid')),
                     storage_type=storage_type,
