@@ -7,7 +7,35 @@ from django.db import migrations, models
 import django.db.models.deletion
 import django_extensions.db.fields
 import osf.models.base
+from osf.models.storage import StorageType
+from api.base import settings as api_settings
 
+
+def move_quota_from_user_quota_table(apps, schema_editor):
+    Userquota = apps.get_model('osf', 'UserQuota')
+    UserStorageQuota = apps.get_model('osf', 'UserStoragequota')
+    Region = apps.get_model('addons_osfstorage.region')
+    OSFUser = apps.get_model('osf.OSFUser')
+    region_id = None
+    for user_quota in Userquota.objects.all():
+        user = OSFUser.objects.get(id=user_quota.user_id)
+        if user_quota.storage_type == StorageType.NII_STORAGE:
+            region_id = api_settings.NII_STORAGE_REGION_ID
+        else:
+            institution = user.affiliated_institutions.first()
+            if institution:
+                region = Region.objects.get(_id=institution._id)
+                region_id = region.id
+        UserStorageQuota.objects.create(
+            user=user,
+            region_id=region_id,
+            max_quota=user_quota.max_quota,
+            used=user_quota.used
+        )
+        user_quota.save()
+
+def noop(*args):
+    pass
 
 class Migration(migrations.Migration):
 
@@ -34,4 +62,5 @@ class Migration(migrations.Migration):
             name='userstoragequota',
             unique_together=set([('user', 'region')]),
         ),
+        migrations.RunPython(move_quota_from_user_quota_table, noop)
     ]
