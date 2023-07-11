@@ -533,6 +533,48 @@ def recalculate_used_quota_by_user(user_id, storage_type=UserQuota.NII_STORAGE):
                 pass
 
 
+def recalculate_used_of_user_by_region(user_id, region_id):
+    """Recalculate used of user by region
+
+    :param str user_id: The guid of user is recalculated
+    :param int region_id: The ids of region
+
+    """
+    if region_id == NII_STORAGE_REGION_ID:
+        storage_type = UserQuota.NII_STORAGE
+    else:
+        storage_type = UserQuota.CUSTOM_STORAGE
+
+    guid = Guid.objects.get(
+        _id=user_id,
+        content_type_id=ContentType.objects.get_for_model(OSFUser).id
+    )
+    projects = AbstractNode.objects.filter(
+        projectstoragetype__storage_type=storage_type,
+        is_deleted=False,
+        creator_id=guid.object_id
+    )
+
+    if projects is not None:
+        used = 0
+        for project in projects:
+            addon = project.get_addon('osfstorage', region_id=region_id)
+            used += calculate_used_quota_by_institutional_storage(
+                project.id,
+                addon
+            )
+
+        try:
+            storage_quota = UserStorageQuota.objects.select_for_update().get(
+                user_id=guid.object_id,
+                region_id=region_id
+            )
+            storage_quota.used = used
+            storage_quota.save()
+        except UserStorageQuota.DoesNotExist:
+            pass
+
+
 def get_file_ids_by_institutional_storage(result, project_id, root_id):
     """ Get all file ids of institutional storage in a project
 
@@ -578,7 +620,6 @@ def calculate_used_quota_by_institutional_storage(project_id, osf_node_setting):
             deleted_on=None,
             deleted_by_id=None,
             provider=provider,
-            parent_id=osf_node_setting.id
         )
         for item in file_nodes:
             if 'file' in item.type:

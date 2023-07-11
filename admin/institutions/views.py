@@ -420,7 +420,14 @@ class UserListByInstitutionID(PermissionRequiredMixin, QuotaUserList):
         return Institution.objects.get(id=self.kwargs['institution_id'])
 
     def get_region(self):
-        return Region.objects.first()
+        region = Region.objects.first()
+        region_institution = Region.objects.filter(
+            _id=self.get_institution()._id,
+            name=region.name
+        ).first()
+        if region_institution is None:
+            return region
+        return region_institution
 
 
 class UpdateQuotaUserListByInstitutionID(PermissionRequiredMixin, View):
@@ -430,7 +437,11 @@ class UpdateQuotaUserListByInstitutionID(PermissionRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         institution_id = self.kwargs['institution_id']
         min_value, max_value = connection.ops.integer_field_range('IntegerField')
-        max_quota = min(int(self.request.POST.get('maxQuota')), max_value)
+        try:
+            max_quota = min(int(self.request.POST.get('maxQuota')), max_value)
+        except (ValueError, TypeError):
+            return redirect('institutions:institution_user_list',
+                            institution_id=institution_id)
         for user in OSFUser.objects.filter(
                 affiliated_institutions=institution_id):
             UserStorageQuota.objects.update_or_create(
