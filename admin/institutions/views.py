@@ -420,14 +420,7 @@ class UserListByInstitutionID(PermissionRequiredMixin, QuotaUserList):
         return Institution.objects.get(id=self.kwargs['institution_id'])
 
     def get_region(self):
-        region = Region.objects.first()
-        region_institution = Region.objects.filter(
-            _id=self.get_institution()._id,
-            name=region.name
-        ).first()
-        if region_institution is None:
-            return region
-        return region_institution
+        return Region.objects.first()
 
 
 class UpdateQuotaUserListByInstitutionID(PermissionRequiredMixin, View):
@@ -461,7 +454,7 @@ class RecalculateQuota(RdmPermissionMixin, RedirectView):
             for institution in institutions_list:
                 user_list = OSFUser.objects.filter(affiliated_institutions=institution)
                 for user in user_list:
-                    quota.recalculate_used_quota_by_user(user._id)
+                    quota.recalculate_used_of_user_by_region(user._id)
 
         return redirect('institutions:institution_list')
 
@@ -474,7 +467,7 @@ class RecalculateQuotaOfUsersInInstitution(RdmPermissionMixin, RedirectView):
             institution = self.request.user.affiliated_institutions.first()
             if institution is not None and Region.objects.filter(_id=institution._id).exists():
                 for user in OSFUser.objects.filter(affiliated_institutions=institution.id):
-                    quota.recalculate_used_quota_by_user(user._id, UserQuota.CUSTOM_STORAGE)
+                    quota.recalculate_used_of_user_by_region(user._id, region_id)
 
         return redirect('institutions:statistical_status_default_storage', region_id=region_id)
 

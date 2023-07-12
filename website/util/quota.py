@@ -106,7 +106,7 @@ def get_storage_quota_info(institution, user, region):
     except UserStorageQuota.DoesNotExist:
         return (
             api_settings.DEFAULT_MAX_QUOTA,
-            user_per_storage_used_quota(institution, user, region)
+            recalculate_used_of_user_by_region(user._id, region.id)
         )
 
 
@@ -533,13 +533,14 @@ def recalculate_used_quota_by_user(user_id, storage_type=UserQuota.NII_STORAGE):
                 pass
 
 
-def recalculate_used_of_user_by_region(user_id, region_id):
+def recalculate_used_of_user_by_region(user_id, region_id=NII_STORAGE_REGION_ID):
     """Recalculate used of user by region
 
     :param str user_id: The guid of user is recalculated
     :param int region_id: The ids of region
 
     """
+    region_id = int(region_id)
     if region_id == NII_STORAGE_REGION_ID:
         storage_type = UserQuota.NII_STORAGE
     else:
@@ -555,10 +556,12 @@ def recalculate_used_of_user_by_region(user_id, region_id):
         creator_id=guid.object_id
     )
 
+    used = 0
     if projects is not None:
-        used = 0
         for project in projects:
             addon = project.get_addon('osfstorage', region_id=region_id)
+            if addon is None or addon.region_id != region_id:
+                continue
             used += calculate_used_quota_by_institutional_storage(
                 project.id,
                 addon
@@ -573,7 +576,7 @@ def recalculate_used_of_user_by_region(user_id, region_id):
             storage_quota.save()
         except UserStorageQuota.DoesNotExist:
             pass
-
+    return used
 
 def get_file_ids_by_institutional_storage(result, project_id, root_id):
     """ Get all file ids of institutional storage in a project
