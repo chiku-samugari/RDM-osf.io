@@ -18,8 +18,6 @@ from osf.models.user_storage_quota import UserStorageQuota
 from rest_framework import status as http_status
 from framework.exceptions import HTTPError
 
-PROVIDERS = []
-
 # import inspect
 logger = logging.getLogger(__name__)
 
@@ -121,48 +119,9 @@ def update_used_quota(self, target, user, event_type, payload):
     if event_type == FileLog.FILE_RENAMED:
         destination = dict(payload).get('destination')
         source = dict(payload).get('source')
-        if dict(destination).get('provider') in PROVIDERS:
-            nodes_filter = []
-            if dict(destination).get('kind') == 'file':
-
-                nodes_filter = BaseFileNode.objects.filter(
-                    _path=dict(source).get('path'),
-                    provider=dict(destination).get('provider'),
-                    target_object_id=target.id,
-                    deleted=None,
-                    target_content_type_id=ContentType.objects.get_for_model(AbstractNode),
-                )
-            elif dict(destination).get('kind') == 'folder':
-
-                nodes_filter = BaseFileNode.objects.filter(
-                    _path__startswith=dict(source).get('path'),
-                    provider=dict(destination).get('provider'),
-                    target_object_id=target.id,
-                    deleted=None,
-                    target_content_type_id=ContentType.objects.get_for_model(AbstractNode),
-                )
-            for node in nodes_filter:
-                node._path = node._path.replace(dict(source).get('path'), dict(destination).get('path'))
-                node._materialized_path = node._path.replace(dict(source).get('path'), dict(destination).get('path'))
-                node.save()
-            lastest_node = BaseFileNode.objects.filter(
-                _path=dict(destination).get('path'),
-                provider=dict(destination).get('provider'),
-                target_object_id=target.id,
-                deleted=None,
-                target_content_type_id=ContentType.objects.get_for_model(AbstractNode),
-            ).order_by('-id').first()
-            lastest_node.is_deleted = True
-            lastest_node.deleted = timezone.now()
-            lastest_node.deleted_on = lastest_node.deleted
-            lastest_node.type = 'osf.trashedfile' if dict(destination).get('kind') == 'file' else 'osf.trashedfolder'
-            lastest_node.deleted_by_id = user.id
-            lastest_node.save()
     data = dict(payload.get('metadata')) if payload.get('metadata') else None
     metadata_provider = data.get('provider') if payload.get('metadata') else None
-    if metadata_provider in PROVIDERS or\
-            metadata_provider == 'osfstorage' or\
-            metadata_provider in ADDON_METHOD_PROVIDER:
+    if metadata_provider == 'osfstorage' or metadata_provider in ADDON_METHOD_PROVIDER:
         file_node = None
         action_payload = dict(payload).get('action')
         try:
@@ -199,7 +158,7 @@ def update_used_quota(self, target, user, event_type, payload):
         if event_type == FileLog.FILE_ADDED:
             file_added(target, payload, file_node, storage_type)
         elif event_type == FileLog.FILE_REMOVED:
-            if metadata_provider in PROVIDERS or metadata_provider in ADDON_METHOD_PROVIDER:
+            if metadata_provider in ADDON_METHOD_PROVIDER:
                 if data.get('kind') == 'file':
                     file_node.is_deleted = True
                     file_node.deleted = timezone.now()
