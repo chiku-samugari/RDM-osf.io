@@ -12,12 +12,12 @@ from api.base import settings as api_settings
 
 
 def move_quota_from_user_quota_table(apps, schema_editor):
-    Userquota = apps.get_model('osf', 'UserQuota')
-    UserStorageQuota = apps.get_model('osf', 'UserStoragequota')
+    UserQuota = apps.get_model('osf', 'UserQuota')
+    UserStorageQuota = apps.get_model('osf', 'UserStorageQuota')
     Region = apps.get_model('addons_osfstorage.region')
     OSFUser = apps.get_model('osf.OSFUser')
     region_id = None
-    for user_quota in Userquota.objects.all():
+    for user_quota in UserQuota.objects.all():
         user = OSFUser.objects.get(id=user_quota.user_id)
         if user_quota.storage_type == StorageType.NII_STORAGE:
             region_id = api_settings.NII_STORAGE_REGION_ID
@@ -34,8 +34,10 @@ def move_quota_from_user_quota_table(apps, schema_editor):
         )
         user_quota.save()
 
+
 def noop(*args):
     pass
+
 
 class Migration(migrations.Migration):
 

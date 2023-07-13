@@ -2323,11 +2323,11 @@ var FGItemButtons = {
                 if (item.data.path) {
                     if (!item.data.hasOwnProperty('isAddonRoot') && !item.data.isAddonRoot) {
                         rowButtons.push(
-                        m.component(FGButton, {
-                            onclick: function(event) {_removeEvent.call(tb, event, [item]); },
-                            icon: 'fa fa-trash',
-                            className : 'text-danger'
-                        }, gettext('Delete Folder')));
+                            m.component(FGButton, {
+                                onclick: function(event) {_removeEvent.call(tb, event, [item]); },
+                                icon: 'fa fa-trash',
+                                className : 'text-danger'
+                            }, gettext('Delete Folder')));
                     }
                 }
             }

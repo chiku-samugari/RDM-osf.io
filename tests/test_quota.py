@@ -563,7 +563,7 @@ class TestSaveFileInfo(OsfTestCase):
 
     def test_update_institutional_storage_used_quota(self):
         UserStorageQuota.objects.create(user=self.project_creator, region=self.region, max_quota=self.storage_max_quota, used=1000)
-        quota.update_institutional_storage_used_quota(self.project_creator, self.region, None, 2000, True)
+        quota.update_institutional_storage_used_quota(self.project_creator, self.region, 2000, True)
         user_storage_quota = UserStorageQuota.objects.filter(user=self.project_creator, region=self.region).first()
 
         assert_is_not_none(user_storage_quota)
@@ -571,7 +571,7 @@ class TestSaveFileInfo(OsfTestCase):
 
     def test_update_institutional_storage_used_quota_used_less_than_zero(self):
         UserStorageQuota.objects.create(user=self.project_creator, region=self.region, max_quota=self.storage_max_quota, used=-1)
-        quota.update_institutional_storage_used_quota(self.project_creator, self.region, None, -1, True)
+        quota.update_institutional_storage_used_quota(self.project_creator, self.region, -1, True)
         user_storage_quota = UserStorageQuota.objects.filter(user=self.project_creator, region=self.region).first()
 
         assert_is_not_none(user_storage_quota)

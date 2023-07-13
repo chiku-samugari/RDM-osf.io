@@ -820,7 +820,7 @@ class UserDetailsView(RdmPermissionMixin, UserPassesTestMixin, GuidView):
 
 class UserInstitutionQuotaView(RdmPermissionMixin, UserPassesTestMixin, BaseUserQuotaView):
     """
-    User screen for intitution managers.
+    User screen for institution managers.
     """
     def test_func(self):
         return not self.is_super_admin and self.is_admin \

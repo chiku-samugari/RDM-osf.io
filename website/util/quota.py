@@ -302,7 +302,6 @@ def file_moved(target, payload):
                     update_institutional_storage_used_quota(
                         target.creator,
                         node_addon_destination.region,
-                        payload['destination']['provider'],
                         file_size
                     )
 
@@ -320,8 +319,8 @@ def file_moved(target, payload):
                     update_institutional_storage_used_quota(
                         target.creator,
                         node_addon_source.region,
-                        payload['source']['provider'],
-                        file_size, add=False
+                        file_size,
+                        add=False
                     )
 
 def update_default_storage(user):
@@ -405,12 +404,11 @@ def get_addon_osfstorage_by_path(target, path, provider):
         return None
 
 
-def update_institutional_storage_used_quota(creator, region, provider, size, add=True):
+def update_institutional_storage_used_quota(creator, region, size, add=True):
     """Update used per-user-per-storage
 
     :param Object creator: User is updated
     :param Object region: Institutional storage is updated
-    :param str provider: Provider name of storage
     :param int size: Size of file
     :param bool add: Add or subtract
 
@@ -537,6 +535,7 @@ def recalculate_used_of_user_by_region(user_id, region_id=NII_STORAGE_REGION_ID)
             pass
     return used
 
+
 def get_file_ids_by_institutional_storage(result, project_id, root_id):
     """ Get all file ids of institutional storage in a project
 
@@ -600,7 +599,6 @@ def calculate_size_of_all_files_by_provider_name(projects, provider):
     :param list projects: All projects
     :param string provider: provider name of addon storage
     :return int: Result
-
     """
     files_ids = []
     for project in projects:
