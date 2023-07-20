@@ -241,7 +241,7 @@ class WikiVersion(ObjectIDMixin, BaseModel):
 
 class WikiPageNodeManager(models.Manager):
 
-    def create_for_node(self, node, name, content, auth):
+    def create_for_node(self, node, name, content, auth, parent=None):
         existing_wiki_page = WikiPage.objects.get_for_node(node, name)
         if existing_wiki_page:
             raise NodeStateError('Wiki Page already exists.')
@@ -249,24 +249,32 @@ class WikiPageNodeManager(models.Manager):
         wiki_page = WikiPage.objects.create(
             node=node,
             page_name=name,
-            user=auth.user
+            user=auth.user,
+            parent=parent
         )
         # Creates a WikiVersion object
         wiki_page.update(auth.user, content)
         return wiki_page
 
-    def get_for_node(self, node, name=None, id=None):
+    def get_for_node(self, node, name=None, id=None, parent=None):
         if name:
             try:
                 name = (name or '').strip()
-                return WikiPage.objects.get(page_name__iexact=name, deleted__isnull=True, node=node)
+                if not parent:
+                    return WikiPage.objects.get(page_name__iexact=name, deleted__isnull=True, node=node, parent__isnull=True)
+                else:
+                    return WikiPage.objects.get(page_name__iexact=name, deleted__isnull=True, node=node, parent__exact=parent)
             except WikiPage.DoesNotExist:
                 return None
         return WikiPage.load(id)
 
     def get_wiki_pages_latest(self, node):
         wiki_page_ids = node.wikis.filter(deleted__isnull=True).values_list('id', flat=True)
-        return WikiVersion.objects.annotate(name=F('wiki_page__page_name'), newest_version=Max('wiki_page__versions__identifier')).filter(identifier=F('newest_version'), wiki_page__id__in=wiki_page_ids)
+        return WikiVersion.objects.annotate(name=F('wiki_page__page_name'), newest_version=Max('wiki_page__versions__identifier')).filter(identifier=F('newest_version'), wiki_page__id__in=wiki_page_ids, wiki_page__parent__isnull=True)
+
+    def get_wiki_child_pages_latest(self, node, parent):
+        wiki_page_ids = node.wikis.filter(deleted__isnull=True).values_list('id', flat=True)
+        return WikiVersion.objects.annotate(name=F('wiki_page__page_name'), newest_version=Max('wiki_page__versions__identifier')).filter(identifier=F('newest_version'), wiki_page__id__in=wiki_page_ids, wiki_page__parent=parent)
 
     def include_wiki_settings(self, node):
         """Check if node meets requirements to make publicly editable."""
@@ -278,6 +286,7 @@ class WikiPage(GuidMixin, BaseModel):
     page_name = models.CharField(max_length=200, validators=[validate_page_name, ])
     user = models.ForeignKey('osf.OSFUser', null=True, blank=True, on_delete=models.CASCADE)
     node = models.ForeignKey('osf.AbstractNode', null=True, blank=True, on_delete=models.CASCADE, related_name='wikis')
+    parent = models.IntegerField(blank=True, null=True)
     deleted = NonNaiveDateTimeField(blank=True, null=True, db_index=True)
 
     class Meta:
