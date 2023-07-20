@@ -94,9 +94,22 @@ def _get_wiki_pages_latest(node):
             'name': page.wiki_page.page_name,
             'url': node.web_url_for('project_wiki_view', wname=page.wiki_page.page_name, _guid=True),
             'wiki_id': page.wiki_page._primary_key,
+            'id': page.wiki_page.id,
             'wiki_content': _wiki_page_content(page.wiki_page.page_name, node=node)
         }
         for page in WikiPage.objects.get_wiki_pages_latest(node).order_by(F('name'))
+    ]
+
+def _get_wiki_child_pages_latest(node, parent):
+    return [
+        {
+            'name': page.wiki_page.page_name,
+            'url': node.web_url_for('project_wiki_view', wname=page.wiki_page.page_name, _guid=True),
+            'wiki_id': page.wiki_page._primary_key,
+            'id': page.wiki_page.id,
+            'wiki_content': _wiki_page_content(page.wiki_page.page_name, node=node)
+        }
+        for page in WikiPage.objects.get_wiki_child_pages_latest(node, parent).order_by(F('name'))
     ]
 
 def _get_wiki_api_urls(node, name, additional_urls=None):
@@ -175,6 +188,10 @@ def project_wiki_delete(auth, wname, **kwargs):
 @must_have_addon('wiki', 'node')
 @must_not_be_retracted_registration
 def project_wiki_view(auth, wname, path=None, **kwargs):
+    logger.info("---------------------------------------------------")
+    logger.info("project_wiki_view")
+    logger.info("---------------------------------------------------")
+
     node = kwargs['node'] or kwargs['project']
     anonymous = has_anonymous_link(node, auth)
     wiki_name = (wname or '').strip()
@@ -369,6 +386,9 @@ def project_wiki_home(**kwargs):
 @must_be_contributor_or_public
 @must_have_addon('wiki', 'node')
 def project_wiki_id_page(auth, wid, **kwargs):
+    logger.info("---------------------------------------------------")
+    logger.info("project_wiki_id_page")
+    logger.info("---------------------------------------------------")
     node = kwargs['node'] or kwargs['project']
     wiki = WikiPage.objects.get_for_node(node, id=wid)
     if wiki:
@@ -442,7 +462,7 @@ def project_wiki_rename(auth, wname, **kwargs):
 @must_have_permission(WRITE)  # returns user, project
 @must_not_be_registration
 @must_have_addon('wiki', 'node')
-def project_wiki_validate_name(wname, auth, node, **kwargs):
+def project_wiki_validate_name(wname, auth, node, p_wname=None, **kwargs):
     wiki_name = wname.strip()
     wiki = WikiPage.objects.get_for_node(node, wiki_name)
 
@@ -451,13 +471,27 @@ def project_wiki_validate_name(wname, auth, node, **kwargs):
             message_short='Wiki page name conflict.',
             message_long='A wiki page with that name already exists.'
         ))
-    else:
-        WikiPage.objects.create_for_node(node, wiki_name, '', auth)
+
+    parent_wiki_id = None
+    if p_wname:
+        parent_wiki_name = p_wname.strip()
+        parent_wiki = WikiPage.objects.get_for_node(node, parent_wiki_name)
+        if not parent_wiki:
+            raise HTTPError(http_status.HTTP_404_NOT_FOUND, data=dict(
+                message_short='Parent Wiki page name nothing.',
+                message_long='A wiki page with that name does not exist.'
+            ))
+        parent_wiki_id = parent_wiki.id
+
+    WikiPage.objects.create_for_node(node, wiki_name, '', auth, parent_wiki_id)
     return {'message': wiki_name}
 
 @must_be_valid_project
 @must_be_contributor_or_public
 def project_wiki_grid_data(auth, node, **kwargs):
+    logger.info("-----------------------------------------------------")
+    logger.info("project_wiki_grid_data")
+    logger.info("-----------------------------------------------------")
     pages = []
     project_wiki_pages = {
         'title': 'Project Wiki Pages',
@@ -465,6 +499,10 @@ def project_wiki_grid_data(auth, node, **kwargs):
         'type': 'heading',
         'children': format_project_wiki_pages(node, auth)
     }
+    logger.info("-----------------------------------------------------")
+    logger.info("project_wiki_pages: {}".format(project_wiki_pages))
+    logger.info("-----------------------------------------------------")
+
     pages.append(project_wiki_pages)
 
     component_wiki_pages = {
@@ -506,6 +544,7 @@ def format_project_wiki_pages(node, auth):
     home_wiki_page = format_home_wiki_page(node)
     pages.append(home_wiki_page)
     for wiki_page in project_wiki_pages:
+        logger.info("project_wiki_page: {}".format(wiki_page))
         if wiki_page['name'] != 'home':
             has_content = bool(wiki_page['wiki_content'].get('wiki_content'))
             page = {
@@ -515,8 +554,39 @@ def format_project_wiki_pages(node, auth):
                     'id': wiki_page['wiki_id'],
                 }
             }
+            child_wiki_pages = _format_child_wiki_pages(node, wiki_page['id'])
+            page['children'] = child_wiki_pages
+            if child_wiki_pages:
+                page['kind'] = 'folder'
+
             if can_edit or has_content:
                 pages.append(page)
+    return pages
+
+
+def _format_child_wiki_pages(node, parent):
+    logger.info("_format_child_wiki_pages parent: {}".format(parent))
+    pages = []
+    child_wiki_pages = _get_wiki_child_pages_latest(node, parent)
+    if not child_wiki_pages:
+        return pages
+
+    for wiki_page in child_wiki_pages:
+        if wiki_page['name'] != 'home':
+            page = {
+                'page': {
+                    'url': wiki_page['url'],
+                    'name': wiki_page['name'],
+                    'id': wiki_page['wiki_id'],
+                }
+            }
+            grandchild_wiki_pages = _format_child_wiki_pages(node, wiki_page['id'])
+            page['children'] = grandchild_wiki_pages
+            if grandchild_wiki_pages:
+                page['kind'] = 'folder'
+
+            logger.info("has_content page: {}".format(page))
+            pages.append(page)
     return pages
 
 

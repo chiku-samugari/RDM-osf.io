@@ -9,6 +9,20 @@
                 </div><!-- end modal-header -->
                 <div class="modal-body">
                     <div class='form-group'>
+                        <div class="radio">
+                            <label>
+                                <input type="radio" name="addHierarchy" value="same" checked>
+                                ${_("Add to same hierarchy")}
+                            </label>
+                        </div>
+                        <div class="radio">
+                            <label>
+                                <input type="radio" name="addHierarchy" value="${wiki_name}" ${'disabled' if wiki_name == 'home' else ''}>
+                                ${_("Add to child hierarchy")}
+                            </label>
+                        </div>
+                    </div>
+                    <div class='form-group'>
                         <input id="data" placeholder="${_('New Wiki Name')}" type="text" class='form-control'>
                     </div>
                     <p id="alert" class="text-danger"> </p>
@@ -56,10 +70,18 @@
             } else {
                 // TODO: helper to eliminate slashes in the url.
                 var wikiName = $data.val();
+                var validateUrl = "";
+                var addHierarchy = $newWikiForm.find('input:radio[name="addHierarchy"]:checked').val();
+                if (addHierarchy === "same"){
+                    validateUrl = ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) + '/validate/';
+                } else {
+                    validateUrl = ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) 
+                        + '/parent/' + encodeURIComponent(addHierarchy) + '/validate/';
+                }
                 var request = $.ajax({
                     type: 'GET',
                     cache: false,
-                    url: ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) + '/validate/',
+                    url: validateUrl,
                     dataType: 'json'
                 });
                 request.done(function (response) {

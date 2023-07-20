@@ -116,6 +116,7 @@ api_routes = {
         Rule([
             '/project/<pid>/wiki/<wname>/validate/',
             '/project/<pid>/node/<nid>/wiki/<wname>/validate/',
+            '/project/<pid>/wiki/<wname>/parent/<p_wname>/validate/',
         ], 'get', views.project_wiki_validate_name, json_renderer),
 
         # Edit | POST

@@ -726,6 +726,14 @@ msgstr "接続されたアカウントに関連付けられたインデックス
 msgid "Add new wiki page"
 msgstr "新しいWikiページを追加"
 
+#: wiki/templates/add_wiki_page.mako:15
+msgid "Add to same hierarchy"
+msgstr "同階層にページを作成する"
+
+#: wiki/templates/add_wiki_page.mako:21
+msgid "Add to child hierarchy"
+msgstr "子階層にページを作成する"
+
 #: wiki/templates/add_wiki_page.mako:12
 msgid "New Wiki Name"
 msgstr "新しいWiki名"
