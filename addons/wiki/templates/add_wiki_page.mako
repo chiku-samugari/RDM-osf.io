@@ -8,14 +8,14 @@
                     <h3 class="modal-title">${_("Add new wiki page")}</h3>
                 </div><!-- end modal-header -->
                 <div class="modal-body">
-                    <div class='form-group'>
-                        <div class="radio">
+                    <div class='form-group wiki-radio-group'>
+                        <div class="wiki-radio-item">
                             <label>
                                 <input type="radio" name="addHierarchy" value="same" checked>
                                 ${_("Add to same hierarchy")}
                             </label>
                         </div>
-                        <div class="radio">
+                        <div class="wiki-radio-item">
                             <label>
                                 <input type="radio" name="addHierarchy" value="${wiki_name}" ${'disabled' if wiki_name == 'home' else ''}>
                                 ${_("Add to child hierarchy")}
@@ -24,6 +24,7 @@
                     </div>
                     <div class='form-group'>
                         <input id="data" placeholder="${_('New Wiki Name')}" type="text" class='form-control'>
+                        <input id="parent-wiki-name" type="hidden" value="${parent_wiki_name}">
                     </div>
                     <p id="alert" class="text-danger"> </p>
                 </div><!-- end modal-body -->
@@ -46,6 +47,7 @@
             var $data = $newWikiForm.find('#data');
             var $submitForm = $newWikiForm.find('#add-wiki-submit');
             var $alert = $newWikiForm.find('#alert');
+            var $parentWikiName = $newWikiForm.find('#parent-wiki-name');
 
             $submitForm
                 .attr('disabled', 'disabled')
@@ -73,7 +75,13 @@
                 var validateUrl = "";
                 var addHierarchy = $newWikiForm.find('input:radio[name="addHierarchy"]:checked').val();
                 if (addHierarchy === "same"){
-                    validateUrl = ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) + '/validate/';
+                    var parent_wiki_name = $newWikiForm.find('#parent-wiki-name').val();
+                    if (parent_wiki_name){
+                        validateUrl = ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) 
+                            + '/parent/' + encodeURIComponent(parent_wiki_name) + '/validate/';
+                    } else {
+                        validateUrl = ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) + '/validate/';
+                    }
                 } else {
                     validateUrl = ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) 
                         + '/parent/' + encodeURIComponent(addHierarchy) + '/validate/';

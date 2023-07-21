@@ -32,13 +32,27 @@ function resolveIcon(item) {
         }
         return returnView(item.data.category);
     }
-    if (item.data.type === 'heading') {
+    if (item.data.type === 'heading' || item.data.kind === 'folder') {
         if (item.open) {
             return m('i.fa.fa-folder-open', ' ');
         }
         return m('i.fa.fa-folder', ' ');
     }
     return m('i.fa.fa-file-o', ' ');
+}
+
+function openParentFolders (item) {
+    var tb = this;
+    // does it have a parent? If so change open
+    var parent = item.parent();
+    if (parent) {
+        if (!parent.open) {
+            var index = tb.returnIndex(parent.id);
+            parent.load = true;
+            tb.toggleFolder(index);
+        }
+        openParentFolders.call(tb, parent);
+    }
 }
 
 function WikiMenu(data, wikiID, canEdit) {
@@ -82,6 +96,7 @@ function WikiMenu(data, wikiID, canEdit) {
                 if(item.data.page.id === wikiID) {
                     item.css = 'fangorn-selected';
                     tb.multiselected([item]);
+                    openParentFolders(item);
                 }
                 columns.push({
                     folderIcons: true,
@@ -100,6 +115,9 @@ function WikiMenu(data, wikiID, canEdit) {
             return m('i.fa.fa-refresh.fa-spin');
         }
     };
+
+
+    
     var grid = new Treebeard(tbOptions);
 }
 

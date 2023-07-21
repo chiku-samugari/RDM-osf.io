@@ -345,3 +345,11 @@ select.form-control {
     display: inherit;
     overflow-y: hidden;
 }
+
+.wiki-radio-group {
+    display:flex;
+}
+
+.wiki-radio-item {
+    margin-right: 10px;
+}

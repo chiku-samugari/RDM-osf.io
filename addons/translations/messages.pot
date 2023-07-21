@@ -737,7 +737,7 @@ msgid "Delete wiki page"
 msgstr ""
 
 #: wiki/templates/delete_wiki_page.mako:10
-msgid "Are you sure you want to delete this wiki page?"
+msgid "This wiki page and all content under it will be deleted. This action is irreversible."
 msgstr ""
 
 #: wiki/templates/delete_wiki_page.mako:14 wiki/templates/edit.mako:38
