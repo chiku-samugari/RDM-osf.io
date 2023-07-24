@@ -17,7 +17,7 @@
                         </div>
                         <div class="wiki-radio-item">
                             <label>
-                                <input type="radio" name="addHierarchy" value="${wiki_name}" ${'disabled' if wiki_name == 'home' else ''}>
+                                <input type="radio" name="addHierarchy" value="${wiki_name}">
                                 ${_("Add to child hierarchy")}
                             </label>
                         </div>
@@ -77,14 +77,12 @@
                 if (addHierarchy === "same"){
                     var parent_wiki_name = $newWikiForm.find('#parent-wiki-name').val();
                     if (parent_wiki_name){
-                        validateUrl = ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) 
-                            + '/parent/' + encodeURIComponent(parent_wiki_name) + '/validate/';
+                        validateUrl = ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) + '/parent/' + encodeURIComponent(parent_wiki_name) + '/validate/';
                     } else {
                         validateUrl = ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) + '/validate/';
                     }
                 } else {
-                    validateUrl = ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) 
-                        + '/parent/' + encodeURIComponent(addHierarchy) + '/validate/';
+                    validateUrl = ${ urls['api']['base'] | sjson, n } + encodeURIComponent(wikiName) + '/parent/' + encodeURIComponent(addHierarchy) + '/validate/';
                 }
                 var request = $.ajax({
                     type: 'GET',

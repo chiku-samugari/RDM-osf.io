@@ -177,7 +177,7 @@ def project_wiki_delete(auth, wname, **kwargs):
 
     if not wiki_page:
         raise HTTPError(http_status.HTTP_404_NOT_FOUND)
-    
+
     child_wiki_pages = WikiPage.objects.get_for_node(node=node, parent=wiki_page.id)
 
     wiki_page.delete(auth)
@@ -281,7 +281,7 @@ def project_wiki_view(auth, wname, path=None, **kwargs):
         'wiki_id': wiki_page._primary_key if wiki_page else None,
         'wiki_name': wiki_page.page_name if wiki_page else wiki_name,
         'wiki_content': content,
-        'parent_wiki_name': parent_wiki_page.page_name if parent_wiki_page else None,
+        'parent_wiki_name': parent_wiki_page.page_name if parent_wiki_page else '',
         'rendered_before_update': rendered_before_update,
         'page': wiki_page,
         'version': version,
@@ -478,10 +478,14 @@ def project_wiki_validate_name(wname, auth, node, p_wname=None, **kwargs):
         parent_wiki_name = p_wname.strip()
         parent_wiki = WikiPage.objects.get_for_node(node, parent_wiki_name)
         if not parent_wiki:
-            raise HTTPError(http_status.HTTP_404_NOT_FOUND, data=dict(
-                message_short='Parent Wiki page name nothing.',
-                message_long='A wiki page with that name does not exist.'
-            ))
+            if parent_wiki_name.lower() == 'home':
+                # Create a wiki
+                parent_wiki = WikiPage.objects.create_for_node(node, parent_wiki_name, '', auth)
+            else:
+                raise HTTPError(http_status.HTTP_404_NOT_FOUND, data=dict(
+                    message_short='Parent Wiki page name nothing.',
+                    message_long='A wiki page with that name does not exist.'
+                ))
         parent_wiki_id = parent_wiki.id
 
     WikiPage.objects.create_for_node(node, wiki_name, '', auth, parent_wiki_id)
@@ -528,6 +532,10 @@ def format_home_wiki_page(node):
                 'id': home_wiki._primary_key,
             }
         }
+        child_wiki_pages = _format_child_wiki_pages(node, home_wiki.id)
+        if child_wiki_pages:
+            home_wiki_page['children'] = child_wiki_pages
+            home_wiki_page['kind'] = 'folder'
     return home_wiki_page
 
 
@@ -551,7 +559,6 @@ def format_project_wiki_pages(node, auth):
             page['children'] = child_wiki_pages
             if child_wiki_pages:
                 page['kind'] = 'folder'
-                page['open'] = True
 
             if can_edit or has_content:
                 pages.append(page)

@@ -41,17 +41,35 @@ function resolveIcon(item) {
     return m('i.fa.fa-file-o', ' ');
 }
 
-function openParentFolders (item) {
-    var tb = this;
+function openParentFolders (tb, item) {
     // does it have a parent? If so change open
     var parent = item.parent();
     if (parent) {
         if (!parent.open) {
             var index = tb.returnIndex(parent.id);
-            parent.load = true;
             tb.toggleFolder(index);
+            parent.load = true;
+            parent.open = true;
         }
-        openParentFolders.call(tb, parent);
+        openParentFolders(tb, parent);
+    }
+}
+
+function findCurrntItem(item, wikiID) {
+    if (item.length == 0){
+        return null;
+    }
+    var tb = this;  // jshint ignore: line
+    for (var i = 0; i < item.length; i++) {
+        if (item[i].data.page.id === wikiID){
+            return item[i];
+        }
+        if (item[i].data.kind === 'folder') {
+            var val = findCurrntItem(item[i].children, wikiID);
+            if (val){
+                return val;
+            }
+        }
     }
 }
 
@@ -80,6 +98,11 @@ function WikiMenu(data, wikiID, canEdit) {
                 if (parent.data.title === 'Project Wiki Pages') {
                     tb.updateFolder(null, parent);
                 }
+                var currentItem = findCurrntItem(parent.children, wikiID);
+                if (currentItem){
+                    openParentFolders(tb, currentItem);
+                    tb.updateFolder(null, currentItem);
+                }
             }
         },
         resolveRows : function (item){
@@ -96,7 +119,6 @@ function WikiMenu(data, wikiID, canEdit) {
                 if(item.data.page.id === wikiID) {
                     item.css = 'fangorn-selected';
                     tb.multiselected([item]);
-                    openParentFolders(item);
                 }
                 columns.push({
                     folderIcons: true,
@@ -116,8 +138,6 @@ function WikiMenu(data, wikiID, canEdit) {
         }
     };
 
-
-    
     var grid = new Treebeard(tbOptions);
 }
 
