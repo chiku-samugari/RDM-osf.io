@@ -614,6 +614,12 @@ def serialize_component_wiki(node, auth):
             'id': node._id
         }
     }
+    home_wiki = WikiPage.objects.get_for_node(node, 'home')
+    if home_wiki:
+        child_wiki_pages = _format_child_wiki_pages(node, home_wiki.id)
+        if child_wiki_pages:
+            component_home_wiki['children'] = child_wiki_pages
+            component_home_wiki['kind'] = 'folder'
 
     can_edit = node.has_permission(auth.user, WRITE) and not node.is_registration
     if can_edit or home_has_content:
@@ -629,6 +635,10 @@ def serialize_component_wiki(node, auth):
                     'id': page['wiki_id'],
                 }
             }
+            child_wiki_pages = _format_child_wiki_pages(node, page['id'])
+            component_page['children'] = child_wiki_pages
+            if child_wiki_pages:
+                component_page['kind'] = 'folder'
             if can_edit or has_content:
                 children.append(component_page)
 
