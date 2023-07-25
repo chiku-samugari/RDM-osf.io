@@ -56,7 +56,7 @@ function openParentFolders (tb, item) {
 }
 
 function findCurrntItem(item, wikiID) {
-    if (item.length == 0){
+    if (item.length === 0){
         return null;
     }
     var tb = this;  // jshint ignore: line
