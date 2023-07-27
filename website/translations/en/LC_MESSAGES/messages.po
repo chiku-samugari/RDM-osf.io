@@ -924,6 +924,10 @@ msgstr ""
 msgid "Error occurred while validating page"
 msgstr ""
 
+#: addons/wiki/templates/import_wiki_page.mako:8
+msgid "Import wiki page"
+msgstr ""
+
 #: addons/wiki/templates/delete_wiki_page.mako:7
 msgid "Delete wiki page"
 msgstr ""

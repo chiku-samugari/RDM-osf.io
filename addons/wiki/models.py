@@ -269,7 +269,7 @@ class WikiPageNodeManager(models.Manager):
 
         if parent:
             try:
-                return WikiPage.objects.get(parent__exact=parent, deleted__isnull=True, node=node)
+                return WikiPage.objects.filter(parent__exact=parent, deleted__isnull=True, node=node)
             except WikiPage.DoesNotExist:
                 return None
 

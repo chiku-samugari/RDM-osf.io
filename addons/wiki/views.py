@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from addons.osfstorage.models import NodeSettings
+from osf.models.files import BaseFileNode
 from rest_framework import status as http_status
 import logging
 
@@ -31,6 +33,7 @@ from website.project.decorators import (
 
 from osf.exceptions import ValidationError, NodeStateError
 from osf.utils.permissions import ADMIN, WRITE
+from website.util import rubeus
 from .exceptions import (
     NameEmptyError,
     NameInvalidError,
@@ -179,11 +182,11 @@ def project_wiki_delete(auth, wname, **kwargs):
         raise HTTPError(http_status.HTTP_404_NOT_FOUND)
 
     child_wiki_pages = WikiPage.objects.get_for_node(node=node, parent=wiki_page.id)
-
     wiki_page.delete(auth)
 
     if child_wiki_pages:
-        child_wiki_pages.delete(auth)
+        for page in child_wiki_pages:
+            page.delete(auth)
 
     wiki_utils.broadcast_to_sharejs('delete', sharejs_uuid, node)
     return {}
@@ -277,11 +280,28 @@ def project_wiki_view(auth, wname, path=None, **kwargs):
         'compare': compare or 'previous',
     }
 
+    # Get import folder
+    root_dir = BaseFileNode.objects.filter(target_object_id=node.id, is_root=True).values('id').first()
+    parent_dirs = BaseFileNode.objects.filter(target_object_id=node.id, type='osf.osfstoragefolder', parent=root_dir['id'], deleted__isnull=True)
+    import_dirs = []
+    for dir in parent_dirs:
+        wiki_dir = BaseFileNode.objects.filter(target_object_id=node.id, type='osf.osfstoragefolder', parent=dir.id, deleted__isnull=True).first()
+        if not wiki_dir:
+            continue
+        wiki_file_name = wiki_dir.name + '.md'
+        if BaseFileNode.objects.filter(target_object_id=node.id, type='osf.osfstoragefile', parent=wiki_dir.id, name=wiki_file_name, deleted__isnull=True).exists():
+            dict = {
+                'id': dir._id,
+                'name': dir.name
+            }
+            import_dirs.append(dict)
+
     ret = {
         'wiki_id': wiki_page._primary_key if wiki_page else None,
         'wiki_name': wiki_page.page_name if wiki_page else wiki_name,
         'wiki_content': content,
         'parent_wiki_name': parent_wiki_page.page_name if parent_wiki_page else '',
+        'import_dirs': import_dirs,
         'rendered_before_update': rendered_before_update,
         'page': wiki_page,
         'version': version,
@@ -654,4 +674,10 @@ def serialize_component_wiki(node, auth):
             'children': children,
         }
         return component
+    return None
+
+@must_be_valid_project
+@must_be_contributor_or_public
+def project_wiki_validate_import(dir_id, auth, node, **kwargs):
+    logger.info("dir_id: {}".format(dir_id))
     return None

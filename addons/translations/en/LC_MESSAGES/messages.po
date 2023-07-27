@@ -390,6 +390,10 @@ msgstr ""
 msgid "New"
 msgstr ""
 
+#: wiki/templates/edit.mako:36
+msgid "Import"
+msgstr ""
+
 #: jupyterhub/templates/jupyterhub_node_settings.mako:31
 #: jupyterhub/templates/jupyterhub_node_settings.mako:80
 msgid "Service Name"
@@ -745,6 +749,10 @@ msgstr ""
 
 #: wiki/templates/add_wiki_page.mako:84
 msgid "Error occurred while validating page"
+msgstr ""
+
+#: wiki/templates/import_wiki_page.mako:8
+msgid "Import wiki page"
 msgstr ""
 
 #: wiki/templates/delete_wiki_page.mako:7

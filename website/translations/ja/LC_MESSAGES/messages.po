@@ -941,6 +941,10 @@ msgstr "Wikiページを検証できませんでした。 もう一度やり直�
 msgid "Error occurred while validating page"
 msgstr "ページの検証中にエラーが発生しました"
 
+#: addons/wiki/templates/import_wiki_page.mako:8
+msgid "Import wiki page"
+msgstr "Wikiインポート"
+
 #: addons/wiki/templates/delete_wiki_page.mako:7
 msgid "Delete wiki page"
 msgstr "Wikiページを削除"
