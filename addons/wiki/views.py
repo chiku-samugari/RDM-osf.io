@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import os
 from addons.osfstorage.models import NodeSettings
 from osf.models.files import BaseFileNode
 from rest_framework import status as http_status
@@ -503,8 +504,8 @@ def project_wiki_validate_name(wname, auth, node, p_wname=None, **kwargs):
                 parent_wiki = WikiPage.objects.create_for_node(node, parent_wiki_name, '', auth)
             else:
                 raise HTTPError(http_status.HTTP_404_NOT_FOUND, data=dict(
-                    message_short='Parent Wiki page name nothing.',
-                    message_long='A wiki page with that name does not exist.'
+                    message_short='Parent Wiki page nothing.',
+                    message_long='The parent wiki page does not exist.'
                 ))
         parent_wiki_id = parent_wiki.id
 
@@ -513,7 +514,7 @@ def project_wiki_validate_name(wname, auth, node, p_wname=None, **kwargs):
 
 @must_be_valid_project
 @must_be_contributor_or_public
-def project_wiki_grid_data(wname, auth, node, **kwargs):
+def project_wiki_grid_data(auth, node, **kwargs):
     pages = []
     project_wiki_pages = {
         'title': 'Project Wiki Pages',
@@ -679,5 +680,71 @@ def serialize_component_wiki(node, auth):
 @must_be_valid_project
 @must_be_contributor_or_public
 def project_wiki_validate_import(dir_id, auth, node, **kwargs):
-    logger.info("dir_id: {}".format(dir_id))
-    return None
+    import_dir = BaseFileNode.objects.values('id', 'name').get(_id=dir_id)
+    import_objects = BaseFileNode.objects.filter(target_object_id=node.id, parent=import_dir['id'], deleted__isnull=True)
+    info_list = []
+    for obj in import_objects:
+        if obj.type == 'osf.osf.osfstoragefile':
+            logger.warn(f'This file cannot be imported: {obj.name}')
+            info = {
+                'path': import_dir['name'],
+                'name': obj.name,
+                'status': 'invalid',
+                'message': 'This file cannot be imported.',
+            }
+            info_list.extend(info)
+            continue
+
+        child_info_list = _validate_import_folder(node, obj, import_dir['name'])
+        info_list.extend(child_info_list)
+
+    return {
+        'data': info_list
+    }
+
+def _validate_import_folder(node, folder, parent_path):
+    path = parent_path + '/' + folder.name
+    info_list = []
+    VALID_IMG_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp']
+    wiki_file_name = folder.name + '.md'
+    if not BaseFileNode.objects.filter(target_object_id=node.id, type='osf.osfstoragefile', parent=folder.id, name=wiki_file_name, deleted__isnull=True).exists():
+        logger.warn(f'The wiki page does not exist, so the subordinate pages are not processed: {folder.name}')
+        info = {
+            'path': path,
+            'name': folder.name,
+            'status': 'invalid',
+            'message': 'The wiki page does not exist, so the subordinate pages are not processed.',
+        }
+        info_list.append(info)
+        return info_list
+
+    child_objects = BaseFileNode.objects.filter(target_object_id=node.id, parent=folder.id, deleted__isnull=True)
+    for obj in child_objects:
+        if obj.type == 'osf.osfstoragefolder':
+            child_info_list = _validate_import_folder(node, obj, path)
+            info_list.extend(child_info_list)
+        else:
+            if obj.name == wiki_file_name:
+                logger.warn(f'valid wiki page: {obj.name}')
+                info = {
+                    'path': path,
+                    'name': obj.name,
+                    'status': 'valid',
+                    'message': '',
+                }
+                info_list.append(info)
+                continue
+
+            ext = os.path.splitext(obj.name)[-1].lower()
+            if not ext in VALID_IMG_EXTENSIONS:
+                logger.warn(f'Only image files can be imported: {obj.name}')
+                info = {
+                    'path': path,
+                    'name': obj.name,
+                    'status': 'invalid',
+                    'message': 'Only image files can be imported.',
+                }
+                info_list.append(info)
+
+    return info_list
+

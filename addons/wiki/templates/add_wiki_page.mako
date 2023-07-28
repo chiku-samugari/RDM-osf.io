@@ -97,6 +97,9 @@
                     if (response.status === 409) {
                         $alert.text('${_("A wiki page with that name already exists.")}');
                     }
+                    else if (response.status === 404){
+                        $alert.text('${_("The parent wiki page does not exist.")}');
+                    }
                     else if (response.status === 403){
                         $alert.text('${_("You do not have permission to perform this action.")}');
                         Raven.captureMessage('${_("Unauthorized user can view wiki add button")}', {

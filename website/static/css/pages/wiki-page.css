@@ -353,3 +353,11 @@ select.form-control {
 .wiki-radio-item {
     margin-right: 10px;
 }
+
+.content-display{
+    display: block;
+}
+
+.content-hidden{
+    display: none;
+}

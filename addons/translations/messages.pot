@@ -720,6 +720,10 @@ msgstr ""
 msgid "A wiki page with that name already exists."
 msgstr ""
 
+#: wiki/templates/add_wiki_page.mako:70
+msgid "The parent wiki page does not exist."
+msgstr ""
+
 #: wiki/templates/add_wiki_page.mako:73
 msgid "You do not have permission to perform this action."
 msgstr ""
@@ -738,6 +742,26 @@ msgstr ""
 
 #: wiki/templates/import_wiki_page.mako:8
 msgid "Import wiki page"
+msgstr ""
+
+#: wiki/templates/import_wiki_page.mako:8
+msgid "Duplicate wiki name"
+msgstr ""
+
+#: wiki/templates/edit.mako:304
+msgid "The following wiki page already exists. Please select the process when importing. When creating a new wiki, the wiki name will be created with a sequential number like [Wiki name](1). If you dismiss this alert, the import will be aborted."
+msgstr ""
+
+#: wiki/templates/import_wiki_page.mako:8
+msgid "Stop import"
+msgstr ""
+
+#: wiki/templates/import_wiki_page.mako:8
+msgid "Continue import"
+msgstr ""
+
+#: wiki/templates/import_wiki_page.mako:8
+msgid "Per-file definition"
 msgstr ""
 
 #: wiki/templates/delete_wiki_page.mako:7

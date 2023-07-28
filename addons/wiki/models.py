@@ -260,10 +260,7 @@ class WikiPageNodeManager(models.Manager):
         if name:
             try:
                 name = (name or '').strip()
-                if name == 'home':
-                    return WikiPage.objects.get(page_name__iexact=name, deleted__isnull=True, node=node, parent__isnull=True)
-                else:
-                    return WikiPage.objects.get(page_name__iexact=name, deleted__isnull=True, node=node)
+                return WikiPage.objects.get(page_name__iexact=name, deleted__isnull=True, node=node)
             except WikiPage.DoesNotExist:
                 return None
 
