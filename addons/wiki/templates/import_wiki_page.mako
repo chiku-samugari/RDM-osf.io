@@ -81,7 +81,7 @@
                     $submitForm
                         .removeAttr('disabled', 'disabled')
                         .text('${_("Import")}');
-                    
+
                     response.data.forEach(function(item) {
                         $('#validateInfo ul').append('<li>' + item.name + '</li>')
                     });

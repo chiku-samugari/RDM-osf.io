@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import os
-from addons.osfstorage.models import NodeSettings
 from osf.models.files import BaseFileNode
 from rest_framework import status as http_status
 import logging
@@ -34,7 +33,6 @@ from website.project.decorators import (
 
 from osf.exceptions import ValidationError, NodeStateError
 from osf.utils.permissions import ADMIN, WRITE
-from website.util import rubeus
 from .exceptions import (
     NameEmptyError,
     NameInvalidError,
@@ -736,7 +734,7 @@ def _validate_import_folder(node, folder, parent_path):
                 continue
 
             ext = os.path.splitext(obj.name)[-1].lower()
-            if not ext in VALID_IMG_EXTENSIONS:
+            if ext not in VALID_IMG_EXTENSIONS:
                 logger.warn(f'Only image files can be imported: {obj.name}')
                 info = {
                     'path': path,
@@ -747,4 +745,3 @@ def _validate_import_folder(node, folder, parent_path):
                 info_list.append(info)
 
     return info_list
-
