@@ -1386,7 +1386,8 @@ class TestWikiMenu(OsfTestCase):
                     'url': self.project.web_url_for('project_wiki_view', wname='zoo', _guid=True),
                     'name': 'zoo',
                     'id': zoo_page._primary_key,
-                }
+                },
+                'children': [],
             }
         ]
         assert_equal(data, expected)
@@ -1422,7 +1423,7 @@ class TestWikiMenu(OsfTestCase):
                             'url': self.component.web_url_for('project_wiki_view', wname='home', _guid=True),
                             'name': 'Home',
                             'id': self.component._primary_key,
-                        }
+                        },
                     },
                     {
                         'page': {
@@ -1430,6 +1431,7 @@ class TestWikiMenu(OsfTestCase):
                             'name': 'zoo',
                             'id': zoo_page._primary_key,
                         },
+                        'children': [],
                     }
                 ],
                 'kind': 'component',
