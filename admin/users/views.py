@@ -53,7 +53,6 @@ from addons.osfstorage.models import Region
 from rest_framework import status as http_status
 from admin.base.utils import reverse_qs
 from framework.exceptions import HTTPError
-from website.util.quota import update_institutional_storage_max_quota
 
 
 class UserDeleteView(PermissionRequiredMixin, DeleteView):

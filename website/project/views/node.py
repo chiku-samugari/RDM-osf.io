@@ -64,7 +64,6 @@ from addons.jupyterhub.utils import serialize_jupyterhub_widget
 from addons.iqbrims.utils import serialize_iqbrims_widget
 from admin.rdm_addons.utils import validate_rdm_addons_allowed
 from api.base import settings as api_settings
-from website.util import quota
 from osf.models.project_storage_type import ProjectStorageType
 from website.util.quota import recalculate_used_quota_by_user
 
