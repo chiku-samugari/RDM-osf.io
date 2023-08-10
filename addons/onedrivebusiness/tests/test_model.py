@@ -142,5 +142,9 @@ class TestNodeSettings(OAuthAddonNodeSettingsTestSuiteMixin, unittest.TestCase):
     def test_serialize_settings(self):
         self.node_settings.drive_id = 'drive-1234'
         settings = self.node_settings.serialize_waterbutler_settings()
-        expected = {'drive_id': 'drive-1234', 'folder': self.node_settings.folder_id}
+        expected = {
+            'nid': self.node._id,
+            'folder': self.node_settings.folder_id,
+            'drive_id': 'drive-1234',
+        }
         assert_equal(settings, expected)
