@@ -854,17 +854,6 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
             region.is_readonly = readonly
             region.allow_expression = allow_expression
             region.readonly_expression = readonly_expression
-            if region_id == api_settings.NII_STORAGE_REGION_ID:
-                region.is_allowed = True
-            else:
-                all_regions = Region.objects.filter(_id=institution._id).exclude(id=region.id)
-                all_allow_true = False
-                for item in all_regions:
-                    if item.is_allowed:
-                        all_allow_true = True
-                        break
-                if not all_allow_true:
-                    region.is_allowed = True
             region.save()
         except Region.DoesNotExist:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
