@@ -66,7 +66,8 @@ class TestInstitutionDefaultStorage(AdminTestCase):
         res = self.view.get(self.request, *args, **kwargs)
         for addon in res.context_data['providers']:
             nt.assert_true(type(addon).__name__ in self.addon_type_dict)
-        nt.assert_equal(res.context_data['region'][0], self.default_region)
+        region = Region.objects.filter(_id=self.institution1._id, is_allowed=True, is_readonly=False).first()
+        nt.assert_equal(res.context_data['region'][0], region)
         nt.assert_equal(res.context_data['selected_provider_short_name'], 'osfstorage')
 
     def test_get_custom_storage(self, *args, **kwargs):

@@ -50,7 +50,7 @@ class InstitutionalStorageView(InstitutionalStorageBaseView, TemplateView):
 
         list_region = Region.objects.filter(_id=institution._id).order_by('pk')
         if not list_region:
-            region = Region.objects.first()
+            region = utils.set_default_storage(institution._id)
             region.name = ''
             list_region = [region]
 
