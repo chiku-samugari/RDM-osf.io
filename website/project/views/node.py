@@ -701,6 +701,7 @@ def component_remove(auth, node, **kwargs):
         contributor_ids = Contributor.objects.filter(node=node).values_list('user', flat=True)
         user_list = OSFUser.objects.filter(id__in=contributor_ids)
         for user in user_list:
+            # Update used quota for user-per-storage after removing the project
             recalculate_used_quota_by_user(user._id, storage_type=storage_type)
 
     id = '{}_deleted'.format(node.project_or_component)

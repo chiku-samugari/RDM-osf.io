@@ -1,26 +1,30 @@
 # -*- coding: utf-8 -*-
 import datetime
+import logging
 import mock
-from nose.tools import *  # noqa (PEP8 asserts)
 import pytest
+from nose.tools import *  # noqa (PEP8 asserts)
 
-from api_tests.utils import create_test_file
-from tests.test_websitefiles import TestFolder, TestFile
 from addons.osfstorage.models import OsfStorageFileNode
 from api.base import settings as api_settings
+from api.base.settings import NII_STORAGE_REGION_ID, ADDON_METHOD_PROVIDER
+from api_tests.utils import create_test_file
 from framework.auth import signing
-from tests.base import OsfTestCase
+from framework.exceptions import HTTPError
 from osf.models import (
     FileLog, FileInfo, TrashedFileNode, TrashedFolder, UserQuota, ProjectStorageType, BaseFileNode, AbstractNode
 
 )
 from osf.models.user_storage_quota import UserStorageQuota
 from osf_tests.factories import (
-    AuthUserFactory, ProjectFactory, UserFactory, InstitutionFactory, RegionFactory, NodeFactory
+    AuthUserFactory, ProjectFactory, UserFactory, InstitutionFactory, RegionFactory,
 )
+from tests.base import OsfTestCase
+from tests.test_websitefiles import TestFolder, TestFile
 from website.util import web_url_for, quota
-from api.base import settings as api_settings
-from framework.exceptions import HTTPError
+from website.util.quota import get_region_id_of_institutional_storage_by_path
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.enable_implicit_clean
@@ -278,12 +282,12 @@ class TestUserStorageQuota(OsfTestCase):
 
     def test_recalculate_used_quota_by_user(self):
         UserStorageQuota.objects.create(user=self.user, region_id=1)
-        quota.recalculate_used_quota_by_user(self.user._id)
+        quota.recalculate_used_quota_by_user(self.user._id, storage_type=UserQuota.CUSTOM_STORAGE)
         user_storage_quota = UserStorageQuota.objects.get(user=self.user, region_id=1)
         assert_equal(user_storage_quota.used, 900)
 
     def test_recalculate_used_quota_by_user_not_found(self):
-        res = quota.recalculate_used_quota_by_user(self.user._id)
+        res = quota.recalculate_used_quota_by_user(self.user._id, storage_type=UserQuota.CUSTOM_STORAGE)
         assert_is_none(res)
 
     def test_get_file_ids_by_institutional_storage(self):
@@ -317,7 +321,6 @@ class TestSaveFileInfo(OsfTestCase):
         self.file.save()
         self.storage_max_quota = api_settings.DEFAULT_MAX_QUOTA
         self.region = RegionFactory()
-
 
     def test_add_file_info(self):
         file_info_query = FileInfo.objects.filter(file=self.file)
@@ -562,7 +565,8 @@ class TestSaveFileInfo(OsfTestCase):
         assert_equal(res, None)
 
     def test_update_institutional_storage_used_quota(self):
-        UserStorageQuota.objects.create(user=self.project_creator, region=self.region, max_quota=self.storage_max_quota, used=1000)
+        UserStorageQuota.objects.create(user=self.project_creator, region=self.region, max_quota=self.storage_max_quota,
+                                        used=1000)
         quota.update_institutional_storage_used_quota(self.project_creator, self.region, 2000, True)
         user_storage_quota = UserStorageQuota.objects.filter(user=self.project_creator, region=self.region).first()
 
@@ -570,7 +574,12 @@ class TestSaveFileInfo(OsfTestCase):
         assert_equal(user_storage_quota.used, 3000)
 
     def test_update_institutional_storage_used_quota_used_less_than_zero(self):
-        UserStorageQuota.objects.create(user=self.project_creator, region=self.region, max_quota=self.storage_max_quota, used=-1)
+        UserStorageQuota.objects.create(
+            user=self.project_creator,
+            region=self.region,
+            max_quota=self.storage_max_quota,
+            used=-1
+        )
         quota.update_institutional_storage_used_quota(self.project_creator, self.region, -1, True)
         user_storage_quota = UserStorageQuota.objects.filter(user=self.project_creator, region=self.region).first()
 
@@ -634,55 +643,53 @@ class TestSaveFileInfo(OsfTestCase):
 
 
 class TestSaveUsedQuota(OsfTestCase):
+    def __init__(self, methodName: str = ...):
+        super().__init__(methodName)
+        self.addon_provider = ADDON_METHOD_PROVIDER[0]
+
     def setUp(self):
         super(TestSaveUsedQuota, self).setUp()
         self.user = UserFactory()
         self.project_creator = UserFactory()
         self.node = ProjectFactory(creator=self.project_creator)
+        self.node_root = TestFolder(
+            target=self.node,
+            type='osf.osfstoragefolder',
+            provider='osf_storage',
+            name='root',
+            path='/root',
+            materialized_path='/long/path/to/name',
+            is_root=True,
+        )
+        self.node_root.save()
         self.file = OsfStorageFileNode.create(
             target=self.node,
-            path='/testfile',
-            _id='testfile',
-            name='testfile',
-            materialized_path='/testfile'
+            parent_id=self.node_root.id,
+            provider='osf_storage',
+            name='osfstoragefile',
+            path='/osfstoragefile',
+            materialized_path='/osfstoragefile'
         )
         self.file.save()
-        self.base_file_node = BaseFileNode(type='osf.s3file', provider='s3', _path='/testfile',
-                                           _materialized_path='/testfile', target_object_id=self.node.id, target_content_type_id=2)
-        self.base_folder_node = BaseFileNode(type='osf.s3folder', provider='s3', _path='/testfolder',
-                                             _materialized_path='/testfolder', target_object_id=self.node.id, target_content_type_id=2)
 
-    def test_add_first_file(self):
-        assert_false(UserQuota.objects.filter(user=self.project_creator).exists())
-
-        quota.update_used_quota(
-            self=None,
+        self.base_folder_node = TestFolder.create(
             target=self.node,
-            user=self.user,
-            event_type=FileLog.FILE_ADDED,
-            payload={
-                'provider': 'osfstorage',
-                'metadata': {
-                    'provider': 'osfstorage',
-                    'name': 'testfile',
-                    'materialized': '/filename',
-                    'path': '/' + self.file._id,
-                    'kind': 'file',
-                    'size': 1000,
-                    'created_utc': '',
-                    'modified_utc': '',
-                    'extra': {'version': '1'}
-                }
-            }
+            parent_id=self.node_root.id,
+            provider=self.addon_provider,
+            type=f'osf.{self.addon_provider}folder',
+            name=f'{self.addon_provider}folder',
+            path=f'/{self.addon_provider}folder',
+            materialized_path=f'/{self.addon_provider}folder',
         )
-
-        user_quota = UserQuota.objects.filter(
-            storage_type=UserQuota.NII_STORAGE,
-            user=self.project_creator
-        ).all()
-        assert_equal(len(user_quota), 1)
-        user_quota = user_quota[0]
-        assert_equal(user_quota.used, 1000)
+        self.base_file_node = TestFile.create(
+            target=self.node,
+            parent_id=self.node_root.id,
+            provider=self.addon_provider,
+            type=f'osf.{self.addon_provider}file',
+            name=f'{self.addon_provider}file',
+            path=f'/{self.addon_provider}file',
+            materialized_path=f'/{self.addon_provider}file',
+        )
 
     def test_update_default_storage(self):
         user = self.user
@@ -699,12 +706,52 @@ class TestSaveUsedQuota(OsfTestCase):
         res = quota.update_default_storage(user)
         assert_equal(res, None)
 
+    def test_add_first_file(self):
+        assert_false(UserStorageQuota.objects.filter(
+            user=self.project_creator
+        ).exists())
+
+        quota.update_used_quota(
+            self=None,
+            target=self.node,
+            user=self.user,
+            event_type=FileLog.FILE_ADDED,
+            payload={
+                'provider': 'osfstorage',
+                'metadata': {
+                    'provider': 'osfstorage',
+                    'name': 'testfile',
+                    'materialized': '/filename',
+                    'path': '/' + self.file._id,
+                    'kind': 'file',
+                    'size': 1000,
+                    'created_utc': '',
+                    'modified_utc': '',
+                    'extra': {'version': '1'}
+                }
+            }
+        )
+
+        user_quota = UserStorageQuota.objects.filter(
+            region_id=1,
+            user=self.project_creator
+        ).all()
+        assert_equal(len(user_quota), 1)
+        user_quota = user_quota[0]
+        assert_equal(user_quota.used, 1000)
+
     def test_add_first_file_custom_storage(self):
-        assert_false(UserQuota.objects.filter(user=self.project_creator).exists())
+        assert_false(UserStorageQuota.objects.filter(
+            user=self.project_creator
+        ).exists())
 
         institution = InstitutionFactory()
         self.user.affiliated_institutions.add(institution)
-        RegionFactory(_id=institution._id)
+        self.region = RegionFactory(_id=institution._id)
+        addon_st = self.node.add_addon('osfstorage', auth=None, log=False, region_id=self.region.id)
+        addon_st.root_node_id = self.node_root.id
+        addon_st.save()
+
         ProjectStorageType.objects.filter(node=self.node).update(
             storage_type=ProjectStorageType.CUSTOM_STORAGE
         )
@@ -730,8 +777,8 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.filter(
-            storage_type=UserQuota.CUSTOM_STORAGE,
+        user_quota = UserStorageQuota.objects.filter(
+            region=self.region,
             user=self.project_creator
         ).all()
         assert_equal(len(user_quota), 1)
@@ -739,9 +786,9 @@ class TestSaveUsedQuota(OsfTestCase):
         assert_equal(user_quota.used, 1200)
 
     def test_add_file(self):
-        UserQuota.objects.create(
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
@@ -767,8 +814,8 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.filter(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.filter(
+            region_id=1,
             user=self.project_creator
         ).all()
         assert_equal(len(user_quota), 1)
@@ -776,18 +823,22 @@ class TestSaveUsedQuota(OsfTestCase):
         assert_equal(user_quota.used, 6500)
 
     def test_add_file_custom_storage(self):
-        UserQuota.objects.create(
-            user=self.project_creator,
-            storage_type=UserQuota.CUSTOM_STORAGE,
-            max_quota=api_settings.DEFAULT_MAX_QUOTA,
-            used=5500
-        )
-
         institution = InstitutionFactory()
         self.user.affiliated_institutions.add(institution)
-        RegionFactory(_id=institution._id)
+        self.region = RegionFactory(_id=institution._id)
+        addon_st = self.node.add_addon('osfstorage', auth=None, log=False, region_id=self.region.id)
+        addon_st.root_node_id = self.node_root.id
+        addon_st.save()
+
         ProjectStorageType.objects.filter(node=self.node).update(
             storage_type=ProjectStorageType.CUSTOM_STORAGE
+        )
+
+        UserStorageQuota.objects.create(
+            user=self.project_creator,
+            region=self.region,
+            max_quota=api_settings.DEFAULT_MAX_QUOTA,
+            used=5500
         )
 
         quota.update_used_quota(
@@ -811,8 +862,8 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.filter(
-            storage_type=UserQuota.CUSTOM_STORAGE,
+        user_quota = UserStorageQuota.objects.filter(
+            region=self.region,
             user=self.project_creator
         ).all()
         assert_equal(len(user_quota), 1)
@@ -840,12 +891,15 @@ class TestSaveUsedQuota(OsfTestCase):
                 }
             }
         )
-        assert_false(UserQuota.objects.filter(user=self.project_creator).exists())
+        assert_false(UserStorageQuota.objects.filter(
+            region_id=1,
+            user=self.project_creator
+        ).exists())
 
     def test_delete_file(self):
-        UserQuota.objects.create(
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
@@ -874,27 +928,31 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region_id=1,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 4500)
 
     def test_delete_file_custom_storage(self):
-        UserQuota.objects.create(
+        institution = InstitutionFactory()
+        self.user.affiliated_institutions.add(institution)
+        self.region = RegionFactory(_id=institution._id)
+        addon_st = self.node.add_addon('osfstorage', auth=None, log=False, region_id=self.region.id)
+        addon_st.root_node_id = self.node_root.id
+        addon_st.save()
+
+        ProjectStorageType.objects.filter(node=self.node).update(
+            storage_type=ProjectStorageType.CUSTOM_STORAGE
+        )
+
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.CUSTOM_STORAGE,
+            region=self.region,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
         FileInfo.objects.create(file=self.file, file_size=1200)
-
-        institution = InstitutionFactory()
-        self.user.affiliated_institutions.add(institution)
-        RegionFactory(_id=institution._id)
-        ProjectStorageType.objects.filter(node=self.node).update(
-            storage_type=ProjectStorageType.CUSTOM_STORAGE
-        )
 
         self.file.deleted_on = datetime.datetime.now()
         self.file.deleted_by = self.user
@@ -919,16 +977,16 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.CUSTOM_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region=self.region,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 4300)
 
     def test_delete_file_lower_used_quota(self):
-        UserQuota.objects.create(
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=500
         )
@@ -957,17 +1015,17 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region_id=1,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 0)
 
-    @mock.patch('website.util.quota.logging')
-    def test_delete_file_invalid_file(self, mock_logging):
-        UserQuota.objects.create(
+    @mock.patch('website.util.quota.logger')
+    def test_delete_file_invalid_file(self, mock_logger):
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
@@ -990,18 +1048,18 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region_id=1,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 5500)
-        mock_logging.error.assert_called_with('FileNode not found, cannot update used quota!')
+        mock_logger.error.assert_called_with('FileNode not found, cannot update used quota!')
 
     @mock.patch('website.util.quota.logging')
     def test_delete_file_without_fileinfo(self, mock_logging):
-        UserQuota.objects.create(
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
@@ -1029,8 +1087,8 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region_id=1,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 5500)
@@ -1038,9 +1096,9 @@ class TestSaveUsedQuota(OsfTestCase):
 
     @mock.patch('website.util.quota.logging')
     def test_delete_file_not_trashed(self, mock_logging):
-        UserQuota.objects.create(
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
@@ -1068,14 +1126,14 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region_id=1,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 5500)
         mock_logging.error.assert_called_with('FileNode is not trashed, cannot update used quota!')
 
-    def test_delete_file_without_userquota(self):
+    def test_delete_file_without_user_storage_quota(self):
         FileInfo.objects.create(file=self.file, file_size=1000)
 
         self.file.deleted_on = datetime.datetime.now()
@@ -1083,6 +1141,11 @@ class TestSaveUsedQuota(OsfTestCase):
         self.file.type = 'osf.trashedfile'
         self.file.save()
 
+        assert_false(UserStorageQuota.objects.filter(
+            region_id=1,
+            user=self.project_creator
+        ).exists())
+
         quota.update_used_quota(
             self=None,
             target=self.node,
@@ -1101,12 +1164,15 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        assert_false(UserQuota.objects.filter(user=self.project_creator).exists())
+        assert_true(UserStorageQuota.objects.filter(
+            region_id=1,
+            user=self.project_creator
+        ).exists())
 
     def test_delete_folder(self):
-        UserQuota.objects.create(
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
@@ -1168,30 +1234,35 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region_id=1,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 500)
 
-    @mock.patch('website.util.quota.get_project_storage_type')
-    @mock.patch('website.util.quota.UserStorageQuota.objects.filter')
-    @mock.patch('website.util.quota.UserQuota.objects.filter')
-    def test_delete_folder_user_storage_quota(self, mock_user_quota, mock_user_storage_quota, mock_storage_type):
-        mock_storage_type.return_value = ProjectStorageType.CUSTOM_STORAGE
-        storage_max_quota = api_settings.DEFAULT_MAX_QUOTA
-        region = RegionFactory()
-        mock_user_quota.return_value.first.return_value = UserQuota.objects.create(user=self.project_creator,
-                                                                                   storage_type=UserQuota.NII_STORAGE,
-                                                                                   max_quota=api_settings.DEFAULT_MAX_QUOTA,
-                                                                                   used=5500)
-        mock_user_storage_quota.return_value.select_for_update.return_value.first.return_value = \
-            UserStorageQuota.objects.create(user=self.project_creator, region=region, max_quota=storage_max_quota, used=5500)
+    def test_delete_folder_custom_storage(self):
+        institution = InstitutionFactory()
+        self.user.affiliated_institutions.add(institution)
+        self.region = RegionFactory(_id=institution._id)
+        addon_st = self.node.add_addon('osfstorage', auth=None, log=False, region_id=self.region.id)
+        addon_st.root_node_id = self.node_root.id
+        addon_st.save()
 
+        ProjectStorageType.objects.filter(node=self.node).update(
+            storage_type=ProjectStorageType.CUSTOM_STORAGE
+        )
+
+        UserStorageQuota.objects.create(
+            user=self.project_creator,
+            region=self.region,
+            max_quota=api_settings.DEFAULT_MAX_QUOTA,
+            used=5500
+        )
 
         folder1 = TrashedFolder(
             target=self.node,
             name='testfolder',
+            parent_id=self.node_root.id,
             deleted_on=datetime.datetime.now(),
             deleted_by=self.user
         )
@@ -1246,21 +1317,16 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
-            user=self.project_creator
-        )
         user_quota_quota = UserStorageQuota.objects.get(
-            region=region,
+            region=self.region,
             user=self.project_creator
         )
-        assert_equal(user_quota.used, 500)
         assert_equal(user_quota_quota.used, 500)
 
     def test_edit_file(self):
-        UserQuota.objects.create(
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
@@ -1287,27 +1353,31 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region_id=1,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 6000)
 
     def test_edit_file_custom_storage(self):
-        UserQuota.objects.create(
+        institution = InstitutionFactory()
+        self.user.affiliated_institutions.add(institution)
+        self.region = RegionFactory(_id=institution._id)
+        addon_st = self.node.add_addon('osfstorage', auth=None, log=False, region_id=self.region.id)
+        addon_st.root_node_id = self.node_root.id
+        addon_st.save()
+
+        ProjectStorageType.objects.filter(node=self.node).update(
+            storage_type=ProjectStorageType.CUSTOM_STORAGE
+        )
+
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.CUSTOM_STORAGE,
+            region=self.region,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
         FileInfo.objects.create(file=self.file, file_size=1000)
-
-        institution = InstitutionFactory()
-        self.user.affiliated_institutions.add(institution)
-        RegionFactory(_id=institution._id)
-        ProjectStorageType.objects.filter(node=self.node).update(
-            storage_type=ProjectStorageType.CUSTOM_STORAGE
-        )
 
         quota.update_used_quota(
             self=None,
@@ -1330,16 +1400,16 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.CUSTOM_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region=self.region,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 6200)
 
     def test_edit_file_negative_size(self):
-        UserQuota.objects.create(
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
@@ -1366,16 +1436,16 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region_id=1,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 5500)
 
     def test_edit_file_without_fileinfo(self):
-        UserQuota.objects.create(
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
@@ -1401,16 +1471,16 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region_id=1,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 7000)
 
     def test_edit_file_lower_used_quota(self):
-        UserQuota.objects.create(
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=500
         )
@@ -1437,16 +1507,16 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region_id=1,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 0)
 
     def test_add_file_when_not_osfstorage(self):
-        UserQuota.objects.create(
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.NII_STORAGE,
+            region_id=1,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
@@ -1472,8 +1542,8 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.NII_STORAGE,
+        user_quota = UserStorageQuota.objects.get(
+            region_id=1,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 5500)
@@ -1511,17 +1581,27 @@ class TestSaveUsedQuota(OsfTestCase):
             }
         )
 
-    def test_rename_folder_with_AmazonS3(self):
+    def test_rename_folder_with_addon_method_provider(self):
         mock_base_file_node = mock.MagicMock()
         mock_base_file_node_orderby = mock.MagicMock()
-        mock_base_file_node.objects.filter.return_value = [BaseFileNode(type='osf.s3folder', provider='s3', _path='/newfoldername',
-                                                                        _materialized_path='/newfoldername', target_object_id=self.node.id,
-                                                                        target_content_type_id=2)]
-        mock_base_file_node_orderby.filter.return_value.order_by.return_value.first.return_value = BaseFileNode(type='osf.s3folder', provider='s3',
-                                                                                                                _path='/newfoldername',
-                                                                                                                _materialized_path='/newfoldername',
-                                                                                                                target_object_id=self.node.id,
-                                                                                                                target_content_type_id=2)
+        mock_base_file_node.objects.filter.return_value = [
+            BaseFileNode(
+                type=f'osf.{self.addon_provider}folder',
+                provider=self.addon_provider,
+                _path='/newfoldername',
+                _materialized_path='/newfoldername',
+                target_object_id=self.node.id,
+                target_content_type_id=2
+            )
+        ]
+        mock_base_file_node_orderby.filter.return_value.order_by.return_value.first.return_value = BaseFileNode(
+            type=f'osf.{self.addon_provider}folder',
+            provider=self.addon_provider,
+            _path='/newfoldername',
+            _materialized_path='/newfoldername',
+            target_object_id=self.node.id,
+            target_content_type_id=2
+        )
 
         with mock.patch('website.util.quota.BaseFileNode', mock_base_file_node):
             with mock.patch('website.util.quota.BaseFileNode', mock_base_file_node_orderby):
@@ -1532,29 +1612,39 @@ class TestSaveUsedQuota(OsfTestCase):
                     event_type=FileLog.FILE_RENAMED,
                     payload={
                         'destination': {
-                            'provider': 's3',
+                            'provider': self.addon_provider,
                             'path': '/newfoldername',
                             'kind': 'folder',
                         },
                         'source': {
-                            'provider': 's3',
+                            'provider': self.addon_provider,
                             'path': '/prefolderename',
                             'kind': 'folder',
                         },
                     }
                 )
 
-    def test_rename_file_with_AmazonS3(self):
+    def test_rename_file_with_addon_method_provider(self):
         mock_base_file_node = mock.MagicMock()
         mock_base_file_node_orderby = mock.MagicMock()
-        mock_base_file_node.objects.filter.return_value = [BaseFileNode(type='osf.s3file', provider='s3', _path='/newfilename',
-                                                                        _materialized_path='/newfilename', target_object_id=self.node.id,
-                                                                        target_content_type_id=2)]
-        mock_base_file_node_orderby.filter.return_value.order_by.return_value.first.return_value = BaseFileNode(type='osf.s3file', provider='s3',
-                                                                                                                _path='/newfilename',
-                                                                                                                _materialized_path='/newfilename',
-                                                                                                                target_object_id=self.node.id,
-                                                                                                                target_content_type_id=2)
+        mock_base_file_node.objects.filter.return_value = [
+            BaseFileNode(
+                type=f'osf.{self.addon_provider}file',
+                provider=self.addon_provider,
+                _path='/newfilename',
+                _materialized_path='/newfilename',
+                target_object_id=self.node.id,
+                target_content_type_id=2
+            )
+        ]
+        mock_base_file_node_orderby.filter.return_value.order_by.return_value.first.return_value = BaseFileNode(
+            type=f'osf.{self.addon_provider}file',
+            provider=self.addon_provider,
+            _path='/newfilename',
+            _materialized_path='/newfilename',
+            target_object_id=self.node.id,
+            target_content_type_id=2
+        )
 
         with mock.patch('website.util.quota.BaseFileNode', mock_base_file_node):
             with mock.patch('website.util.quota.BaseFileNode', mock_base_file_node_orderby):
@@ -1565,199 +1655,305 @@ class TestSaveUsedQuota(OsfTestCase):
                     event_type=FileLog.FILE_RENAMED,
                     payload={
                         'destination': {
-                            'provider': 's3',
+                            'provider': self.addon_provider,
                             'path': '/newfilename',
                             'kind': 'file',
                         },
                         'source': {
-                            'provider': 's3',
+                            'provider': self.addon_provider,
                             'path': '/prefilename',
                             'kind': 'file',
                         },
                     }
                 )
 
-    def test_upload_file_with_Amazon_S3(self):
-        UserQuota.objects.create(
+    def test_add_file_with_addon_method_provider(self):
+        institution = InstitutionFactory()
+        self.project_creator.affiliated_institutions.add(institution)
+        self.user.affiliated_institutions.add(institution)
+        self.region = RegionFactory(
+            _id=institution._id,
+            waterbutler_settings={
+                'storage': {
+                    'bucket': 'grdm-system-test',
+                    'folder': '',
+                    'provider': self.addon_provider,
+                    'encrypt_uploads': False
+                }
+            }
+        )
+        addon_st = self.node.add_addon('osfstorage', auth=None, log=False, region_id=self.region.id)
+        addon_st.root_node_id = self.node_root.id
+        addon_st.save()
+
+        ProjectStorageType.objects.filter(node=self.node).update(
+            storage_type=ProjectStorageType.CUSTOM_STORAGE
+        )
+
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.CUSTOM_STORAGE,
+            region=self.region,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5000
         )
 
-        institution = InstitutionFactory()
-        self.user.affiliated_institutions.add(institution)
-        RegionFactory(_id=institution._id)
-        ProjectStorageType.objects.filter(node=self.node).update(
-            storage_type=ProjectStorageType.CUSTOM_STORAGE
+        self.base_file_node.save()
+
+        quota.update_used_quota(
+            self=None,
+            target=self.node,
+            user=self.user,
+            event_type=FileLog.FILE_ADDED,
+            payload={
+                'provider': self.addon_provider,
+                'metadata': {
+                    'provider': self.addon_provider,
+                    'name': self.base_file_node.name,
+                    'materialized': self.base_file_node.materialized_path,
+                    'path': self.base_file_node.materialized_path,
+                    'kind': 'file',
+                    'size': 1000,
+                    'created_utc': '',
+                    'modified_utc': '',
+                    'extra': {'version': '1'}
+                }
+            }
         )
-        mock_base_file_node = mock.MagicMock()
-        mock_file_info = mock.MagicMock()
-        mock_base_file_node.objects.filter.return_value.order_by.return_value.first.return_value = BaseFileNode(type='osf.s3file', provider='s3',
-                                                                                                                _path='/testfile',
-                                                                                                                _materialized_path='/testfile',
-                                                                                                                parent_id=self.node.id,
-                                                                                                                target_object_id=self.node.id,
-                                                                                                                target_content_type_id=2)
-        mock_file_info.objects.create.return_value = None
 
-        with mock.patch('website.util.quota.BaseFileNode', mock_base_file_node):
-            with mock.patch('website.util.quota.FileInfo', mock_file_info):
-                quota.update_used_quota(
-                    self=None,
-                    target=self.node,
-                    user=self.user,
-                    event_type=FileLog.FILE_ADDED,
-                    payload={
-                        'provider': 's3',
-                        'metadata': {
-                            'provider': 's3',
-                            'name': 'testfile',
-                            'materialized': '/testfile',
-                            'path': '/testfile',
-                            'kind': 'file',
-                            'size': 2000,
-                        }
-                    }
-                )
-
-        user_quota = UserQuota.objects.filter(
-            storage_type=UserQuota.CUSTOM_STORAGE,
+        user_quota = UserStorageQuota.objects.filter(
+            region=self.region,
             user=self.project_creator
         ).all()
         assert_equal(len(user_quota), 1)
         user_quota = user_quota[0]
-        assert_equal(user_quota.used, 7000)
+        assert_equal(user_quota.used, 6000)
 
-    def test_add_folder_with_Amazon_S3(self):
-        UserQuota.objects.create(
-            user=self.project_creator,
-            storage_type=UserQuota.CUSTOM_STORAGE,
-            max_quota=api_settings.DEFAULT_MAX_QUOTA,
-            used=5000
-        )
+    def test_add_folder_with_addon_method_provider(self):
         institution = InstitutionFactory()
+        self.project_creator.affiliated_institutions.add(institution)
         self.user.affiliated_institutions.add(institution)
-        RegionFactory(_id=institution._id)
+        self.region = RegionFactory(
+            _id=institution._id,
+            waterbutler_settings={
+                'storage': {
+                    'bucket': 'grdm-system-test',
+                    'folder': '',
+                    'provider': self.addon_provider,
+                    'encrypt_uploads': False
+                }
+            }
+        )
+        addon_st = self.node.add_addon('osfstorage', auth=None, log=False, region_id=self.region.id)
+        addon_st.root_node_id = self.node_root.id
+        addon_st.save()
+
         ProjectStorageType.objects.filter(node=self.node).update(
             storage_type=ProjectStorageType.CUSTOM_STORAGE
         )
-        mock_base_file_node = mock.MagicMock()
-        mock_file_info = mock.MagicMock()
-        mock_base_file_node.return_value = BaseFileNode(type='osf.s3folder', provider='s3', _path='/testfolder',
-                                                        _materialized_path='/testfolder', target_object_id=self.node.id, target_content_type_id=2)
-        mock_base_file_node.objects.filter.return_value.order_by.return_value.first.return_value = BaseFileNode(type='osf.s3folder', provider='s3',
-                                                                                                                _path='/testfolder',
-                                                                                                                _materialized_path='/testfolder',
-                                                                                                                target_object_id=self.node.id,
-                                                                                                                target_content_type_id=2)
-        mock_file_info.objects.create.return_value = None
 
-        with mock.patch('website.util.quota.BaseFileNode', mock_base_file_node):
-            with mock.patch('website.util.quota.FileInfo', mock_file_info):
-                quota.update_used_quota(
-                    self=None,
-                    target=self.node,
-                    user=self.user,
-                    event_type=FileLog.FILE_ADDED,
-                    payload={
-                        'provider': 's3',
-                        'action': 'create_folder',
-                        'metadata': {
-                            'provider': 's3',
-                            'name': '/testfolder',
-                            'materialized': '/testfolder',
-                            'path': '/testfolder',
-                            'kind': 'folder',
-                            'size': 0,
-                        }
-                    }
-                )
+        UserStorageQuota.objects.create(
+            user=self.project_creator,
+            region=self.region,
+            max_quota=api_settings.DEFAULT_MAX_QUOTA,
+            used=5000
+        )
 
-        user_quota = UserQuota.objects.filter(
-            storage_type=UserQuota.CUSTOM_STORAGE,
+        self.base_folder_node.save()
+
+        quota.update_used_quota(
+            self=None,
+            target=self.node,
+            user=self.user,
+            event_type=FileLog.FILE_ADDED,
+            payload={
+                'provider': self.addon_provider,
+                'action': 'create_folder',
+                'metadata': {
+                    'provider': self.addon_provider,
+                    'name': self.base_folder_node.name,
+                    'materialized': self.base_folder_node.materialized_path,
+                    'path': self.base_folder_node.materialized_path,
+                    'kind': 'folder',
+                    'size': 0,
+                    'created_utc': '',
+                    'modified_utc': '',
+                }
+            }
+        )
+
+        user_quota = UserStorageQuota.objects.filter(
+            region=self.region,
             user=self.project_creator
         ).all()
         assert_equal(len(user_quota), 1)
         user_quota = user_quota[0]
         assert_equal(user_quota.used, 5000)
 
-    def test_delete_file_with_Amazon_S3(self):
-        mock_base_file_node = mock.MagicMock()
-        mock_file_info = mock.MagicMock()
-        mock_user_quota = mock.MagicMock()
-        mock_base_file_node.objects.filter.return_value.order_by.return_value.first.return_value = self.base_file_node
-        mock_file_info.objects.get.return_value = FileInfo(file=self.base_file_node, file_size=1000)
-        mock_user_quota.objects.filter.return_value.first.return_value = UserQuota(
+    def test_delete_file_with_addon_method_provider(self):
+        institution = InstitutionFactory()
+        self.project_creator.affiliated_institutions.add(institution)
+        self.user.affiliated_institutions.add(institution)
+        self.region = RegionFactory(
+            _id=institution._id,
+            waterbutler_settings={
+                'storage': {
+                    'bucket': 'grdm-system-test',
+                    'folder': '',
+                    'provider': self.addon_provider,
+                    'encrypt_uploads': False
+                }
+            }
+        )
+        addon_st = self.node.add_addon('osfstorage', auth=None, log=False, region_id=self.region.id)
+        addon_st.root_node_id = self.node_root.id
+        addon_st.save()
+
+        ProjectStorageType.objects.filter(node=self.node).update(
+            storage_type=ProjectStorageType.CUSTOM_STORAGE
+        )
+
+        self.base_file_node.save()
+        FileInfo.objects.create(file=self.base_file_node, file_size=1000)
+
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.CUSTOM_STORAGE,
+            region=self.region,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
-        with mock.patch('website.util.quota.BaseFileNode', mock_base_file_node):
-            with mock.patch('website.util.quota.FileInfo', mock_file_info):
-                with mock.patch('website.util.quota.UserQuota', mock_user_quota):
-                    quota.update_used_quota(
-                        self=None,
-                        target=self.node,
-                        user=self.user,
-                        event_type=FileLog.FILE_REMOVED,
-                        payload={
-                            'provider': 's3',
-                            'metadata': {
-                                'provider': 's3',
-                                'name': 'testfile',
-                                'materialized': '/filename',
-                                'path': '/filename',
-                                'kind': 'file'
-                            }
-                        }
-                    )
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.CUSTOM_STORAGE,
+
+        self.base_file_node.deleted_on = datetime.datetime.now()
+        self.base_file_node.deleted_by = self.user
+        self.base_file_node.type = 'osf.trashedfile'
+        self.base_file_node.save()
+
+        quota.update_used_quota(
+            self=None,
+            target=self.node,
+            user=self.user,
+            event_type=FileLog.FILE_REMOVED,
+            payload={
+                'provider': self.addon_provider,
+                'metadata': {
+                    'provider': self.addon_provider,
+                    'name': self.base_file_node.name,
+                    'materialized': self.base_file_node.materialized_path,
+                    'path': self.base_file_node.materialized_path,
+                    'kind': 'file'
+                }
+            }
+        )
+        user_quota = UserStorageQuota.objects.get(
+            region=self.region,
             user=self.project_creator
         )
         assert_equal(user_quota.used, 4500)
 
-    def test_delete_folder_with_Amazon_S3(self):
-        mock_base_file_node = mock.MagicMock()
-        mock_file_info = mock.MagicMock()
-        mock_user_quota = mock.MagicMock()
-        mock_base_file_node.objects.filter.return_value.order_by.return_value.first.return_value = self.base_folder_node
-        folder_element = BaseFileNode(type='osf.s3folder', provider='s3', _path='/testfolder/foldername',
-                                      _materialized_path='/testfolder/foldername', target_object_id=self.node.id, target_content_type_id=2)
-        mock_base_file_node.objects.filter.return_value.all.return_value = [self.base_file_node, folder_element]
-        mock_file_info.objects.get.return_value = FileInfo(file=self.base_file_node, file_size=1500)
-        mock_user_quota.objects.filter.return_value.first.return_value = UserQuota(
+    def test_delete_folder_with_addon_method_provider(self):
+        institution = InstitutionFactory()
+        self.project_creator.affiliated_institutions.add(institution)
+        self.user.affiliated_institutions.add(institution)
+        self.region = RegionFactory(
+            _id=institution._id,
+            waterbutler_settings={
+                'storage': {
+                    'bucket': 'grdm-system-test',
+                    'folder': '',
+                    'provider': self.addon_provider,
+                    'encrypt_uploads': False
+                }
+            }
+        )
+        addon_st = self.node.add_addon('osfstorage', auth=None, log=False, region_id=self.region.id)
+        addon_st.root_node_id = self.node_root.id
+        addon_st.save()
+
+        ProjectStorageType.objects.filter(node=self.node).update(
+            storage_type=ProjectStorageType.CUSTOM_STORAGE
+        )
+
+        UserStorageQuota.objects.create(
             user=self.project_creator,
-            storage_type=UserQuota.CUSTOM_STORAGE,
+            region=self.region,
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5500
         )
-        with mock.patch('website.util.quota.BaseFileNode', mock_base_file_node):
-            with mock.patch('website.util.quota.FileInfo', mock_file_info):
-                with mock.patch('website.util.quota.UserQuota', mock_user_quota):
-                    quota.update_used_quota(
-                        self=None,
-                        target=self.node,
-                        user=self.user,
-                        event_type=FileLog.FILE_REMOVED,
-                        payload={
-                            'provider': 's3',
-                            'metadata': {
-                                'provider': 's3',
-                                'name': 'testfolder',
-                                'materialized': '/testfolder',
-                                'path': '/testfolder',
-                                'kind': 'folder'
-                            }
-                        }
-                    )
-        user_quota = UserQuota.objects.get(
-            storage_type=UserQuota.CUSTOM_STORAGE,
+
+        folder1 = TrashedFolder(
+            target=self.node,
+            parent_id=self.node_root.id,
+            provider=self.addon_provider,
+            name=f'{self.addon_provider}folder1',
+            path=f'/{self.addon_provider}folder1',
+            materialized_path=f'/{self.addon_provider}folder1',
+            deleted_on=datetime.datetime.now(),
+            deleted_by=self.user
+        )
+        folder1.save()
+        folder2 = TrashedFolder(
+            target=self.node,
+            parent_id=folder1.id,
+            provider=self.addon_provider,
+            name=f'{self.addon_provider}folder2',
+            path=f'/{self.addon_provider}folder1/{self.addon_provider}folder2',
+            materialized_path=f'/{self.addon_provider}folder1/{self.addon_provider}folder2',
+            deleted_on=datetime.datetime.now(),
+            deleted_by=self.user
+        )
+        folder2.save()
+        file1 = TrashedFileNode.create(
+            target=self.node,
+            parent_id=folder1.id,
+            name=f'{self.addon_provider}file1',
+            path=f'/{self.addon_provider}folder1/{self.addon_provider}file1',
+            materialized_path=f'/{self.addon_provider}folder1/{self.addon_provider}file1',
+            deleted_on=datetime.datetime.now(),
+            deleted_by=self.user
+        )
+        file1.provider = self.addon_provider
+        file1.type = 'osf.trashedfile'
+        file1.save()
+        file2 = TrashedFileNode.create(
+            target=self.node,
+            parent_id=folder2.id,
+            name=f'{self.addon_provider}file2',
+            path=f'/{self.addon_provider}folder1/{self.addon_provider}folder2/{self.addon_provider}file2',
+            materialized_path=f'/{self.addon_provider}folder1/{self.addon_provider}folder2/{self.addon_provider}file2',
+            deleted_on=datetime.datetime.now(),
+            deleted_by=self.user
+        )
+        file2.provider = self.addon_provider
+        file2.type = 'osf.trashedfile'
+        file2.save()
+
+        file1_info = FileInfo(file=file1, file_size=2000)
+        file1_info.save()
+        file2_info = FileInfo(file=file2, file_size=3000)
+        file2_info.save()
+
+        quota.update_used_quota(
+            self=None,
+            target=self.node,
+            user=self.user,
+            event_type=FileLog.FILE_REMOVED,
+            payload={
+                'provider': self.addon_provider,
+                'metadata': {
+                    'provider': self.addon_provider,
+                    'name': folder1.name,
+                    'materialized': folder1.materialized_path,
+                    'path': folder1.materialized_path,
+                    'kind': 'folder',
+                    'extra': {}
+                }
+            }
+        )
+
+        user_quota = UserStorageQuota.objects.get(
+            region=self.region,
             user=self.project_creator
         )
-        assert_equal(user_quota.used, 4000)
+        assert_equal(user_quota.used, 500)
 
 
 class TestUpdateUserUsedQuota(OsfTestCase):
@@ -1928,3 +2124,132 @@ class TestQuotaApiBrowser(OsfTestCase):
         assert_equal(response.status_code, 200)
         assert_equal(response.json['max'], 200 * api_settings.SIZE_UNIT_GB)
         assert_equal(response.json['used'], 100 * api_settings.SIZE_UNIT_GB)
+
+
+class TestGetRegionIdOfInstitutionalStorageByPath(OsfTestCase):
+
+    def setUp(self):
+        self.target = mock.Mock()
+        self.provider = 'dropboxbusiness'
+        self.path = '/example/path'
+        self.storage_type = ProjectStorageType.CUSTOM_STORAGE
+
+    def test_get_region_id_of_institutional_storage_by_path_with_nii_storage_type(self):
+        result = get_region_id_of_institutional_storage_by_path(
+            self.target,
+            'invalid_provider',
+            self.path,
+            ProjectStorageType.NII_STORAGE
+        )
+
+        assert_equal(result, NII_STORAGE_REGION_ID)
+
+    def test_get_region_id_of_institutional_storage_by_path_with_osfstorage_node_setting(self):
+        with mock.patch('website.util.quota.get_addon_osfstorage_by_path') as mock_get_addon_osfstorage_by_path:
+            region_mock = mock.Mock(id=123)
+            osf_node_setting_mock = mock.Mock(region=region_mock)
+            mock_get_addon_osfstorage_by_path.return_value = osf_node_setting_mock
+
+            result = get_region_id_of_institutional_storage_by_path(
+                self.target,
+                'osfstorage',
+                self.path,
+                self.storage_type
+            )
+
+        assert_equal(result, 123)
+        mock_get_addon_osfstorage_by_path.assert_called_once_with(
+            self.target,
+            self.path,
+            'osfstorage'
+        )
+
+    def test_get_region_id_of_institutional_storage_by_path_with_osfstorage_empty_node_setting(self):
+        with mock.patch('website.util.quota.get_addon_osfstorage_by_path') as mock_get_addon_osfstorage_by_path:
+            mock_get_addon_osfstorage_by_path.return_value = None
+
+            result = get_region_id_of_institutional_storage_by_path(
+                self.target,
+                'osfstorage',
+                self.path,
+                self.storage_type
+            )
+
+        assert_is_none(result)
+
+    def test_get_region_id_of_institutional_storage_by_path_with_custom_storage(self):
+        region_mock = mock.Mock()
+        region_mock.id = 456
+        institution_mock = mock.Mock()
+        institution_mock.affiliated_institutions.first.return_value = institution_mock
+        region_filter_mock = mock.Mock()
+        region_filter_mock.first.return_value = region_mock
+
+        with mock.patch('website.util.quota.Region.objects.filter') as mock_filter, \
+                mock.patch('website.util.quota.get_addon_osfstorage_by_path'):
+            mock_filter.return_value = region_filter_mock
+            self.target.creator.affiliated_institutions.first.return_value = institution_mock
+
+            result = get_region_id_of_institutional_storage_by_path(
+                self.target,
+                self.provider,
+                self.path,
+                self.storage_type
+            )
+
+        assert_equal(result, 456)
+        mock_filter.assert_called_once_with(
+            _id=institution_mock._id,
+            waterbutler_settings__storage__provider=self.provider
+        )
+
+    def test_get_region_id_of_institutional_storage_by_path_with_custom_storage_no_region(self):
+        institution_mock = mock.Mock()
+        institution_mock.affiliated_institutions.first.return_value = institution_mock
+        region_filter_mock = mock.Mock()
+        region_filter_mock.first.return_value = None
+
+        with mock.patch('website.util.quota.Region.objects.filter') as mock_filter, \
+                mock.patch('website.util.quota.get_addon_osfstorage_by_path'):
+            mock_filter.return_value = region_filter_mock
+            self.target.creator.affiliated_institutions.first.return_value = institution_mock
+
+            result = get_region_id_of_institutional_storage_by_path(
+                self.target,
+                self.provider,
+                self.path,
+                self.storage_type
+            )
+
+        assert_is_none(result)
+        mock_filter.assert_called_once_with(
+            _id=institution_mock._id,
+            waterbutler_settings__storage__provider=self.provider
+        )
+
+    def test_get_region_id_of_institutional_storage_by_path_with_custom_storage_no_affiliated_institutions(self):
+        with mock.patch('website.util.quota.get_addon_osfstorage_by_path'), \
+                mock.patch('website.util.quota.Region.objects.filter'), \
+                mock.patch('website.util.quota.get_addon_osfstorage_by_path') as mock_get_addon_osfstorage_by_path:
+            self.target.creator.affiliated_institutions.first.return_value = None
+
+            result = get_region_id_of_institutional_storage_by_path(
+                self.target,
+                self.provider,
+                self.path,
+                self.storage_type
+            )
+
+        assert_is_none(result)
+
+    def test_get_region_id_of_institutional_storage_by_path_with_custom_storage_invalid_provider(self):
+        with mock.patch('website.util.quota.get_addon_osfstorage_by_path'), \
+                mock.patch('website.util.quota.Region.objects.filter'):
+            result = get_region_id_of_institutional_storage_by_path(
+                self.target,
+                'invalid_provider',
+                self.path,
+                self.storage_type
+            )
+
+        assert_equal(result, NII_STORAGE_REGION_ID)
