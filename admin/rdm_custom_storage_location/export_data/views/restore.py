@@ -612,7 +612,6 @@ def copy_files_from_export_data_to_destination(task, current_process_step, expor
         file_created = file.get('created_at')
         file_modified = file.get('modified_at')
         file_provider = file.get('provider')
-        file_id = file.get('id')
         file_guid = file.get('guid')
 
         if is_destination_addon_storage:
