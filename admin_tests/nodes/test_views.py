@@ -135,8 +135,8 @@ class TestNodeDeleteView(AdminTestCase):
         nt.assert_in('guid', res)
         nt.assert_equal(res.get('guid'), self.node._id)
 
-    @mock.patch('website.util.quota.update_user_used_quota')
-    def test_remove_node(self, mock_update_user_used_quota_method):
+    @mock.patch('website.util.quota.recalculate_used_quota_by_user')
+    def test_remove_node(self, mock_recalculate_used_quota_by_user_method):
         count = AdminLogEntry.objects.count()
         mock_now = datetime.datetime(2017, 3, 16, 11, 00, tzinfo=pytz.utc)
         with mock.patch.object(timezone, 'now', return_value=mock_now):
@@ -145,10 +145,10 @@ class TestNodeDeleteView(AdminTestCase):
         nt.assert_true(self.node.is_deleted)
         nt.assert_equal(AdminLogEntry.objects.count(), count + 1)
         nt.assert_equal(self.node.deleted, mock_now)
-        mock_update_user_used_quota_method.assert_called()
+        mock_recalculate_used_quota_by_user_method.assert_called()
 
-    @mock.patch('website.util.quota.update_user_used_quota')
-    def test_remove_node_is_not_project_type(self, mock_update_user_used_quota_method):
+    @mock.patch('website.util.quota.recalculate_used_quota_by_user')
+    def test_remove_node_is_not_project_type(self, mock_recalculate_used_quota_by_user_method):
         node = NodeFactory()
         self.view = setup_log_view(self.plain_view(), self.request,
                                    guid=node._id)
@@ -160,10 +160,10 @@ class TestNodeDeleteView(AdminTestCase):
         nt.assert_true(node.is_deleted)
         nt.assert_equal(AdminLogEntry.objects.count(), count + 1)
         nt.assert_equal(node.deleted, mock_now)
-        mock_update_user_used_quota_method.assert_not_called()
+        mock_recalculate_used_quota_by_user_method.assert_not_called()
 
-    @mock.patch('website.util.quota.update_user_used_quota')
-    def test_restore_node(self, mock_update_user_used_quota_method):
+    @mock.patch('website.util.quota.recalculate_used_quota_by_user')
+    def test_restore_node(self, mock_recalculate_used_quota_by_user_method):
         self.view.delete(self.request)
         self.node.refresh_from_db()
         nt.assert_true(self.node.is_deleted)
@@ -174,10 +174,10 @@ class TestNodeDeleteView(AdminTestCase):
         nt.assert_false(self.node.is_deleted)
         nt.assert_true(self.node.deleted is None)
         nt.assert_equal(AdminLogEntry.objects.count(), count + 1)
-        mock_update_user_used_quota_method.assert_called()
+        mock_recalculate_used_quota_by_user_method.assert_called()
 
-    @mock.patch('website.util.quota.update_user_used_quota')
-    def test_restore_node_is_not_project_type(self, mock_update_user_used_quota_method):
+    @mock.patch('website.util.quota.recalculate_used_quota_by_user')
+    def test_restore_node_is_not_project_type(self, mock_recalculate_used_quota_by_user_method):
         node = NodeFactory()
         self.view = setup_log_view(self.plain_view(), self.request,
                                    guid=node._id)
@@ -191,7 +191,7 @@ class TestNodeDeleteView(AdminTestCase):
         nt.assert_false(node.is_deleted)
         nt.assert_true(node.deleted is None)
         nt.assert_equal(AdminLogEntry.objects.count(), count + 1)
-        mock_update_user_used_quota_method.assert_not_called()
+        mock_recalculate_used_quota_by_user_method.assert_not_called()
 
     def test_no_user_permissions_raises_error(self):
         user = AuthUserFactory()

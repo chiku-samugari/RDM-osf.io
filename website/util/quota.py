@@ -92,10 +92,9 @@ def get_quota_info(user, storage_type=UserQuota.NII_STORAGE):
         return (api_settings.DEFAULT_MAX_QUOTA, used_quota(user._id, storage_type))
 
 
-def get_storage_quota_info(institution, user, region):
-    """ Get the per-user-per-storage info of institution
+def get_storage_quota_info(user, region):
+    """ Get the per-user-per-storage info
 
-    :param Object institution: Institution of user
     :param Object user: User is using the storage
     :param Object region: Institution storage
     :return tuple: Tuple of storage's quota and used quota

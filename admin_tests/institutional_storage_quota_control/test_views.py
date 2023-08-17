@@ -49,23 +49,26 @@ class TestUpdateQuotaUserListByInstitutionStorageID(AdminTestCase):
         )
 
         nt.assert_equal(response.status_code, 302)
-        user_quota = UserQuota.objects.filter(
-            user=self.user1, storage_type=UserQuota.CUSTOM_STORAGE
+        user_quota = UserStorageQuota.objects.filter(
+            user=self.user1, region_id=self.region.id
         ).first()
         nt.assert_is_not_none(user_quota)
         nt.assert_equal(user_quota.max_quota, max_quota)
 
-    def test_post_get_quota_exits(self):
+    def test_post_update_quota_exits(self):
         max_quota = 50
         request = RequestFactory().post(
             reverse(
-                'institutional_storage_quota_control'
-                ':update_quota_institution_user_list',
+                'institutional_storage_quota_control:update_quota_institution_user_list',
                 kwargs={'institution_id': self.institution.id}),
             {'maxQuota': max_quota, 'region_id': self.region.id})
         request.user = self.user1
-        UserQuota.objects.create(user=self.user1, storage_type=UserQuota.CUSTOM_STORAGE, max_quota=300)
-        UserStorageQuota.objects.create(user=self.user1, region=self.region, max_quota=150, used=22)
+        init_user_quota = UserQuota.objects.create(
+            user=self.user1, storage_type=UserQuota.CUSTOM_STORAGE, max_quota=300
+        )
+        UserStorageQuota.objects.create(
+            user=self.user1, region=self.region, used=22, max_quota=150
+        )
         response = self.view(
             request,
             institution_id=self.institution.id
@@ -79,60 +82,32 @@ class TestUpdateQuotaUserListByInstitutionStorageID(AdminTestCase):
             user=self.user1, region=self.region
         ).first()
         nt.assert_is_not_none(user_quota)
-        nt.assert_equal(user_quota.max_quota, 200)
+        nt.assert_equal(user_quota.max_quota, init_user_quota.max_quota)
         nt.assert_is_not_none(user_storage_quota)
         nt.assert_equal(user_storage_quota.max_quota, max_quota)
 
-    def test_post_get_quota_less_than_zero(self):
+    def test_post_update_quota_less_than_zero(self):
         max_quota = 50
         request = RequestFactory().post(
             reverse(
-                'institutional_storage_quota_control'
-                ':update_quota_institution_user_list',
+                'institutional_storage_quota_control:update_quota_institution_user_list',
                 kwargs={'institution_id': self.institution.id}),
             {'maxQuota': max_quota, 'region_id': self.region.id})
         request.user = self.user1
-        UserQuota.objects.create(user=self.user1, storage_type=UserQuota.CUSTOM_STORAGE, max_quota=-1)
-        UserStorageQuota.objects.create(user=self.user1, region=self.region, max_quota=150, used=22)
+        UserStorageQuota.objects.create(
+            user=self.user1, region=self.region, max_quota=150, used=22
+        )
         response = self.view(
             request,
             institution_id=self.institution.id
         )
 
         nt.assert_equal(response.status_code, 302)
-        user_quota = UserQuota.objects.filter(
-            user=self.user1, storage_type=UserQuota.CUSTOM_STORAGE
-        ).first()
         user_storage_quota = UserStorageQuota.objects.filter(
             user=self.user1, region=self.region
         ).first()
-        nt.assert_is_not_none(user_quota)
-        nt.assert_equal(user_quota.max_quota, 0)
         nt.assert_is_not_none(user_storage_quota)
         nt.assert_equal(user_storage_quota.max_quota, max_quota)
-
-    def test_post_update_quota(self):
-        UserQuota.objects.create(user=self.user1, max_quota=100)
-        max_quota = 150
-        request = RequestFactory().post(
-            reverse(
-                'institutional_storage_quota_control:'
-                'update_quota_institution_user_list',
-                kwargs={'institution_id': self.institution.id}),
-            {'maxQuota': max_quota, 'region_id': self.region.id})
-        request.user = self.user1
-
-        response = self.view(
-            request,
-            institution_id=self.institution.id
-        )
-
-        nt.assert_equal(response.status_code, 302)
-        user_quota = UserQuota.objects.filter(
-            user=self.user1, storage_type=UserQuota.CUSTOM_STORAGE
-        ).first()
-        nt.assert_is_not_none(user_quota)
-        nt.assert_equal(user_quota.max_quota, max_quota)
 
     def test_post_create_quota_not_found(self):
         max_quota = 50

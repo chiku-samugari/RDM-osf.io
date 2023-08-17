@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
 
+import logging
+import inspect  # noqa
 import csv
 import pytz
 from furl import furl
@@ -29,7 +31,7 @@ from framework.auth.core import generate_verification_key
 from osf.models.user_storage_quota import UserStorageQuota
 from website.mailchimp_utils import subscribe_on_confirm
 from website import search
-from website.util import quota
+from website.util import quota, inspect_info  # noqa
 
 from admin.base.views import GuidView
 from osf.models.admin_log_entry import (
@@ -53,6 +55,8 @@ from addons.osfstorage.models import Region
 from rest_framework import status as http_status
 from admin.base.utils import reverse_qs
 from framework.exceptions import HTTPError
+
+logger = logging.getLogger(__name__)
 
 
 class UserDeleteView(PermissionRequiredMixin, DeleteView):
@@ -743,7 +747,7 @@ class BaseUserQuotaView(View):
     """Base class for UserQuotaView and UserInstitutionQuotaView.
     """
 
-    def update_quota(self, max_quota, storage_type, region_id=NII_STORAGE_REGION_ID):
+    def update_quota(self, max_quota, region_id=NII_STORAGE_REGION_ID):
         try:
             max_quota = int(max_quota)
         except (ValueError, TypeError):
@@ -776,13 +780,13 @@ class UserQuotaView(BaseUserQuotaView):
     raise_exception = True
 
     def post(self, request, *args, **kwargs):
-        self.update_quota(request.POST.get('maxQuota'), UserQuota.NII_STORAGE)
+        self.update_quota(request.POST.get('maxQuota'), region_id=request.POST.get('region_id'))
         return redirect(reverse_user(self.kwargs.get('guid')))
 
 
 class UserDetailsView(RdmPermissionMixin, UserPassesTestMixin, GuidView):
     """
-    User screen for intitution managers.
+    User screen for institution managers.
     """
     template_name = 'users/user_details.html'
     context_object_name = 'current_user'
@@ -799,7 +803,6 @@ class UserDetailsView(RdmPermissionMixin, UserPassesTestMixin, GuidView):
             region = Region.objects.filter(id=region_id).first()
             if region and institution and institution._id == region._id:
                 max_quota, _ = quota.get_storage_quota_info(
-                    institution,
                     user,
                     region
                 )
@@ -830,7 +833,6 @@ class UserInstitutionQuotaView(RdmPermissionMixin, UserPassesTestMixin, BaseUser
 
         self.update_quota(
             request.POST.get('maxQuota'),
-            UserQuota.CUSTOM_STORAGE,
             region_id
         )
 

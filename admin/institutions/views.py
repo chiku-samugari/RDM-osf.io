@@ -269,18 +269,30 @@ class InstitutionalMetricsAdminRegister(PermissionRequiredMixin, FormView):
     def get_success_url(self):
         return reverse('institutions:register_metrics_admin', kwargs={'institution_id': self.kwargs['institution_id']})
 
+
 class QuotaUserList(ListView):
     """Base class for UserListByInstitutionID and StatisticalStatusDefaultStorage.
     """
+
+    def get_institution(self):
+        raise NotImplementedError("QuotaUserList subclasses must implement a \
+            'get_institution' method.")
+
+    def get_region(self):
+        raise NotImplementedError("QuotaUserList subclasses must implement a \
+            'get_region' method.")
+
+    def get_user_list(self):
+        raise NotImplementedError("QuotaUserList subclasses must implement a \
+            'get_user_list' method.")
 
     def custom_size_abbreviation(self, size, abbr):
         if abbr == 'B':
             return (size / api_settings.BASE_FOR_METRIC_PREFIX, 'KB')
         return size, abbr
 
-    def get_user_quota_info(self, user, storage_type):
+    def get_user_quota_info(self, user):
         max_quota, used_quota = quota.get_storage_quota_info(
-            self.get_institution(),
             user,
             self.get_region()
         )
@@ -304,7 +316,7 @@ class QuotaUserList(ListView):
         }
 
     def get_queryset(self):
-        user_list = self.get_userlist()
+        user_list = self.get_user_list()
         order_by = self.get_order_by()
         reverse = self.get_direction() != 'asc'
         user_list.sort(key=itemgetter(order_by), reverse=reverse)
@@ -382,14 +394,14 @@ class UserListByInstitutionID(PermissionRequiredMixin, QuotaUserList):
     raise_exception = True
     paginate_by = 10
 
-    def get_userlist(self):
+    def get_user_list(self):
         guid = self.request.GET.get('guid')
         name = self.request.GET.get('info')
         email = self.request.GET.get('email')
         queryset = OSFUser.objects.filter(affiliated_institutions=self.kwargs['institution_id'])
 
         if not email and not guid and not name:
-            return [self.get_user_quota_info(user, UserQuota.NII_STORAGE) for user in queryset]
+            return [self.get_user_quota_info(user) for user in queryset]
 
         query_email = query_guid = query_name = None
 
@@ -400,26 +412,25 @@ class UserListByInstitutionID(PermissionRequiredMixin, QuotaUserList):
             query_guid = queryset.filter(guids___id=guid)
         if name:
             query_name = queryset.filter(Q(fullname__icontains=name) |
-                                         # Q(family_name_ja__icontains=name) |  # add in (1)4.1.4
-                                         # Q(given_name_ja__icontains=name) |  # add in (1)4.1.4
-                                         # Q(middle_names_ja__icontains=name) |  # add in (1)4.1.4
                                          Q(given_name__icontains=name) |
                                          Q(middle_names__icontains=name) |
                                          Q(family_name__icontains=name))
 
         if query_email is not None and query_email.exists():
-            return [self.get_user_quota_info(user, UserQuota.NII_STORAGE) for user in query_email]
+            return [self.get_user_quota_info(user) for user in query_email]
         elif query_guid is not None and query_guid.exists():
-            return [self.get_user_quota_info(user, UserQuota.NII_STORAGE) for user in query_guid]
+            return [self.get_user_quota_info(user) for user in query_guid]
         elif query_name is not None and query_name.exists():
-            return [self.get_user_quota_info(user, UserQuota.NII_STORAGE) for user in query_name]
+            return [self.get_user_quota_info(user) for user in query_name]
         else:
             return []
 
     def get_institution(self):
+        # be called in QuotaUserList.get_user_quota_info method
         return Institution.objects.get(id=self.kwargs['institution_id'])
 
     def get_region(self):
+        # be called in QuotaUserList.get_user_quota_info method
         return Region.objects.first()
 
 
@@ -545,17 +556,8 @@ class InstitutionalStorage(RdmPermissionMixin, ListView):
 
 class QuotaUserStorageList(QuotaUserList):
 
-    def get_institution(self):
-        raise NotImplementedError("QuotaUserStorageList subclasses must implement a \
-            'get_institution' method.")
-
-    def get_region(self):
-        raise NotImplementedError("QuotaUserStorageList subclasses must implement a \
-            'get_region' method.")
-
     def get_user_storage_quota_info(self, user):
         max_quota, used_quota = quota.get_storage_quota_info(
-            self.get_institution(),
             user, self.get_region()
         )
         max_quota_bytes = max_quota * api_settings.SIZE_UNIT_GB
@@ -590,7 +592,7 @@ class StatisticalStatusDefaultInstitutionalStorage(QuotaUserStorageList, RdmPerm
     def test_func(self):
         return not self.is_super_admin and self.is_admin and self.request.user.affiliated_institutions.exists()
 
-    def get_userlist(self):
+    def get_user_list(self):
         user_list = []
         institution = self.request.user.affiliated_institutions.first()
         if institution is not None and Region.objects.filter(_id=institution._id).exists():

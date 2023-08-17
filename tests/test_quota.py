@@ -366,9 +366,9 @@ class TestSaveFileInfo(OsfTestCase):
             user=self.user,
             event_type=FileLog.FILE_MOVED,
             payload={
-                'provider': 'fake_osfstorage',
+                'provider': 'osfstorage',
                 'metadata': {
-                    'provider': 'fake_osfstorage',
+                    'provider': 'osfstorage',
                     'name': 'testfile',
                     'materialized': '/filename',
                     'path': '/' + self.file._id,
@@ -414,9 +414,9 @@ class TestSaveFileInfo(OsfTestCase):
             user=self.user,
             event_type=FileLog.FILE_MOVED,
             payload={
-                'provider': 'fake_osfstorage',
+                'provider': 'osfstorage',
                 'metadata': {
-                    'provider': 'fake_osfstorage',
+                    'provider': 'osfstorage',
                     'name': 'testfile',
                     'materialized': '/filename',
                     'path': '/' + self.file._id,
@@ -457,9 +457,9 @@ class TestSaveFileInfo(OsfTestCase):
                 user=self.user,
                 event_type=FileLog.FILE_MOVED,
                 payload={
-                    'provider': 'fake_osfstorage',
+                    'provider': 'osfstorage',
                     'metadata': {
-                        'provider': 'fake_osfstorage',
+                        'provider': 'osfstorage',
                         'name': 'testfile',
                         'materialized': '/filename',
                         'path': '/' + self.file._id,
@@ -528,9 +528,9 @@ class TestSaveFileInfo(OsfTestCase):
             user=self.user,
             event_type=FileLog.FILE_MOVED,
             payload={
-                'provider': 'fake_osfstorage',
+                'provider': 'osfstorage',
                 'metadata': {
-                    'provider': 'fake_osfstorage',
+                    'provider': 'osfstorage',
                     'name': 'testfile',
                     'materialized': '/filename',
                     'path': '/' + self.file._id,
