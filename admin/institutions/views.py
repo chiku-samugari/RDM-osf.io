@@ -334,9 +334,6 @@ class QuotaUserList(ListView):
             return 'desc'
         return direction
 
-    def get_region(self):
-        return None
-
     def get_context_data(self, **kwargs):
         institution = self.get_institution()
         kwargs['institution_id'] = institution.id

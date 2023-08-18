@@ -18,7 +18,7 @@ from osf_tests.factories import (
     RegionFactory,
     UserFactory
 )
-from osf.models import Institution, Node, UserQuota, OSFUser, BaseFileNode
+from osf.models import Institution, Node, OSFUser, BaseFileNode
 from osf.models.user_storage_quota import UserStorageQuota
 
 from admin_tests.utilities import setup_form_view, setup_user_view, setup_view

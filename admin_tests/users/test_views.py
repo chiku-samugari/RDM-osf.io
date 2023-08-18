@@ -989,7 +989,7 @@ class TestGetUserInstitutionQuota(AdminTestCase):
             self.view,
             RequestFactory().get(
                 reverse('users:user_details', kwargs={'guid': self.user._id}),
-            {'region_id': self.region.id}
+                {'region_id': self.region.id}
             ),
             guid=self.user._id
         )
