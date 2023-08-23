@@ -1299,7 +1299,11 @@ $('#cancel_restore_modal_button').on('click', function () {
 });
 
 $('#restore').on('hidden.bs.modal', function () {
-    enableRestoreFunction();
+    if (no_hidden_modal_event) {
+        no_hidden_modal_event = false;
+    } else {
+        enableRestoreFunction();
+    }
 });
 
 $('#restore_button').on('click', function () {
@@ -1349,7 +1353,6 @@ $('#stop_restore_button').on('click', function () {
         type: 'post',
         data: data
     }).done(function (response) {
-        stop_restore_task_id = response['task_id'];
         enableRestoreFunction();
         $osf.growl(_('Stop Restore Export Data'), _('Stopped restoring data process.'), 'success', 0);
     }).fail(function (jqXHR) {
@@ -1421,9 +1424,9 @@ function checkTaskStatus(task_id, task_type) {
             }
         }
     }).fail(function (jqXHR) {
-        enableRestoreFunction();
         var data = jqXHR.responseJSON;
-        if (data && data['result'] && data['result']!=='Restore process is stopped') {
+        if (data && data['result'] && data['result'] !== 'Restore process is stopped') {
+            enableRestoreFunction();
             var title = _('Restore Export Data');
             $osf.growl(title, _(data['result']), 'danger', 0);
         }
@@ -1435,6 +1438,8 @@ $('#start_restore_modal_button').on('click', function () {
     var data = {};
     data['destination_id'] = $('#destination_storage').val();
     data['is_from_confirm_dialog'] = true;
+    // Prevent hidden modal event trigger
+    no_hidden_modal_event = true;
     // Call enableStopRestoreFunction() when click Restore button
     closeGrowl();
     $.ajax({
