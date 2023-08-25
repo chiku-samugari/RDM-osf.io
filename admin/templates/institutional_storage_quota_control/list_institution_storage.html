@@ -29,23 +29,20 @@
         {% if institution.institution_id %}
         <tr>
             <td>
-                <img class="institution-logo"
-                     src="{{ logohost }}/static/img/institutions/shields/{{ institution.institution_logo_name }}">
+                <a href="{% url 'institutional_storage_quota_control:institution_user_list' institution_id=institution.institution_id %}">
+                    <img class="institution-logo" src="{{ logohost }}/static/img/institutions/shields/{{ institution.institution_logo_name }}">
+                </a>
             </td>
             <td>
-                <a href="{% url 'institutional_storage_quota_control:institutional_storages' institution_id=institution.institution_id %}">
+                <a href="{% url 'institutional_storage_quota_control:institution_user_list' institution_id=institution.institution_id %}">
                     {{ institution.institution_name }}
                 </a>
             </td>
-            <td>{{ institution.name|join:'<br>' }}</td>
+            <td>{{ institution.name}}</td>
         </tr>
         {% endif %}
     {% endfor %}
     </tbody>
     </table>
-
-    {% if not institutions|length %}
-        <h3>{% trans "No results found" %}</h3>
-    {% endif %}
 
 {% endblock content %}

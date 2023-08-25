@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 import logging
 
 from django.apps import apps
+from django.db.models import IntegerField
+from django.db.models.functions import Cast
 from django.dispatch import receiver
 from django.db import models, connection
 from django.db.models.signals import post_save
@@ -10,6 +12,8 @@ from django.contrib.contenttypes.models import ContentType
 from psycopg2._psycopg import AsIs
 
 from addons.base.models import BaseNodeSettings, BaseStorageAddon, BaseUserSettings
+# GRDM-37149: Hide osfstorage for institutional provider
+from addons.base.exceptions import AddonError
 from osf.utils.fields import EncryptedJSONField
 from osf.utils.datetime_aware_jsonfield import DateTimeAwareJSONField
 from osf.exceptions import InvalidTagError, NodeStateError, TagNotFoundError
@@ -25,7 +29,6 @@ from website.util import api_url_for
 from website import settings as website_settings
 from addons.osfstorage.settings import DEFAULT_REGION_ID
 from website.util import api_v2_url
-from addons.base.utils import get_root_institutional_storage
 
 settings = apps.get_app_config('addons_osfstorage')
 
@@ -170,11 +173,11 @@ class OsfStorageFileNode(BaseFileNode):
     def update_region_from_latest_version(self, destination_parent):
         raise NotImplementedError
 
-    def move_under(self, destination_parent, name=None):
-        if self.is_preprint_primary:
+    def move_under(self, destination_parent, name=None, is_check_permission=True):
+        if self.is_preprint_primary and is_check_permission:
             if self.target != destination_parent.target or self.provider != destination_parent.provider:
                 raise exceptions.FileNodeIsPrimaryFile()
-        if self.is_checked_out:
+        if self.is_checked_out and is_check_permission:
             raise exceptions.FileNodeCheckedOutError()
         self.update_region_from_latest_version(destination_parent)
         return super(OsfStorageFileNode, self).move_under(destination_parent, name)
@@ -236,7 +239,7 @@ class OsfStorageFile(OsfStorageFileNode, File):
 
     @property
     def _hashes(self):
-        last_version = self.versions.last()
+        last_version = self.versions_sorted_by_identifier.last()
         if not last_version:
             return None
         return {
@@ -248,7 +251,7 @@ class OsfStorageFile(OsfStorageFileNode, File):
 
     @property
     def last_known_metadata(self):
-        last_version = self.versions.last()
+        last_version = self.versions_sorted_by_identifier.last()
         if not last_version:
             size = None
         else:
@@ -262,9 +265,19 @@ class OsfStorageFile(OsfStorageFileNode, File):
 
     def touch(self, bearer, version=None, revision=None, **kwargs):
         try:
+            if version is None and revision is None:
+                return self.versions_sorted_by_identifier.first()
+
             return self.get_version(revision or version)
         except ValueError:
             return None
+
+    @property
+    def versions_sorted_by_identifier(self):
+        versions_order_by_identifier = self.versions.annotate(version_identifier=Cast('identifier', IntegerField())).order_by('-version_identifier')
+        if versions_order_by_identifier.exists():
+            return versions_order_by_identifier
+        return self.versions
 
     @property
     def history(self):
@@ -293,16 +306,7 @@ class OsfStorageFile(OsfStorageFileNode, File):
 
     def update_region_from_latest_version(self, destination_parent):
         most_recent_fileversion = self.versions.select_related('region').order_by('-created').first()
-        if hasattr(destination_parent.target, 'get_addon'):
-            file_id = destination_parent._id.strip('/').split('/')[0]
-            file_node_root_id = get_root_institutional_storage(file_id)
-            if file_node_root_id is not None:
-                file_node_root_id = file_node_root_id.id
-            addon = destination_parent.target.get_addon('osfstorage', root_id=file_node_root_id)
-            if addon is not None and most_recent_fileversion:
-                most_recent_fileversion.region = addon.region
-                most_recent_fileversion.save()
-        elif most_recent_fileversion and most_recent_fileversion.region != destination_parent.target.osfstorage_region:
+        if most_recent_fileversion and most_recent_fileversion.region != destination_parent.target.osfstorage_region:
             most_recent_fileversion.region = destination_parent.target.osfstorage_region
             most_recent_fileversion.save()
 
@@ -316,16 +320,7 @@ class OsfStorageFile(OsfStorageFileNode, File):
         if metadata:
             version.update_metadata(metadata, save=False)
 
-        if hasattr(self.target, 'get_addon'):
-            root_folder_id = get_root_institutional_storage(self._id)
-            if root_folder_id is not None:
-                root_folder_id = root_folder_id.id
-            region = self.target.get_addon(self._provider, root_id=root_folder_id).region
-            # The region of file version should be region of corresponding addon
-            version.region = region
-        else:
-            version.region = self.target.osfstorage_region
-
+        version.region = self.target.osfstorage_region
         version._find_matching_archive(save=False)
 
         version.save()
@@ -496,10 +491,6 @@ class Region(models.Model):
     waterbutler_url = models.URLField(default=website_settings.WATERBUTLER_URL)
     mfr_url = models.URLField(default=website_settings.MFR_SERVER_URL)
     waterbutler_settings = DateTimeAwareJSONField(default=dict)
-    is_allowed = models.BooleanField(default=True)
-    is_readonly = models.BooleanField(default=False)
-    allow_expression = models.CharField(max_length=200, null=True)
-    readonly_expression = models.CharField(max_length=200, null=True)
 
     def __unicode__(self):
         return '{}'.format(self.name)
@@ -514,6 +505,10 @@ class Region(models.Model):
 
     class Meta:
         unique_together = ('_id', 'name')
+
+    @property
+    def guid(self):
+        return self._id
 
     @property
     def provider_name(self):
@@ -546,6 +541,17 @@ class Region(models.Model):
             return self.addon.full_name
         return None
 
+    @property
+    def has_export_data(self):
+        from osf.models import ExportData
+        return self.exportdata_set.filter(status__in=ExportData.EXPORT_DATA_AVAILABLE).exists()
+
+    @property
+    def location_ids_has_exported_data(self):
+        from osf.models import ExportData
+        locations = self.exportdata_set.filter(status__in=ExportData.EXPORT_DATA_AVAILABLE)
+        return list(locations.values_list('location_id', flat=True).distinct('location_id'))
+
 
 class UserSettings(BaseUserSettings):
     default_region = models.ForeignKey(Region, null=True, on_delete=models.CASCADE)
@@ -560,7 +566,7 @@ class UserSettings(BaseUserSettings):
 
     def set_region(self, region_id):
         try:
-            region = Region.objects.get(id=region_id)
+            region = Region.objects.get(_id=region_id)
         except Region.DoesNotExist:
             raise ValueError('Region cannot be found.')
 
@@ -571,15 +577,25 @@ class UserSettings(BaseUserSettings):
 
 class NodeSettings(BaseNodeSettings, BaseStorageAddon):
     # Required overrides
-    complete = True
-    has_auth = True
+    @property
+    def complete(self):
+        # GRDM-37149: Hide osfstorage for institutional provider
+        return self.has_auth
+
+    @property
+    def has_auth(self):
+        # GRDM-37149: Hide osfstorage for institutional provider
+        from addons.base import institutions_utils
+        region_disabled, _ = institutions_utils.get_region_provider(self.owner)
+        if region_disabled:
+            # hide osfstorage
+            return False
+        return True
 
     root_node = models.ForeignKey(OsfStorageFolder, null=True, blank=True, on_delete=models.CASCADE)
 
     region = models.ForeignKey(Region, null=True, on_delete=models.CASCADE)
     user_settings = models.ForeignKey(UserSettings, null=True, blank=True, on_delete=models.CASCADE)
-    owner = models.ForeignKey(AbstractNode, related_name='%(app_label)s_node_settings',
-                              null=True, blank=True, on_delete=models.CASCADE)
 
     @property
     def folder_name(self):
@@ -635,6 +651,10 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
         return clone, None
 
     def serialize_waterbutler_settings(self):
+        # GRDM-37149: Hide osfstorage for institutional provider
+        if not self.has_auth:
+            raise AddonError('{} is not configured'.format(
+                self.config.short_name))
         return dict(Region.objects.get(id=self.region_id).waterbutler_settings, **{
             'nid': self.owner._id,
             'rootId': self.root_node._id,
@@ -647,13 +667,17 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
         })
 
     def serialize_waterbutler_credentials(self):
+        # GRDM-37149: Hide osfstorage for institutional provider
+        if not self.has_auth:
+            raise AddonError('{} is not configured'.format(
+                self.config.short_name))
         return Region.objects.get(id=self.region_id).waterbutler_credentials
 
     def create_waterbutler_log(self, auth, action, metadata):
         params = {
             'node': self.owner._id,
             'project': self.owner.parent_id,
-            'region': self.region.id,
+
             'path': metadata['materialized'],
         }
 

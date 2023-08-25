@@ -619,6 +619,7 @@ function doItemOp(operation, to, from, rename, conflict) {
         return;
     }
 
+    var origFrom = Object.assign({}, from);
     if (operation === OPERATIONS.COPY) {
         from = tb.createItem($.extend(true, {status: operation.status}, from.data), to.id);
     } else {
@@ -711,6 +712,7 @@ function doItemOp(operation, to, from, rename, conflict) {
         }
         // no need to redraw because fangornOrderFolder does it
         orderFolder.call(tb, from.parent());
+        resolveconfigOption.call(tb, from, 'onMoveComplete', [from, origFrom, to, moveSpec]);
     }).fail(function(xhr, textStatus) {
         if (to.data.provider === from.provider) {
             tb.pendingFileOps.pop();
@@ -2038,8 +2040,6 @@ function _loadTopLevelChildren() {
     for (i = 0; i < this.treeData.children.length; i++) {
         this.updateFolder(null, this.treeData.children[i]);
     }
-    this.select('#tb-tbody > .tb-modal-shade').hide();
-    this.select('#tb-tbody').css('overflow', '');
 }
 
 /**
@@ -2179,8 +2179,7 @@ function setCurrentFileID(tree, nodeID, file) {
     } else if (tb.fangornFolderIndex !== undefined && tb.fangornFolderArray !== undefined && tb.fangornFolderIndex < tb.fangornFolderArray.length) {
         for (var j = 0; j < tree.children.length; j++) {
             child = tree.children[j];
-            var isSelectedItem = child.data.id.includes(file.id);
-            if (nodeID === child.data.nodeId && child.data.provider === file.provider && isSelectedItem) {
+            if (nodeID === child.data.nodeId && child.data.provider === file.provider && child.data.name === tb.fangornFolderArray[tb.fangornFolderIndex]) {
                 tb.fangornFolderIndex++;
                 if (child.data.kind === 'folder') {
                     tb.updateFolder(null, child);
@@ -3253,6 +3252,9 @@ function fetchData(tree) {
                                 self.options.lazyLoadError.call(self, tree);
                             } else {
                                 if (self.options.lazyLoadPreprocess) {
+                                    if(!value.hasOwnProperty('next_token')){
+                                        tree.next_token = null;
+                                    }
                                     value = self.options.lazyLoadPreprocess.call(self, value);
                                 }
                                 if (!$.isArray(value)) {
@@ -3437,7 +3439,6 @@ tbOptions = {
         var displaySize;
         var msgText;
         var quota;
-        var storage_quota;
         if (_fangornCanDrop(treebeard, item)) {
             if (item.data.accept && item.data.accept.maxSize) {
                 size = file.size / 1000000;
@@ -3453,26 +3454,20 @@ tbOptions = {
                 }
             }
             if (item.data.provider === 'osfstorage') {
-                storage_quota = $.ajax({
-                    async: false,
-                    method: 'GET',
-                    url: item.data.nodeApiUrl + item.data.path.replaceAll('/', '') + '/get_institution_storage_quota/'
-                });
                 quota = $.ajax({
                     async: false,
                     method: 'GET',
                     url: item.data.nodeApiUrl + 'get_creator_quota/'
                 });
-                if (quota.responseJSON || storage_quota.responseJSON) {
+                if (quota.responseJSON) {
                     quota = quota.responseJSON;
-                    storage_quota = storage_quota.responseJSON;
-                    if (quota.used + file.size > quota.max || storage_quota.used + file.size > storage_quota.max) {
+                    if (quota.used + file.size > quota.max) {
                         msgText = gettext('Not enough quota to upload the file.');
                         item.notify.update(msgText, 'warning', undefined, 3000);
                         addFileStatus(treebeard, file, false, msgText, '');
                         return false;
                     }
-                    if (quota.used + file.size > quota.max * window.contextVars.threshold || storage_quota.used + file.size > storage_quota.max * window.contextVars.threshold) {
+                    if (quota.used + file.size > quota.max * window.contextVars.threshold) {
                         $osf.growl(
                             gettext('Quota usage alert'),
                             sprintf(gettext('You have used more than %1$s% of your quota.'),(window.contextVars.threshold * 100)),
@@ -3499,7 +3494,7 @@ tbOptions = {
         clickable : '#treeGrid',
         addRemoveLinks : false,
         previewTemplate : '<div></div>',
-        parallelUploads : 5,
+        parallelUploads : 1,
         acceptDirectories : false,
         createImageThumbnails : false,
         fallback: function(){},
