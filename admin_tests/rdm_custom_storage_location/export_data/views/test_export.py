@@ -17,7 +17,8 @@ from osf_tests.factories import (
     ExportDataLocationFactory,
     AuthUserFactory,
     RegionFactory,
-    ExportDataFactory,
+    ExportDataFactory, RegionFactoryInstitutionalAddon,
+    ExternalAccountFactory
 )
 from tests.base import AdminTestCase
 
@@ -82,6 +83,28 @@ class TestCheckStateExportDataActionView(AdminTestCase):
             with mock.patch('admin.rdm_custom_storage_location.export_data.views.export.ExportData.objects', mock_obj):
                 with mock.patch('admin.rdm_custom_storage_location.export_data.views.export.AbortableAsyncResult', mock_task):
                     response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 200)
+
+    def test_post_success_addon(self):
+        self.request.data = {
+            'task_id': 100,
+        }
+        mock_obj = mock.MagicMock()
+        mock_class = mock.MagicMock()
+        mock_task = mock.MagicMock()
+        fake_task = FakeTask('completed', 'OK')
+        mock_task.return_value = fake_task
+        mock_obj.filter.return_value.exists.return_value = ExportDataFactory()
+        mock_source = RegionFactoryInstitutionalAddon()
+        mock_class.return_value = self.institution.id, mock_source, self.location.id
+        mock_addon_option_object = mock.MagicMock()
+        mock_addon_option_object.return_value.external_accounts.return_value.first.return_value = ExternalAccountFactory()
+        with mock.patch('admin.rdm_custom_storage_location.export_data.views.export.ExportDataBaseActionView.extract_input', mock_class):
+            with mock.patch('admin.rdm_custom_storage_location.export_data.views.export.ExportData.objects', mock_obj):
+                with mock.patch('admin.rdm_custom_storage_location.export_data.views.export.AbortableAsyncResult', mock_task):
+                    with mock.patch('admin.rdm_custom_storage_location.export_data.views.export.get_rdm_addon_option',
+                                    mock_addon_option_object):
+                        response = self.view.post(self.request)
         nt.assert_equal(response.status_code, 200)
 
     def test_post_error(self):
