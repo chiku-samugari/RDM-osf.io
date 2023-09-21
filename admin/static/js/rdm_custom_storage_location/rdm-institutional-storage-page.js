@@ -18,7 +18,7 @@ var preload_accounts_type2 = ['nextcloudinstitutions',
                 's3compatinstitutions']
 // delay time to show growl box; in millisecond
 var growlBoxDelay = 5000;
-var intervalCheckStatus = 5000;
+var intervalCheckStatus = 10000;
 var list_file_info_export_fail = [];
 var list_file_info_restore_fail = [];
 var file_name_export_fail = '';
