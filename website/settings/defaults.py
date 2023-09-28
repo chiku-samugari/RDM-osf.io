@@ -28,7 +28,7 @@ STATIC_URL_PATH = '/static'
 ASSET_HASH_PATH = os.path.join(APP_PATH, 'webpack-assets.json')
 ROOT = os.path.join(BASE_PATH, '..')
 BCRYPT_LOG_ROUNDS = 12
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.DEBUG
 TEST_ENV = False
 
 RECURSION_LIMIT = 2000  # [GRDM-9050, GRDM-16889]
