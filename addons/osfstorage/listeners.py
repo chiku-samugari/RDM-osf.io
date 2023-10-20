@@ -45,8 +45,10 @@ def delete_files_task(node_id):
         Guid = apps.get_model('osf.Guid')
         OsfStorageFolder = apps.get_model('osf.OsfStorageFolder')
         guid = Guid.objects.filter(_id=node_id).values('content_type_id', 'object_id').get()
-        OsfStorageFolder.objects.get(
+        root_folders = OsfStorageFolder.objects.filter(
             target_object_id=guid['object_id'],
             target_content_type=guid['content_type_id'],
             is_root=True
-        ).delete(save=True)
+        )
+        for root_folder in root_folders:
+            root_folder.delete(save=True)

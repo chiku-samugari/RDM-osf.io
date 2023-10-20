@@ -4,11 +4,11 @@ from django.db import migrations
 from osf.utils.migrations import UpdateRegistrationSchemasAndSchemaBlocks
 
 def make_egap_active_but_invisible(state, schema):
-        RegistrationSchema = state.get_model('osf', 'registrationschema')
-        egap_registration = RegistrationSchema.objects.get(name='EGAP Registration', schema_version=2)
-        egap_registration.visible = False
-        egap_registration.active = True
-        egap_registration.save()
+    RegistrationSchema = state.get_model('osf', 'registrationschema')
+    egap_registration = RegistrationSchema.objects.get(name='EGAP Registration', schema_version=2)
+    egap_registration.visible = False
+    egap_registration.active = True
+    egap_registration.save()
 
 def noop(*args, **kwargs):
     pass

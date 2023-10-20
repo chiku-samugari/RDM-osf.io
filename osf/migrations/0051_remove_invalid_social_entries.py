@@ -19,10 +19,10 @@ def remove_invalid_social_entries(state, *args, **kwargs):
 
     for user in targets:
         for invalid_key in set(user.social.keys()) - set(osfuser.SOCIAL_FIELDS.keys()):
-                logger.warn(str(dir(user)))
-                user.social.pop(invalid_key)
-                logger.info('User ID {0}: dropped social: {1}'.format(user.id, invalid_key))
-                user.save()
+            logger.warn(str(dir(user)))
+            user.social.pop(invalid_key)
+            logger.info('User ID {0}: dropped social: {1}'.format(user.id, invalid_key))
+            user.save()
 
     logger.info('Invalid social entry removal completed.')
 

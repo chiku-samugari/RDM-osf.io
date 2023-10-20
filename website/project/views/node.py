@@ -64,8 +64,8 @@ from addons.jupyterhub.utils import serialize_jupyterhub_widget
 from addons.iqbrims.utils import serialize_iqbrims_widget
 from admin.rdm_addons.utils import validate_rdm_addons_allowed
 from api.base import settings as api_settings
-from website.util import quota
 from osf.models.project_storage_type import ProjectStorageType
+from website.util.quota import recalculate_used_quota_by_user
 
 
 from nii.mapcore_api import MAPCoreException
@@ -408,7 +408,11 @@ def serialize_addons(node, auth):
         config['default'] = addon.short_name in settings.ADDONS_DEFAULT
 
         if node.has_addon(addon.short_name):
-            node_json = node.get_addon(addon.short_name).to_json(auth.user)
+            node_json = {}
+            if addon.short_name == 'osfstorage':
+                node_json = node.get_first_addon(addon.short_name).to_json(auth.user)
+            else:
+                node_json = node.get_addon(addon.short_name).to_json(auth.user)
             config.update(node_json)
 
         if addon.short_name in addons_allowed:
@@ -697,7 +701,8 @@ def component_remove(auth, node, **kwargs):
         contributor_ids = Contributor.objects.filter(node=node).values_list('user', flat=True)
         user_list = OSFUser.objects.filter(id__in=contributor_ids)
         for user in user_list:
-            quota.update_user_used_quota(user, storage_type=storage_type)
+            # Update used quota for user-per-storage after removing the project
+            recalculate_used_quota_by_user(user._id, storage_type=storage_type)
 
     id = '{}_deleted'.format(node.project_or_component)
     status.push_status_message(message, kind='success', trust=False, id=id)
@@ -837,9 +842,6 @@ def _view_project(node, auth, primary=False,
             for message in messages:
                 status.push_status_message(message, kind='info', dismissible=False, trust=True)
     NodeRelation = apps.get_model('osf.NodeRelation')
-    max_quota, used_quota = quota.get_quota_info(
-        node.creator, quota.get_project_storage_type(node)
-    )
     is_registration = node.is_registration
     timestamp_pattern = get_timestamp_pattern_division(auth, node)
     data = {
@@ -849,8 +851,6 @@ def _view_project(node, auth, primary=False,
             'title': sanitize.unescape_entities(node.title),
             'category': node.category_display,
             'category_short': node.category,
-            'used_quota': used_quota,
-            'max_quota': max_quota * api_settings.SIZE_UNIT_GB,
             'threshold': api_settings.WARNING_THRESHOLD,
             'node_type': node.project_or_component,
             'description': node.description or '',

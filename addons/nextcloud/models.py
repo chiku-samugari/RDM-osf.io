@@ -115,6 +115,7 @@ class NodeSettings(BaseOAuthNodeSettings, BaseStorageAddon):
         if not self.folder_id:
             raise exceptions.AddonError('Nextcloud is not configured')
         return {
+            'nid': self.owner._id,
             'folder': self.folder_id,
             'verify_ssl': USE_SSL
         }
@@ -169,7 +170,7 @@ class NodeSettings(BaseOAuthNodeSettings, BaseStorageAddon):
 
         ret = []
         for item in c.list(path):
-            if item.file_type is 'dir':
+            if item.file_type == 'dir':
                 ret.append({
                     'addon': 'nextcloud',
                     'path': item.path,

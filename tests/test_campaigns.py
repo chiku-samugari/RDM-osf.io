@@ -10,7 +10,7 @@ from website.util.metrics import provider_source_tag
 from osf_tests import factories
 from tests.base import OsfTestCase
 from tests.utils import mock_auth
-
+from future.moves.urllib.parse import unquote
 
 def set_preprint_providers():
     """Populate `PreprintProvider` to test database for testing."""
@@ -261,7 +261,7 @@ class TestCampaignsCASInstitutionLogin(OsfTestCase):
     def test_institution_logged_in(self):
         resp = self.app.get(self.url_login)
         assert_equal(resp.status_code, http_status.HTTP_302_FOUND)
-        assert_in(self.service_url, resp.headers['Location'])
+        assert_in(self.service_url, unquote(resp.headers['Location']))
         # register behave the same as login
         resp2 = self.app.get(self.url_register)
         assert_equal(resp.headers['Location'], resp2.headers['Location'])

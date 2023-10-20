@@ -3,7 +3,8 @@
 formatted hgrid list/folders.
 """
 import logging
-
+import re
+import traceback
 from django.utils import timezone
 
 from framework import sentry
@@ -17,6 +18,7 @@ from website.util import paths
 from website.settings import DISK_SAVING_MODE
 from osf.utils import sanitize
 from osf.utils.permissions import WRITE_NODE
+from api.base import settings as api_settings
 
 
 logger = logging.getLogger(__name__)
@@ -71,6 +73,8 @@ def build_addon_root(node_settings, name, permissions=None,
 
     """
     from osf.utils.permissions import check_private_key_for_anonymized_link
+    from addons.osfstorage.models import Region
+    from api.base.settings import ADDON_METHOD_PROVIDER
 
     permissions = permissions or DEFAULT_PERMISSIONS
     if name and not check_private_key_for_anonymized_link(private_key):
@@ -83,6 +87,7 @@ def build_addon_root(node_settings, name, permissions=None,
         urls = default_urls(node_settings.owner.api_url, node_settings.config.short_name)
 
     forbid_edit = DISK_SAVING_MODE if node_settings.config.short_name == 'osfstorage' else False
+    auth = None
     if isinstance(permissions, Auth):
         auth = permissions
         permissions = {
@@ -116,11 +121,42 @@ def build_addon_root(node_settings, name, permissions=None,
         'nodeUrl': node_settings.owner.url,
         'nodeApiUrl': node_settings.owner.api_url,
     }
+
+    if node_settings.config.short_name == 'osfstorage':
+        # Add path for root institutional storage folder
+        ret.update({'path': '{}/'.format(node_settings.root_node._id)})
+    elif node_settings.config.short_name in ADDON_METHOD_PROVIDER:
+        # Add path for root institutional storage folder
+        ret.update({'path': '{}/'.format(node_settings.root_node._id)})
+
     ret.update(kwargs)
 
     if hasattr(node_settings, 'region'):
         ret.update({'nodeRegion': node_settings.region.name})
         ret.update({'waterbutlerURL': node_settings.region.waterbutler_url})
+        is_readonly = check_authentication_attribute(user,
+                                                     node_settings.region.readonly_expression,
+                                                     node_settings.region.is_readonly)
+        if is_readonly:
+            ret.update({'permissions': {
+                'view': True,
+                'edit': False
+            }})
+    else:
+        if node_settings.config.short_name in ADDON_METHOD_PROVIDER and isinstance(auth, Auth):
+            institution = auth.user.affiliated_institutions.first()
+            region = Region.objects.filter(
+                _id=institution._id,
+                waterbutler_settings__storage__provider=node_settings.config.short_name
+            ).first()
+            is_readonly = check_authentication_attribute(auth.user,
+                                                         region.readonly_expression,
+                                                         region.is_readonly)
+            if is_readonly:
+                ret.update({'permissions': {
+                    'view': True,
+                    'edit': False
+                }})
 
     return ret
 
@@ -248,13 +284,61 @@ class NodeFileCollector(object):
         return self._serialize_node(node, children=data)
 
     def _collect_addons(self, node):
+        from addons.osfstorage.models import Region
         rv = []
+        region_disabled = False
+        region_provider = None
+        region_provider_set = set()
+        osf_addons = node.get_osfstorage_addons()
+        data = {}
+        institution_id = None
+        for osf_addon in osf_addons:
+            logger.debug(f'osf_addon is {osf_addon}')
+            region = osf_addon.region
+            institution_id = region._id
+            if region and region.waterbutler_settings:
+                region_disabled = region.waterbutler_settings.get(
+                    'disabled', False)
+                storage = region.waterbutler_settings.get('storage', None)
+                if storage:
+                    region_provider = storage.get('provider', None)
+                    region_provider_set.add(region_provider)
+            region.is_allowed = check_authentication_attribute(self.auth.user,
+                                                               region.allow_expression,
+                                                               region.is_allowed)
+            data[osf_addon.id] = {
+                'region_disabled': region_disabled,
+                'region_provider': region_provider,
+                'is_allowed': region.is_allowed,
+            }
         for addon in node.get_addons():
             if addon.config.has_hgrid_files:
+                # skip storage
+                if addon.short_name == 'osfstorage' and (data[addon.id]['region_disabled'] or not data[addon.id]['is_allowed']):
+                    continue  # skip (hide osfstorage)
+                if addon.config.for_institutions:
+                    if addon.config.short_name not in region_provider_set:
+                        continue  # skip (hide this *institutions)
+                    if institution_id is not None:
+                        if addon.short_name != 'osfstorage':
+                            region = Region.objects.filter(id=addon.region.id).first()
+                            logger.debug(f'region is {region}')
+                        else:
+                            region = Region.objects.filter(
+                                _id=institution_id,
+                                waterbutler_settings__storage__provider=addon.short_name).first()
+                        if region is not None:
+                            region.is_allowed = check_authentication_attribute(self.auth.user,
+                                                                               region.allow_expression,
+                                                                               region.is_allowed)
+                            if not region.is_allowed:
+                                continue
+                # temp = addon.config.get_hgrid_data(addon, self.auth, **self.extra)
                 # WARNING: get_hgrid_data can return None if the addon is added but has no credentials.
                 try:
                     temp = addon.config.get_hgrid_data(addon, self.auth, **self.extra)
                 except Exception as e:
+                    traceback.print_exc()
                     logger.warn(
                         getattr(
                             e,
@@ -325,3 +409,71 @@ def delta_date(d):
     diff = d - timezone.now()
     s = diff.total_seconds()
     return s
+
+
+def check_authentication_attribute(user, expression, is_enabled):
+    """Check authentication attribute for user
+
+    :param Object user: user use institutional storage
+    :param str expression: logical expression
+    :param bool is_enabled: turn on or off
+    :return bool: user satisfy condition or note
+
+    """
+
+    from osf.models import AuthenticationAttribute, InstitutionEntitlement, UserExtendedData
+    institution = user.affiliated_institutions.first()
+    if institution:
+        if institution.is_authentication_attribute:
+            if is_enabled and expression:
+                indexes = re.findall(r'\d+', expression)
+                indexes = [int(i) for i in indexes]
+                sorted(indexes, reverse=True)
+                extended_data = UserExtendedData.objects.filter(user=user).first()
+                for index in indexes:
+                    attribute = AuthenticationAttribute.objects.get(
+                        institution=institution, index_number=index, is_deleted=False
+                    )
+                    result = 'False'
+                    if attribute:
+                        try:
+                            attribute_name = api_settings.ATTRIBUTE_LIST[attribute.attribute_name]
+                            value = attribute.attribute_value
+                            if attribute.attribute_name == 'eduPersonAffiliation':
+                                jobs = getattr(user, attribute_name)
+                                for job in jobs:
+                                    if value in job['title']:
+                                        result = 'True'
+                                        break
+                            elif attribute.attribute_name == 'eduPersonOrcid':
+                                social = getattr(user, attribute_name)
+                                if value in social['orcid']:
+                                    result = 'True'
+                            elif attribute.attribute_name == 'eduPersonScopedAffiliation':
+                                entitlement_list = InstitutionEntitlement.objects.filter(institution=institution)
+                                for item in entitlement_list:
+                                    if value in item.entitlement:
+                                        result = 'True'
+                                        break
+                            elif hasattr(user, attribute_name):
+                                if value in str(getattr(user, attribute_name)):
+                                    result = 'True'
+                            else:
+                                if extended_data is not None:
+                                    data = extended_data.data['idp_attr'][attribute_name]
+                                    if value in data:
+                                        result = 'True'
+                        except KeyError:
+                            result = 'False'
+                        except AttributeError:
+                            result = 'False'
+                    expression = expression.replace(str(index), result)
+                try:
+                    if eval(expression
+                            .replace('&&', ' and ')
+                            .replace('||', ' or ')
+                            .replace('!', ' not ')) is False:
+                        return False
+                except SyntaxError:
+                    return False
+    return is_enabled

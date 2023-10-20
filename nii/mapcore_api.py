@@ -93,10 +93,10 @@ class MAPCoreException(Exception):
             super(MAPCoreException, self).__init__(
                 'ext_message={}'.format(ext_message))
         else:
-                super(MAPCoreException, self).__init__(
-                    'http_status_code={}, api_error_code={}, message={}, ext_message={}'.format(
-                        mapcore.http_status_code, mapcore.api_error_code,
-                        mapcore.error_message, ext_message))
+            super(MAPCoreException, self).__init__(
+                'http_status_code={}, api_error_code={}, message={}, ext_message={}'.format(
+                    mapcore.http_status_code, mapcore.api_error_code,
+                    mapcore.error_message, ext_message))
 
     def listing_group_member_is_not_permitted(self):
         if self.mapcore.api_error_code == 206 and \

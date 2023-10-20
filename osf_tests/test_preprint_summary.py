@@ -1,7 +1,8 @@
 import datetime
+import logging
 
 from osf_tests.factories import PreprintFactory, PreprintProviderFactory
-from osf.models import Preprint
+from osf.models import Preprint, PreprintProvider
 import mock
 import pytest
 import pytz
@@ -36,7 +37,7 @@ pytestmark = pytest.mark.django_db
 class TestPreprintCount:
 
     def test_get_preprint_count(self, preprint, date):
-
+        logging.debug(f'PreprintProvider count: {PreprintProvider.objects.count()}')
         requests.post = mock.MagicMock()
         resp = requests.Response()
         resp._content = b'{"hits" : {"total" : 1}}'

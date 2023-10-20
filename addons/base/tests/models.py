@@ -387,7 +387,10 @@ class OAuthAddonNodeSettingsTestSuiteMixin(OAuthAddonModelTestSuiteMixinBase):
 
     def test_serialize_settings(self):
         settings = self.node_settings.serialize_waterbutler_settings()
-        expected = {'folder': self.node_settings.folder_id}
+        expected = {
+            'nid': self.node._id,
+            'folder': self.node_settings.folder_id,
+        }
         assert_equal(settings, expected)
 
     def test_serialize_settings_not_configured(self):

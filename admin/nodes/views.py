@@ -196,7 +196,7 @@ class NodeDeleteView(PermissionRequiredMixin, NodeDeleteBase):
                 contributor_ids = Contributor.objects.filter(node=node).values_list('user', flat=True)
                 user_list = OSFUser.objects.filter(id__in=contributor_ids)
                 for user in user_list:
-                    quota.update_user_used_quota(user, storage_type=storage_type)
+                    quota.recalculate_used_quota_by_user(user._id, storage_type=storage_type)
 
         except AttributeError:
             return page_not_found(
@@ -524,7 +524,9 @@ class RestartStuckRegistrationsView(StuckRegistrationsView):
         stuck_reg = self.get_object()
         if verify(stuck_reg):
             try:
-                archive(stuck_reg)
+                # Get region id from query params
+                region_id = self.request.GET.get('region', None)
+                archive(stuck_reg, region_id)
                 messages.success(request, 'Registration archive processes has restarted')
             except Exception as exc:
                 messages.error(request, 'This registration cannot be unstuck due to {} '

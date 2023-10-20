@@ -1,3 +1,17 @@
+from addons.osfstorage import models
+from osf import models as osf_models
+import logging
+logger = logging.getLogger(__name__)
+
+def get_parent_id(parent):
+    parent_id = None
+    if parent.is_root:
+        parent_id = parent.id
+    else:
+        parent = osf_models.BaseFileNode.objects.filter(id=parent.parent_id, deleted_on__isnull=True).first()
+        if parent:
+            parent_id = get_parent_id(parent)
+    return parent_id
 
 def copy_files(src, target_node, parent=None, name=None):
     """Copy the files from src to the target node
@@ -18,12 +32,18 @@ def copy_files(src, target_node, parent=None, name=None):
     if src.is_file and src.versions.exists():
         fileversions = src.versions.select_related('region').order_by('-created')
         most_recent_fileversion = fileversions.first()
-        if most_recent_fileversion.region and most_recent_fileversion.region != target_node.osfstorage_region:
+        parent_id = get_parent_id(parent)
+        osfstorage_region = target_node.osfstorage_region
+        osfstorage_nodesettings = models.NodeSettings.objects.filter(owner_id=target_node.id, is_deleted=False, root_node_id=parent_id).first()
+        if osfstorage_nodesettings:
+            osfstorage_region = osfstorage_nodesettings.region
+        if most_recent_fileversion.region and most_recent_fileversion.region != osfstorage_region:
             # add all original version except the most recent
             attach_versions(cloned, fileversions[1:], src)
             # create a new most recent version and update the region before adding
             new_fileversion = most_recent_fileversion.clone()
-            new_fileversion.region = target_node.osfstorage_region
+            new_fileversion.region = osfstorage_region
+            new_fileversion.creator = most_recent_fileversion.creator
             new_fileversion.save()
             attach_versions(cloned, [new_fileversion], src)
         else:

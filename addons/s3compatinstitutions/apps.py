@@ -1,9 +1,9 @@
 import os
-
+import logging
 from addons.base.apps import BaseAddonAppConfig
 from website.util import rubeus
 from addons.s3compatinstitutions.settings import MAX_UPLOAD_SIZE
-
+logger = logging.getLogger(__name__)
 FULL_NAME = 'S3 Compatible Storage for Institutions'
 SHORT_NAME = 's3compatinstitutions'
 LONG_NAME = 'addons.{}'.format(SHORT_NAME)
@@ -17,13 +17,15 @@ TEMPLATE_PATH = os.path.join(
 
 def s3compatinstitutions_root(addon_config, node_settings, auth, **kwargs):
     from addons.osfstorage.models import Region
-    # GRDM-37149: Hide deactivated institutional storage
-    if not node_settings.complete:
-        return None
+
     node = node_settings.owner
     institution = node_settings.addon_option.institution
     if Region.objects.filter(_id=institution._id).exists():
-        region = Region.objects.get(_id=institution._id)
+        region = Region.objects.filter(
+            _id=institution._id,
+            waterbutler_settings__storage__provider=SHORT_NAME,
+            id=node_settings.region.id
+        ).first()
         if region:
             node_settings.region = region
     root = rubeus.build_addon_root(

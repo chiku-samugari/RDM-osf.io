@@ -307,7 +307,8 @@ class TestCASExternalLogin(OsfTestCase):
         assert_true(mock_get_user_from_cas_resp.call_count, 1)
         assert_equal(resp.status_code, 302)
         assert_in('/logout?service=', resp.headers['Location'])
-        assert_in('/login?service=', resp.headers['Location'])
+        #assert_in('/login?service=', resp.headers['Location'])
+        assert_in('%2Flogin%3Fservice%3D', resp.headers['Location'])
 
     @mock.patch('framework.auth.cas.get_user_from_cas_resp')
     @mock.patch('framework.auth.cas.CasClient.service_validate')

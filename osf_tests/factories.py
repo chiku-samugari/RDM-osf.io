@@ -31,6 +31,8 @@ from osf.utils.names import impute_names_model
 from osf.utils.workflows import DefaultStates, DefaultTriggers
 from addons.base.institutions_utils import KEYNAME_BASE_FOLDER
 from addons.osfstorage.models import OsfStorageFile, Region
+from api.base import settings as api_settings
+
 
 settings = apps.get_app_config('addons_osfstorage')
 fake = Factory.create()
@@ -50,6 +52,20 @@ def FakeList(provider, n, *args, **kwargs):
     return [func(*args, **kwargs) for _ in range(n)]
 
 
+class InstitutionFactory(DjangoModelFactory):
+    _id = factory.Sequence(lambda n: 'us_east_{0}'.format(n))
+    name = factory.Faker('company')
+    login_url = factory.Faker('url')
+    logout_url = factory.Faker('url')
+    domains = FakeList('url', n=3)
+    email_domains = FakeList('domain_name', n=1)
+    logo_name = factory.Faker('file_name')
+    is_authentication_attribute = True
+
+    class Meta:
+        model = models.Institution
+
+
 class UserFactory(DjangoModelFactory):
     # TODO: Change this to only generate long names and see what breaks
     fullname = factory.Sequence(lambda n: 'Freddie Mercury{0}'.format(n))
@@ -59,6 +75,8 @@ class UserFactory(DjangoModelFactory):
                                                 'queenfan86')
     is_registered = True
     date_confirmed = factory.Faker('date_time_this_decade', tzinfo=pytz.utc)
+    date_registered = factory.Faker('date_time_this_decade', tzinfo=pytz.utc)
+    created = factory.Faker('date_time_this_decade', tzinfo=pytz.utc)
     merged_by = None
     verification_key = None
 
@@ -75,6 +93,9 @@ class UserFactory(DjangoModelFactory):
             instance.save()
         for email in emails:
             instance.emails.create(address=email)
+        instance.password = 'queenfan86'
+        instance.save()
+        #instance.affiliated_institutions = [InstitutionFactory()]
         return instance
 
     @classmethod
@@ -87,6 +108,8 @@ class UserFactory(DjangoModelFactory):
             instance.save()
         for email in emails:
             instance.emails.create(address=email)
+        instance.password = 'queenfan86'
+        instance.save()
         return instance
 
     @factory.post_generation
@@ -252,18 +275,6 @@ class NodeFactory(BaseNodeFactory):
     parent = factory.SubFactory(ProjectFactory)
 
 
-class InstitutionFactory(DjangoModelFactory):
-    name = factory.Faker('company')
-    login_url = factory.Faker('url')
-    logout_url = factory.Faker('url')
-    domains = FakeList('url', n=3)
-    email_domains = FakeList('domain_name', n=1)
-    logo_name = factory.Faker('file_name')
-
-    class Meta:
-        model = models.Institution
-
-
 class InstitutionEntitlementFactory(DjangoModelFactory):
     entitlement = factory.Faker('name')
 
@@ -278,6 +289,24 @@ class InstitutionEntitlementFactory(DjangoModelFactory):
 
         return super(InstitutionEntitlementFactory, cls)._create(target_class, institution=institution, login_availability=login_availability,
                                                                  modifier=modifier, *args, **kwargs)
+
+
+class AuthenticationAttributeFactory(DjangoModelFactory):
+    class Meta:
+        model = models.AuthenticationAttribute
+
+    @classmethod
+    def _create(cls, target_class, institution=None, index_number=None, attribute_name=None, attribute_value=None,
+                *args, **kwargs):
+        institution = institution or InstitutionFactory()
+        index_number = index_number or api_settings.DEFAULT_INDEX_NUMBER
+        attribute_name = attribute_name
+        attribute_value = attribute_value
+
+        return super(AuthenticationAttributeFactory, cls)._create(target_class, institution=institution,
+                                                                  index_number=index_number,
+                                                                  attribute_name=attribute_name,
+                                                                  attribute_value=attribute_value, *args, **kwargs)
 
 
 class NodeLicenseRecordFactory(DjangoModelFactory):
@@ -1010,7 +1039,7 @@ generic_location = {
 
 generic_waterbutler_settings = {
     'storage': {
-        'provider': 'glowcloud',
+        'provider': 'osfstorage',
         'container': 'osf_storage',
         'use_public': True,
         'bucket': 'bucket test',
@@ -1063,6 +1092,10 @@ class RegionFactory(DjangoModelFactory):
     waterbutler_credentials = generic_waterbutler_credentials
     waterbutler_settings = generic_waterbutler_settings
     waterbutler_url = 'http://123.456.test.woo'
+    is_allowed = True
+    is_readonly = False
+    allow_expression = None
+    readonly_expression = None
 
 
 class ProviderAssetFileFactory(DjangoModelFactory):
@@ -1132,49 +1165,13 @@ class BrandFactory(DjangoModelFactory):
     class Meta:
         model = models.Brand
 
-    name = factory.Faker('company')
+    name = factory.LazyAttribute(lambda n: fake.sentence()[:10])
     hero_logo_image = factory.Faker('url')
     topnav_logo_image = factory.Faker('url')
     hero_background_image = factory.Faker('url')
 
     primary_color = factory.Faker('hex_color')
     secondary_color = factory.Faker('hex_color')
-
-
-class ExportDataLocationFactory(DjangoModelFactory):
-    class Meta:
-        model = models.ExportDataLocation
-
-    institution_guid = factory.Sequence(lambda n: 'us_east_{0}'.format(n))
-    name = factory.Sequence(lambda n: 'Location {0}'.format(n))
-    waterbutler_credentials = generic_waterbutler_credentials
-    waterbutler_settings = generic_waterbutler_settings
-    waterbutler_url = 'http://123.456.test.woo'
-    mfr_url = 'http://123.456.test.woo'
-
-
-class ExportDataFactory(DjangoModelFactory):
-    class Meta:
-        model = models.ExportData
-
-    location = factory.SubFactory(ExportDataLocationFactory)
-    source = factory.SubFactory(RegionFactory)
-    process_start = datetime.datetime.now()
-    is_deleted = False
-    status = models.ExportData.STATUS_COMPLETED
-    creator = factory.SubFactory(UserFactory)
-
-
-class ExportDataRestoreFactory(DjangoModelFactory):
-    class Meta:
-        model = models.ExportDataRestore
-
-    export = factory.SubFactory(ExportDataFactory)
-    destination = factory.SubFactory(RegionFactory)
-    process_start = datetime.datetime.now()
-    status = models.ExportData.STATUS_COMPLETED
-    creator = factory.SubFactory(UserFactory)
-
 
 class ContentTypeFactory(DjangoModelFactory):
     class Meta:
@@ -1224,3 +1221,17 @@ class BaseFileVersionsThroughFactory(DjangoModelFactory):
 class RdmFileTimestamptokenVerifyResultFactory(DjangoModelFactory):
     class Meta:
         model = models.RdmFileTimestamptokenVerifyResult
+
+
+class RegionExtraFactory:
+    def __init__(self, institution_id, name):
+        self.institution_id = institution_id
+        self.name = name
+
+
+class UserQuotaFactory(DjangoModelFactory):
+    class Meta:
+        model = models.UserQuota
+
+    max_quota = 1000000
+    used = 10

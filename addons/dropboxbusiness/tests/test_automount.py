@@ -3,7 +3,9 @@ import unittest
 from mock import patch, Mock
 import pytest
 from nose.tools import *  # noqa (PEP8 asserts)
-
+from framework.auth.core import Auth
+from addons.dropboxbusiness.apps import dropboxbusiness_root
+from tests.base import OsfTestCase
 from admin.rdm_addons.utils import get_rdm_addon_option
 
 from osf_tests.factories import (
@@ -23,7 +25,6 @@ pytestmark = pytest.mark.django_db
 class DropboxBusinessAccountFactory(ExternalAccountFactory):
     provider = 'dropboxbusiness'
 
-SHORT_NAME = 'dropboxbusiness'
 FILEACCESS_NAME = 'dropboxbusiness'
 MANAGEMENT_NAME = 'dropboxbusiness_manage'
 DBXBIZ = 'addons.dropboxbusiness'
@@ -61,19 +62,6 @@ class TestDropboxBusiness(unittest.TestCase):
             mock3.return_value = 'dbmid:dummy'
             mock4.return_value = ('dbtid:dummy', 'g:dummy')
             self.project = ProjectFactory(creator=self.user)
-            self.osfstorage = self.project.get_addon('osfstorage')
-            new_region = RegionFactory(
-                _id=self.institution._id,
-                name='Institutional Storage',
-                waterbutler_settings={
-                    'storage': {
-                        'provider': SHORT_NAME,
-                    },
-                }
-            )
-            self.osfstorage.region = new_region
-            self.osfstorage.save()
-            self.project.save()
 
     def _allowed(self):
         self.f_option.is_allowed = True
@@ -116,5 +104,31 @@ class TestDropboxBusiness(unittest.TestCase):
         assert_equal(result.admin_dbmid, 'dbmid:dummy')
         assert_equal(result.team_folder_id, 'dbtid:dummy')
         assert_equal(result.group_id, 'g:dummy')
+
+class TestAppDropboxbussiness(OsfTestCase):
+    def setUp(self):
+        super(TestAppDropboxbussiness, self).setUp()
+        self.user = AuthUserFactory()
+        self.user.save()
+        self.consolidated_auth = Auth(user=self.user)
+        self.project = ProjectFactory(creator=self.user)
+        self.auth = Auth(user=self.project.creator)
+        self.project.add_addon('dropboxbusiness', auth=self.consolidated_auth)
+        self.node_settings = self.project.get_addon('dropboxbusiness')
+        self.ADDON_SHORT_NAME = 'dropboxbusiness'
+        self.node_settings.save()
+
+    @patch('admin.institutions.views.Region.objects')
+    def test_dropboxbusiness_root(self, mock_region_objects_filter):
+        institution = InstitutionFactory(_id=123456)
+        region = RegionFactory()
+        region._id = institution._id
+        region.waterbutler_settings__storage__provider = self.ADDON_SHORT_NAME
+        self.node_settings.fileaccess_option = get_rdm_addon_option(institution.id, FILEACCESS_NAME)
+        region.save()
+        mock_region_objects_filter.return_value = region
+        mock_region_objects_filter.return_value.exists.return_value = True
+        result = dropboxbusiness_root(addon_config='', node_settings=self.node_settings, auth=self.auth)
+        assert isinstance(result, list)
 
 

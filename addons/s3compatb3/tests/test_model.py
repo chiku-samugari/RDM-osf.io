@@ -200,6 +200,9 @@ class TestNodeSettings(OAuthAddonNodeSettingsTestSuiteMixin, unittest.TestCase):
 
     def test_serialize_settings(self):
         settings = self.node_settings.serialize_waterbutler_settings()
-        expected = {'bucket': self.node_settings.folder_id,
-                    'encrypt_uploads': self.node_settings.encrypt_uploads}
+        expected = {
+            'nid': self.node._id,
+            'bucket': self.node_settings.folder_id,
+            'encrypt_uploads': self.node_settings.encrypt_uploads,
+        }
         assert_equal(settings, expected)

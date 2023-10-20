@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
 
+import logging
+import inspect  # noqa
 import csv
 import pytz
 from furl import furl
@@ -16,6 +18,7 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.core.paginator import Paginator
 
+from api.base.settings import NII_STORAGE_REGION_ID
 from osf.exceptions import UserStateError
 from osf.models.base import Guid
 from osf.models.user import OSFUser
@@ -25,10 +28,10 @@ from osf.models import UserQuota
 from framework.auth import get_user
 from framework.auth.utils import impute_names
 from framework.auth.core import generate_verification_key
-
+from osf.models.user_storage_quota import UserStorageQuota
 from website.mailchimp_utils import subscribe_on_confirm
 from website import search
-from website.util import quota
+from website.util import quota, inspect_info  # noqa
 
 from admin.base.views import GuidView
 from osf.models.admin_log_entry import (
@@ -48,6 +51,12 @@ from admin.users.serializers import serialize_user, serialize_simple_preprint, s
 from admin.users.forms import EmailResetForm, WorkshopForm, UserSearchForm, MergeUserForm, AddSystemTagForm
 from admin.users.templatetags.user_extras import reverse_user
 from website.settings import DOMAIN, OSF_SUPPORT_EMAIL
+from addons.osfstorage.models import Region
+from rest_framework import status as http_status
+from admin.base.utils import reverse_qs
+from framework.exceptions import HTTPError
+
+logger = logging.getLogger(__name__)
 
 
 class UserDeleteView(PermissionRequiredMixin, DeleteView):
@@ -738,7 +747,7 @@ class BaseUserQuotaView(View):
     """Base class for UserQuotaView and UserInstitutionQuotaView.
     """
 
-    def update_quota(self, max_quota, storage_type):
+    def update_quota(self, max_quota, region_id=NII_STORAGE_REGION_ID):
         try:
             max_quota = int(max_quota)
         except (ValueError, TypeError):
@@ -747,11 +756,20 @@ class BaseUserQuotaView(View):
         if max_quota <= 0:
             max_quota = 1
 
-        UserQuota.objects.update_or_create(
-            user=OSFUser.load(self.kwargs.get('guid')),
-            storage_type=storage_type,
-            defaults={'max_quota': max_quota}
-        )
+        if region_id:
+            user = OSFUser.load(self.kwargs.get('guid'))
+            institution = user.affiliated_institutions.first()
+            region = Region.objects.filter(id=int(region_id)).first()
+            if not region or not institution or institution._id != region._id:
+                raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+
+            UserStorageQuota.objects.update_or_create(
+                user=OSFUser.load(self.kwargs.get('guid')),
+                region=region,
+                defaults={'max_quota': max_quota}
+            )
+        else:
+            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
 
 class UserQuotaView(BaseUserQuotaView):
@@ -762,13 +780,13 @@ class UserQuotaView(BaseUserQuotaView):
     raise_exception = True
 
     def post(self, request, *args, **kwargs):
-        self.update_quota(request.POST.get('maxQuota'), UserQuota.NII_STORAGE)
+        self.update_quota(request.POST.get('maxQuota'), region_id=request.POST.get('region_id'))
         return redirect(reverse_user(self.kwargs.get('guid')))
 
 
 class UserDetailsView(RdmPermissionMixin, UserPassesTestMixin, GuidView):
     """
-    User screen for intitution managers.
+    User screen for institution managers.
     """
     template_name = 'users/user_details.html'
     context_object_name = 'current_user'
@@ -779,24 +797,49 @@ class UserDetailsView(RdmPermissionMixin, UserPassesTestMixin, GuidView):
 
     def get_object(self, queryset=None):
         user = OSFUser.load(self.kwargs.get('guid'))
-        max_quota, _ = quota.get_quota_info(user, UserQuota.CUSTOM_STORAGE)
+        region_id = self.request.GET.get('region_id', None)
+        if region_id:
+            institution = user.affiliated_institutions.first()
+            region = Region.objects.filter(id=region_id).first()
+            if region and institution and institution._id == region._id:
+                max_quota, _ = quota.get_storage_quota_info(
+                    user,
+                    region
+                )
+            else:
+                raise Http404
+        else:
+            max_quota, _ = quota.get_quota_info(user, UserQuota.CUSTOM_STORAGE)
         return {
             'username': user.username,
             'name': user.fullname,
             'id': user._id,
             'nodes': list(map(serialize_simple_node, user.contributor_to)),
-            'quota': max_quota
+            'quota': max_quota,
+            'region_id': region_id if region_id is not None else ''
         }
 
 
 class UserInstitutionQuotaView(RdmPermissionMixin, UserPassesTestMixin, BaseUserQuotaView):
     """
-    User screen for intitution managers.
+    User screen for institution managers.
     """
     def test_func(self):
         return not self.is_super_admin and self.is_admin \
             and self.request.user.affiliated_institutions.exists()
 
     def post(self, request, *args, **kwargs):
-        self.update_quota(request.POST.get('maxQuota'), UserQuota.CUSTOM_STORAGE)
-        return redirect('users:user_details', guid=self.kwargs.get('guid'))
+        region_id = request.POST.get('region_id', None)
+
+        self.update_quota(
+            request.POST.get('maxQuota'),
+            region_id
+        )
+
+        return redirect(
+            reverse_qs(
+                'users:user_details',
+                kwargs={'guid': self.kwargs.get('guid')},
+                query_kwargs={'region_id': region_id}
+            )
+        )
