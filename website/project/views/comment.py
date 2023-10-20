@@ -37,8 +37,7 @@ def update_file_guid_referent(self, target, event_type, payload, user=None):
     file_guids = BaseFileNode.resolve_class(source['provider'], BaseFileNode.ANY).get_file_guids(
         materialized_path=source['materialized'] if source['provider'] != 'osfstorage' else source['path'],
         provider=source['provider'],
-        target=source_node,
-        root_path=source['root_path']
+        target=source_node
     )
 
     for guid in file_guids:

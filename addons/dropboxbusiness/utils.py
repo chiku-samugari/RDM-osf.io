@@ -35,7 +35,7 @@ from framework.celery_tasks import app as celery_app
 
 logger = logging.getLogger(__name__)
 
-ENABLE_DEBUG = True
+ENABLE_DEBUG = False
 
 def DEBUG(msg):
     if ENABLE_DEBUG:
@@ -45,7 +45,6 @@ def DEBUG(msg):
 
 if not ENABLE_DEBUG:
     logging.getLogger('dropbox').setLevel(logging.CRITICAL)
-    logging.getLogger(__name__).setLevel(logging.CRITICAL)
 
 def eppn_to_email(eppn):
     return settings.EPPN_TO_EMAIL_MAP.get(eppn, eppn)
@@ -227,42 +226,6 @@ def is_has_team_space(fileaccess_client):
     return has_team_space
 
 
-def get_team_folder_id(team_info, admin_dbmid, team_folder_name):
-    cursor = None
-    has_more = True
-    fclient = team_info.fileaccess_client_team
-    has_team_space = is_has_team_space(fclient)
-    if has_team_space:
-        # Get shared folder
-        fclient_admin = team_info.fileaccess_client_admin
-        res = fclient_admin.users_get_current_account()
-        root_namespace_id = res.root_info.root_namespace_id
-        fclient_pathroot_user = team_info.fileaccess_client_user_with_path_root(admin_dbmid, root_namespace_id)
-        while has_more:
-            if cursor is None:
-                fs = fclient_pathroot_user.sharing_list_folders()
-            else:
-                fs = fclient_pathroot_user.sharing_list_folders_continue(cursor)
-            cursor = getattr(fs, 'cursor', None)
-            has_more = cursor is not None
-            for meta in fs.entries:
-                if meta.name == team_folder_name:
-                    return meta.shared_folder_id
-    else:
-        # Get team folder
-        while has_more:
-            if cursor is None:
-                fs = fclient.team_team_folder_list()
-            else:
-                fs = fclient.team_team_folder_list_continue(cursor)
-            has_more = fs.has_more
-            cursor = fs.cursor
-            for meta in fs.team_folders:
-                if meta.name == team_folder_name:
-                    return meta.team_folder_id
-    return None
-
-
 def create_team_folder(
         fileaccess_token,
         management_token,
@@ -283,7 +246,6 @@ def create_team_folder(
     jobs = []
 
     has_team_space = is_has_team_space(fclient)
-    logger.debug(f'dropboxbusiness group_name: {group_name}')
     if has_team_space:
         team_info = TeamInfo(fileaccess_token, management_token, admin=True)
         fclient_admin = team_info.fileaccess_client_admin
@@ -324,8 +286,7 @@ def create_team_folder(
         else:
             team_folder = fclient.team_team_folder_create(team_folder_name)
             folder_id = team_folder.team_folder_id
-    except Exception as e:
-        logger.debug(f'Exception {e}')
+    except Exception:
         delete_unused_group()
         raise
 
@@ -366,48 +327,24 @@ def create_team_folder(
     return (folder_id, group.get_group_id())
 
 
-def create_two_addon_options(institution_id):
-    # avoid "ImportError: cannot import name"
-    from addons.dropboxbusiness.models import \
-        (DropboxBusinessFileaccessProvider,
-         DropboxBusinessManagementProvider)
-    get_rdm_addon_option(
-        institution_id, DropboxBusinessFileaccessProvider.short_name,
-        create=True, need_create=True)
-    get_rdm_addon_option(
-        institution_id, DropboxBusinessManagementProvider.short_name,
-        create=True, need_create=True)
-
-
 def get_two_addon_options(institution_id, allowed_check=True):
     # avoid "ImportError: cannot import name"
     from addons.dropboxbusiness.models import \
         (DropboxBusinessFileaccessProvider,
          DropboxBusinessManagementProvider)
-    # Note: May be impact when multiple
-    fileaccess_addon_options = get_rdm_addon_option(
+    fileaccess_addon_option = get_rdm_addon_option(
         institution_id, DropboxBusinessFileaccessProvider.short_name,
         create=False)
-    management_addon_options = get_rdm_addon_option(
+    management_addon_option = get_rdm_addon_option(
         institution_id, DropboxBusinessManagementProvider.short_name,
         create=False)
-    if fileaccess_addon_options is None or \
-       management_addon_options is None or \
-       not fileaccess_addon_options.exists():
+    if fileaccess_addon_option is None or \
+       management_addon_option is None:
         return None
-
-    fm_options = []
-    for index, f_option in enumerate(fileaccess_addon_options):
-        if allowed_check and not f_option.is_allowed:
-            continue
-        else:
-            fm_options.append((f_option, management_addon_options[index]))
-
-    if not fm_options:
+    if allowed_check and not fileaccess_addon_option.is_allowed:
         return None
-
     # NOTE: management_addon_option.is_allowed is ignored.
-    return fm_options
+    return (fileaccess_addon_option, management_addon_option)
 
 
 def addon_option_to_token(addon_option):
@@ -420,9 +357,9 @@ def addon_option_to_token(addon_option):
     if not addon_option.external_accounts.exists():
         return None
     if addon_option.provider == 'dropboxbusiness':
-        return DropboxBusinessFileaccessProvider(addon_option.external_accounts.last()).fetch_access_token()
+        return DropboxBusinessFileaccessProvider(addon_option.external_accounts.first()).fetch_access_token()
     elif addon_option.provider == 'dropboxbusiness_manage':
-        return DropboxBusinessManagementProvider(addon_option.external_accounts.last()).fetch_access_token()
+        return DropboxBusinessManagementProvider(addon_option.external_accounts.first()).fetch_access_token()
     else:
         return None
 
@@ -563,7 +500,7 @@ def update_admin_dbmid(team_id):
         group_id_to_name = dict_folder_groups(
             team_info.fileaccess_client_admin,
             addon.team_folder_id)
-        logger.debug('group_id_to_name=' + pf(group_id_to_name))
+        DEBUG('group_id_to_name=' + pf(group_id_to_name))
         admin_name = group_id_to_name.get(admin_group_id)
         if not admin_name:
             logger.info(u'Admin group for the team folder (node={}) is updated. (Because Admin group may be removed from the team folder or settings.ADMIN_GROUP_NAME may be changed.)'.format(addon.owner._id))
@@ -602,7 +539,7 @@ def create_folder(team_info, team_folder_id, path):
     client = team_info.fileaccess_client_admin_with_path_root(team_folder_id)
     try:
         client.files_create_folder(path)
-        logger.debug(u'create folder: {}'.format(path))
+        DEBUG(u'create folder: {}'.format(path))
         return True
     except ApiError:
         logger.exception(u'cannot create a folder: {}'.format(path))
@@ -639,7 +576,7 @@ def copy_folders(team_info, src_addon, src_path, dest_addon, dest_path):
     for child_src_folder in folders:
         folder_name = os.path.basename(child_src_folder.rstrip('/'))
         child_dest_folder = os.path.join(dest_path, folder_name)
-        logger.debug(u'child_src_folder={}, child_dest_folder={}'.format(child_src_folder, child_dest_folder))
+        DEBUG(u'child_src_folder={}, child_dest_folder={}'.format(child_src_folder, child_dest_folder))
         res = create_folder(team_info, dest_team_folder_id, child_dest_folder)
         if res:
             copy_folders(team_info,
@@ -713,7 +650,7 @@ class TeamInfo(object):
                  admin=False, admin_dbmid=None,
                  groups=False,
                  file_properties=False, timestamp=False):
-        logger.debug('init TeamInfo()')
+        DEBUG('init TeamInfo()')
         self.fileaccess_token = fileaccess_token
         self.management_token = management_token
         self.session = dropbox.dropbox.create_session(
@@ -784,7 +721,7 @@ class TeamInfo(object):
     @property
     def fileaccess_client_admin(self):
         self._fileaccess_client_check()
-        logger.debug('Admin: email={}'.format(self.dbmid_to_email[self.admin_dbmid]))
+        DEBUG('Admin: email={}'.format(self.dbmid_to_email[self.admin_dbmid]))
         return self._fileaccess_client.as_admin(self.admin_dbmid)
 
     ### not property
@@ -808,7 +745,7 @@ class TeamInfo(object):
         i = self.management_client.team_get_info()
         self.team_id = i.team_id
         self.name = i.name
-        logger.debug(u'team info(manage): {}: {}'.format(self.team_id, self.name))
+        DEBUG(u'team info(manage): {}: {}'.format(self.team_id, self.name))
 
     def _setup_members(self):
         cursor = None
@@ -837,10 +774,10 @@ class TeamInfo(object):
                 self.email_to_dbmid[p.email] = p.team_member_id
                 self.dbid_to_email[p.account_id] = p.email
 
-        logger.debug('dbmid_to_email: ' + pf(self.dbmid_to_email))
-        logger.debug('dbmid_to_role: ' + pf(self.dbmid_to_role))
-        logger.debug('dbmid_to_dbid: ' + pf(self.dbmid_to_dbid))
-        logger.debug('email_to_dbmid: ' + pf(self.email_to_dbmid))
+        DEBUG('dbmid_to_email: ' + pf(self.dbmid_to_email))
+        DEBUG('dbmid_to_role: ' + pf(self.dbmid_to_role))
+        DEBUG('dbmid_to_dbid: ' + pf(self.dbmid_to_dbid))
+        DEBUG('email_to_dbmid: ' + pf(self.email_to_dbmid))
 
     def _setup_admin(self):
         self.admin_dbmid_all = []
@@ -851,8 +788,8 @@ class TeamInfo(object):
                 email = self.dbmid_to_email.get(dbmid)
                 if email:
                     self.admin_email_all.append(email)
-        logger.debug('admin_dbmid_all: ' + pf(self.admin_dbmid_all))
-        logger.debug('admin_email_all: ' + pf(self.admin_email_all))
+        DEBUG('admin_dbmid_all: ' + pf(self.admin_dbmid_all))
+        DEBUG('admin_email_all: ' + pf(self.admin_email_all))
 
     def _setup_groups(self):
         self.group_name_to_id = {}
@@ -870,8 +807,8 @@ class TeamInfo(object):
             for g in lst.groups:
                 self.group_name_to_id[g.group_name] = g.group_id
                 self.group_id_to_name[g.group_id] = g.group_name
-        logger.debug('group_name_to_id: ' + pf(self.group_name_to_id))
-        logger.debug('group_id_to_name: ' + pf(self.group_id_to_name))
+        DEBUG('group_name_to_id: ' + pf(self.group_name_to_id))
+        DEBUG('group_id_to_name: ' + pf(self.group_id_to_name))
 
     def _update_team_folders(self):
         cursor = None
@@ -941,7 +878,7 @@ class TeamInfo(object):
                 if REMOVE_ALL is False and prop_group.name != prop_group_name:
                     continue
                 # for GRDM
-                logger.debug('remove template: ' + template_id)
+                DEBUG('remove template: ' + template_id)
                 client.file_properties_templates_remove_for_team(template_id)
             res = client.file_properties_templates_list_for_team()
 
@@ -950,14 +887,14 @@ class TeamInfo(object):
             prop_group = client.file_properties_templates_get_for_team(
                 template_id)
             if prop_group.name != prop_group_name:
-                logger.debug('ignored template_id: ' + template_id)
+                DEBUG('ignored template_id: ' + template_id)
                 continue
             # property group for GRDM
-            logger.debug('found template_id: ' + template_id)
+            DEBUG('found template_id: ' + template_id)
             found_template_id = template_id
             for field in prop_group.fields:
                 self.property_fields.add(field.name)
-                # logger.debug('existing prop field: ' + field.name)
+                # DEBUG('existing prop field: ' + field.name)
             break
 
         check_keys = []
@@ -983,36 +920,28 @@ class TeamInfo(object):
                 key, '',
                 dropbox.file_properties.PropertyType.string)
             add_fields.append(f)
-            logger.debug('new prop field: ' + key)
+            DEBUG('new prop field: ' + key)
 
         if found_template_id is None:
-            logger.debug('create new prop fieldss')
+            DEBUG('create new prop fieldss')
             res = client.file_properties_templates_add_for_team(
                 prop_group_name, prop_group_name,
                 add_fields)
             self.property_template_id = res.template_id
         elif len(add_fields) > 0:
-            logger.debug('add prop fields')
+            DEBUG('add prop fields')
             res = client.file_properties_templates_update_for_team(
                 found_template_id, prop_group_name, prop_group_name,
                 add_fields)
             self.property_template_id = res.template_id
         else:
-            logger.debug('not update prop fields: ' + found_template_id)
+            DEBUG('not update prop fields: ' + found_template_id)
             self.property_template_id = found_template_id
 
-        logger.debug('property_template_id: ' + self.property_template_id)
+        DEBUG('property_template_id: ' + self.property_template_id)
 
     def _update_file_properties(self, team_folder_id, path, properties):
-        logger.debug(u'_update_file_properties: team_folder_id={}, path={}'.format(team_folder_id, path))
-        logger.debug(f'org path is {path}')
-        paths = path.strip('/').split('/')
-        paths.pop(0)
-        if path.endswith('/') and len(paths) > 0:
-            path = '/' + '/'.join(paths) + '/'
-        else:
-            path = '/' + '/'.join(paths)
-        logger.debug(f'handle path is {path}')
+        DEBUG(u'_update_file_properties: team_folder_id={}, path={}'.format(team_folder_id, path))
         template_id = self.property_template_id
         old_properties = self._get_file_properties(team_folder_id, path)
         old_properties.update(properties)
@@ -1043,7 +972,7 @@ class TeamInfo(object):
                 key = self._prop_split_key(name, i)
                 field = dropbox.file_properties.PropertyField(key, ensure_str(value))
                 add_or_update_fields.append(field)
-                logger.debug('update property: key={}'.format(key))
+                DEBUG('update property: key={}'.format(key))
 
         # for simple data
         for key in settings.PROPERTY_KEYS:
@@ -1052,7 +981,7 @@ class TeamInfo(object):
                 add_or_update_fields.append(
                     dropbox.file_properties.PropertyField(
                         key, str(value)))
-                logger.debug('update property: key={}'.format(key))
+                DEBUG('update property: key={}'.format(key))
 
         property_groups = [
             dropbox.file_properties.PropertyGroup(
@@ -1062,17 +991,17 @@ class TeamInfo(object):
             self.admin_dbmid, team_folder_id)
         client.file_properties_properties_overwrite(
             path, property_groups)
-        logger.debug(u'file_properties_properties_overwrite(path={}): done'.format(path))
+        DEBUG(u'file_properties_properties_overwrite(path={}): done'.format(path))
 
     def _get_file_properties(self, team_folder_id, path):
-        logger.debug(u'_get_file_properties: team_folder_id={}, path={}'.format(team_folder_id, path))
+        DEBUG(u'_get_file_properties: team_folder_id={}, path={}'.format(team_folder_id, path))
         template_id = self.property_template_id
         client = self.fileaccess_client_admin_with_path_root(team_folder_id)
         meta = client.files_get_metadata(
             path,
             include_property_groups=dropbox.file_properties.TemplateFilterBase.filter_some([template_id]))
         if not isinstance(meta, dropbox.files.FileMetadata):
-            logger.debug(u'is not a FILE: ' + path)
+            DEBUG(u'is not a FILE: ' + path)
             return None
 
         raw_properties = {}
@@ -1081,7 +1010,7 @@ class TeamInfo(object):
                 continue
             for field in prop_group.fields:
                 raw_properties[field.name] = field.value
-                # logger.debug(u'raw_properties[{}] = {}'.format(field.name, field.value))
+                # DEBUG(u'raw_properties[{}] = {}'.format(field.name, field.value))
 
         result_properties = {}
 
@@ -1095,11 +1024,11 @@ class TeamInfo(object):
                 key = self._prop_split_key(name, i)
                 val = raw_properties.get(key)
                 if val is None:
-                    logger.debug(u'not found: ' + key)
+                    DEBUG(u'not found: ' + key)
                     break
                 split_values.append(val)
-                # logger.debug('split data: {}={}'.format(key, val))
-                logger.debug('split data key: {}'.format(key))
+                # DEBUG('split data: {}={}'.format(key, val))
+                DEBUG('split data key: {}'.format(key))
             data_b64 = ''.join(split_values)
             data = base64.b64decode(data_b64)
             result_properties[name] = data
@@ -1109,7 +1038,7 @@ class TeamInfo(object):
             data = raw_properties.get(key)
             if data:
                 result_properties[key] = data
-                logger.debug('simple data: {}={}'.format(key, data))
+                DEBUG('simple data: {}={}'.format(key, data))
 
         return result_properties
 
@@ -1129,7 +1058,7 @@ class TeamInfo(object):
             if not isinstance(e.error, dropbox.files.GetMetadataError):
                 logger.exception(u'unexpected error: team_folder_id={}, path={}'.format(team_folder_id, path))
             else:
-                logger.debug('GetMetadataError: {}'.format(e.error.get_path()))
+                DEBUG('GetMetadataError: {}'.format(e.error.get_path()))
         except Exception:
             logger.exception(u'unexpected error: team_folder_id={}, path={}'.format(team_folder_id, path))
             properties = None
@@ -1189,7 +1118,7 @@ class FileAttr(object):
                 self.modified_by = team_info.dbid_to_email.get(dbid)
                 p += ', modified_by=(dbid={}, email={})'.format(
                     dbid, self.modified_by)
-        logger.debug(p)
+        DEBUG(p)
 
     # return (team_folder_id, team_folder_name, subpath)
     def team_folder_path(self):
@@ -1219,7 +1148,7 @@ def _select_admin(node):
         if user.is_disabled or user.eppn is None:
             continue
         if node.is_admin_contributor(user):
-            logger.debug('selected user for timestamp: username={}, eppn={}, eppn_to_email={}'.format(user.username, user.eppn, eppn_to_email(user.eppn)))
+            DEBUG('selected user for timestamp: username={}, eppn={}, eppn_to_email={}'.format(user.username, user.eppn, eppn_to_email(user.eppn)))
             return user
     raise Exception('unexpected condition')
 
@@ -1230,7 +1159,7 @@ def _check_and_add_timestamp(team_info, file_attr):
     if tfp is None:
         return
     team_folder_id, name, path = tfp
-    logger.debug(u'team_folder_id={}, name={}, path={}'.format(team_folder_id,
+    DEBUG(u'team_folder_id={}, name={}, path={}'.format(team_folder_id,
                                                         name, path))
 
     def _file_exists(cls, target, path):
@@ -1256,13 +1185,13 @@ def _check_and_add_timestamp(team_info, file_attr):
         waterbutler_json_res = waterbutler.get_node_info(
             admin_cookie, node._id, PROVIDER_NAME, path)
         if waterbutler_json_res is None:
-            logger.debug(u'waterbutler.get_node_info() is None: path={}'.format(path))
+            DEBUG(u'waterbutler.get_node_info() is None: path={}'.format(path))
             return
         file_data = waterbutler_json_res.get('data')
         if file_data is None:
-            logger.debug(u'waterbutler.get_node_info().get("data") is None: path={}'.format(path))
+            DEBUG(u'waterbutler.get_node_info().get("data") is None: path={}'.format(path))
             return
-        logger.debug(u'file_data: ' + str(file_data))
+        DEBUG(u'file_data: ' + str(file_data))
         attrs = file_data['attributes']
         file_node.update(None, attrs, user=admin)  # update content_hash
         file_info = {
@@ -1278,7 +1207,7 @@ def _check_and_add_timestamp(team_info, file_attr):
         # verified by admin
         verify_result = timestamp.check_file_timestamp(
             admin.id, node, file_info, verify_external_only=True)
-        logger.debug('check timestamp: verify_result={}'.format(verify_result.get('verify_result_title')))
+        DEBUG('check timestamp: verify_result={}'.format(verify_result.get('verify_result_title')))
         if verify_result['verify_result'] == \
            api_settings.TIME_STAMP_TOKEN_CHECK_SUCCESS:
             return  # already checked
@@ -1401,7 +1330,7 @@ def celery_check_updated_files(self, team_ids):
             name = u'Institution={}, Dropbox Business Team ID={}'.format(
                 institution, dbtid)
             try:
-                logger.debug(u'check and update timestamp: {}'.format(name))
+                DEBUG(u'check and update timestamp: {}'.format(name))
                 _check_team_files(dbtid)
             except Exception:
                 logger.exception(name)

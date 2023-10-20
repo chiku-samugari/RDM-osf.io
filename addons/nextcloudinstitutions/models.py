@@ -15,8 +15,6 @@ from addons.nextcloudinstitutions import settings, apps, utils
 from osf.models.files import File, Folder, BaseFileNode
 from osf.utils.permissions import ADMIN, READ, WRITE
 from website.util import timestamp
-from addons.osfstorage.models import Region
-from osf.models.node import AbstractNode
 
 logger = logging.getLogger(__name__)
 
@@ -58,39 +56,25 @@ class NextcloudInstitutionsFile(NextcloudInstitutionsFileNode, File):
     def _my_node_settings(self):
         node = self.target
         if node:
-            addon = node.get_addon(self.provider, root_id=self.parent_id)
+            addon = node.get_addon(self.provider)
             if addon:
                 return addon
         return None
 
     def get_timestamp(self):
         node_settings = self._my_node_settings()
-        path = self.path
-        paths = path.strip('/').split('/')
-        paths.pop(0)
-        if path.endswith('/') and len(paths) > 0:
-            path = '/' + '/'.join(paths) + '/'
-        else:
-            path = '/' + '/'.join(paths)
         if node_settings:
             return utils.get_timestamp(
                 node_settings,
-                node_settings.root_folder_fullpath + path)
+                node_settings.root_folder_fullpath + self.path)
         return None, None, None
 
     def set_timestamp(self, timestamp_data, timestamp_status, context):
         node_settings = self._my_node_settings()
-        path = self.path
-        paths = path.strip('/').split('/')
-        paths.pop(0)
-        if path.endswith('/') and len(paths) > 0:
-            path = '/' + '/'.join(paths) + '/'
-        else:
-            path = '/' + '/'.join(paths)
         if node_settings:
             utils.set_timestamp(
                 node_settings,
-                node_settings.root_folder_fullpath + path,
+                node_settings.root_folder_fullpath + self.path,
                 timestamp_data, timestamp_status, context=context)
 
 
@@ -104,9 +88,6 @@ class NodeSettings(InstitutionsNodeSettings, InstitutionsStorageAddon):
     SHORT_NAME = SHORT_NAME
 
     folder_id = models.TextField(blank=True, null=True)
-    region = models.ForeignKey(Region, blank=True, null=True, related_name='next_cloud_institutions_region_id', on_delete=models.CASCADE)
-    root_node = models.ForeignKey(BaseFileNode, related_name='next_cloud_institutions_root_node_id', blank=True, null=True, default=None, on_delete=models.CASCADE)
-    owner = models.ForeignKey(AbstractNode, related_name='next_cloud_institutions_node_settings', null=True, blank=True, on_delete=models.CASCADE)
 
     @classmethod
     def addon_settings(cls):
@@ -197,7 +178,7 @@ class NodeSettings(InstitutionsNodeSettings, InstitutionsStorageAddon):
             try:
                 c.delete_share(share_id)
             except Exception as e:
-                logger.warning(u'delete_share failed: user_id={}: {}'.format(user_id, str(e)))
+                logger.warning(u'delete_share failed: user_id={}: {}'.format(user_id), str(e))
 
     def sync_contributors(self):
         node = self.owner
@@ -315,7 +296,6 @@ class NodeSettings(InstitutionsNodeSettings, InstitutionsStorageAddon):
 
     def serialize_waterbutler_settings_impl(self):
         return {
-            'nid': self.owner._id,
             'folder': self.root_folder_fullpath,
             'verify_ssl': settings.USE_SSL
         }

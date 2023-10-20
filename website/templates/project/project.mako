@@ -716,6 +716,8 @@ ${parent.javascript_bottom()}
             tags: ${ node['tags'] | sjson, n },
             institutions: ${node['institutions'] | sjson, n},
         },
+        max_quota: ${node['max_quota']},
+        used_quota: ${node['used_quota']},
         threshold: ${node['threshold']},
 
         storageRegions: ${ storage_regions | sjson, n },

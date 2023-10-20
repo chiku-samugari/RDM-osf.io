@@ -129,8 +129,7 @@ class CallbackView(RdmPermissionMixin, RdmAddonRequestContextMixin, UserPassesTe
                 state = request.session['oauth_states'][addon_name]['state']
                 session.data['oauth_states'][addon_name]['state'] = state
 
-            rdm_addon_options = get_rdm_addon_option(institution_id, addon_name)
-            rdm_addon_option = rdm_addon_options.last()
+            rdm_addon_option = get_rdm_addon_option(institution_id, addon_name)
             # Retrieve permanent credentials from provider
             provider.auth_callback(user=rdm_addon_option)
 

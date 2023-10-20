@@ -15,8 +15,6 @@ from addons.base.institutions_utils import (
 from addons.s3compatinstitutions import settings, apps
 from osf.models.external import BasicAuthProviderMixin
 from osf.models.files import File, Folder, BaseFileNode
-from addons.osfstorage.models import Region
-from osf.models.node import AbstractNode
 #from osf.utils.permissions import ADMIN, READ, WRITE
 
 logger = logging.getLogger(__name__)
@@ -57,10 +55,7 @@ class NodeSettings(InstitutionsNodeSettings, InstitutionsStorageAddon):
     SHORT_NAME = SHORT_NAME
 
     folder_id = models.TextField(blank=True, null=True)
-    region = models.ForeignKey(Region, blank=True, null=True, related_name='s3_institutions_region_id', on_delete=models.CASCADE)
-    root_node = models.ForeignKey(BaseFileNode, related_name='s3_institutions_root_node_id', blank=True, null=True, default=None, on_delete=models.CASCADE)
-    owner = models.ForeignKey(AbstractNode, related_name='s3_institutions_addon_node_settings',
-                                 null=True, blank=True, on_delete=models.CASCADE)
+
     @classmethod
     def addon_settings(cls):
         return settings
@@ -156,10 +151,6 @@ class NodeSettings(InstitutionsNodeSettings, InstitutionsStorageAddon):
         # not supported [GRDM-20960]
         pass
 
-    # NOTE: override in s3compatinstitutions
-    def set_region_id(self, region_id, auth=None):
-        self.s3_institutions_region_id = region_id
-
     @property
     def bucket(self):
         return self.base_folder
@@ -177,7 +168,6 @@ class NodeSettings(InstitutionsNodeSettings, InstitutionsStorageAddon):
 
     def serialize_waterbutler_settings(self):
         return {
-            'nid': self.owner._id,
             'bucket': self.bucket,
             'prefix': self.root_prefix,
             'encrypt_uploads': settings.ENCRYPT_UPLOADS

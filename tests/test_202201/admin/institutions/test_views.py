@@ -1,3 +1,5 @@
+import json
+from operator import itemgetter
 from django.urls import reverse
 from nose import tools as nt
 import mock
@@ -6,17 +8,21 @@ from django.test import RequestFactory
 from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied
 
+from api.base import settings as api_settings
 from tests.base import AdminTestCase
 from osf_tests.factories import (
     AuthUserFactory,
     InstitutionFactory,
+    ProjectFactory,
     RegionFactory
 )
-from osf.models import Institution, UserQuota, OSFUser
+from osf.models import Institution, Node, UserQuota, OSFUser
 
-from admin_tests.utilities import setup_view
+from admin_tests.utilities import setup_form_view, setup_user_view, setup_view
 
 from admin.institutions import views
+from admin.institutions.forms import InstitutionForm
+from admin.base.forms import ImportFileForm
 
 
 @pytest.mark.skip('Clone test case from tests/test_quota.py for making coverage')
@@ -178,7 +184,6 @@ class TestRecalculateQuotaOfUsersInInstitution(AdminTestCase):
 
         self.institution1 = InstitutionFactory()
         self.institution2 = InstitutionFactory()
-        self.region = RegionFactory(_id=self.institution1._id, name='Storage')
 
         self.user = AuthUserFactory()
         self.user.is_superuser = False
@@ -190,10 +195,7 @@ class TestRecalculateQuotaOfUsersInInstitution(AdminTestCase):
         self.request = RequestFactory().get('/fake_path')
         self.request.user = self.user
 
-        self.url = reverse(
-            'institutions:statistical_status_default_storage',
-            kwargs={'region_id': self.region.id}
-        )
+        self.url = reverse('institutions:statistical_status_default_storage')
         self.view = views.RecalculateQuotaOfUsersInInstitution()
         self.view.request = self.request
 
@@ -201,7 +203,7 @@ class TestRecalculateQuotaOfUsersInInstitution(AdminTestCase):
     @mock.patch('website.util.quota.update_user_used_quota')
     def test_dispatch_method_with_institution_exists_in_Region(self, mock_update_user_used_quota_method, mock_region):
         mock_region.filter.return_value.exists.return_value = True
-        response = self.view.dispatch(request=self.request, region_id=self.region.id)
+        response = self.view.dispatch(request=self.request)
 
         nt.assert_equal(response.status_code, 302)
         nt.assert_equal(response.url, self.url)
@@ -212,7 +214,7 @@ class TestRecalculateQuotaOfUsersInInstitution(AdminTestCase):
     def test_dispatch_method_with_institution_not_exists_in_Region(self, mock_update_user_used_quota_method,
                                                                    mock_region):
         mock_region.filter.return_value.exists.return_value = False
-        response = self.view.dispatch(request=self.request, region_id=self.region.id)
+        response = self.view.dispatch(request=self.request)
         nt.assert_equal(response.status_code, 302)
         nt.assert_equal(response.url, self.url)
         mock_update_user_used_quota_method.assert_not_called()
@@ -225,7 +227,7 @@ class TestRecalculateQuotaOfUsersInInstitution(AdminTestCase):
         self.user.save()
         self.request.user = self.user
         mock_region.filter.return_value.exists.return_value = False
-        response = self.view.dispatch(request=self.request, region_id=self.region.id)
+        response = self.view.dispatch(request=self.request)
         nt.assert_equal(response.status_code, 302)
         nt.assert_equal(response.url, self.url)
         mock_update_user_used_quota_method.assert_not_called()
@@ -416,7 +418,9 @@ class TestQuotaUserList(AdminTestCase):
         user_list = []
         for user in OSFUser.objects.filter(
                 affiliated_institutions=self.institution.id):
-            user_list.append(self.view.get_user_quota_info(user))
+            user_list.append(self.view.get_user_quota_info(
+                user, UserQuota.CUSTOM_STORAGE)
+            )
         return user_list
 
     def test_get_user_quota_info_eppn_is_none(self):
@@ -424,7 +428,10 @@ class TestQuotaUserList(AdminTestCase):
         UserQuota.objects.create(user=self.user,
                                  storage_type=UserQuota.CUSTOM_STORAGE,
                                  max_quota=200)
-        response = self.view.get_user_quota_info(self.user)
+        response = self.view.get_user_quota_info(
+            self.user,
+            storage_type=UserQuota.CUSTOM_STORAGE
+        )
 
         nt.assert_is_not_none(response['eppn'])
         nt.assert_equal(response['eppn'], default_value_eppn)

@@ -30,14 +30,10 @@ from django.contrib.auth.models import Permission
 from framework.auth.core import Auth
 
 from tests.base import AdminTestCase
-from osf_tests.factories import UserFactory, AuthUserFactory, ProjectFactory, RegistrationFactory, NodeFactory, InstitutionFactory
+from osf_tests.factories import UserFactory, AuthUserFactory, ProjectFactory, RegistrationFactory, NodeFactory
 
 
 class TestNodeView(AdminTestCase):
-    def setUp(self):
-        super(TestNodeView, self).setUp()
-        self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
 
     def test_get_flagged_spam(self):
         user = AuthUserFactory()
@@ -74,7 +70,7 @@ class TestNodeView(AdminTestCase):
             view.get_object()
 
     def test_load_data(self):
-        node = ProjectFactory(creator=self.user)
+        node = ProjectFactory()
         guid = node._id
         request = RequestFactory().get('/fake_path')
         view = NodeView()
@@ -83,7 +79,7 @@ class TestNodeView(AdminTestCase):
         nt.assert_is_instance(res, dict)
 
     def test_name_data(self):
-        node = ProjectFactory(creator=self.user)
+        node = ProjectFactory()
         guid = node._id
         request = RequestFactory().get('/fake_path')
         view = NodeView()
@@ -95,8 +91,7 @@ class TestNodeView(AdminTestCase):
 
     def test_no_user_permissions_raises_error(self):
         user = AuthUserFactory()
-        user.affiliated_institutions = [InstitutionFactory()]
-        node = ProjectFactory(creator=user)
+        node = ProjectFactory()
         guid = node._id
         request = RequestFactory().get(reverse('nodes:node', kwargs={'guid': guid}))
         request.user = user
@@ -106,8 +101,7 @@ class TestNodeView(AdminTestCase):
 
     def test_correct_view_permissions(self):
         user = AuthUserFactory()
-        user.affiliated_institutions = [InstitutionFactory()]
-        node = ProjectFactory(creator=user)
+        node = ProjectFactory()
         guid = node._id
 
         change_permission = Permission.objects.get(codename='view_node')
@@ -124,9 +118,7 @@ class TestNodeView(AdminTestCase):
 class TestNodeDeleteView(AdminTestCase):
     def setUp(self):
         super(TestNodeDeleteView, self).setUp()
-        self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
-        self.node = ProjectFactory(creator=self.user)
+        self.node = ProjectFactory()
         self.request = RequestFactory().post('/fake_path')
         self.plain_view = NodeDeleteView
         self.view = setup_log_view(self.plain_view(), self.request,
@@ -157,7 +149,7 @@ class TestNodeDeleteView(AdminTestCase):
 
     @mock.patch('website.util.quota.update_user_used_quota')
     def test_remove_node_is_not_project_type(self, mock_update_user_used_quota_method):
-        node = NodeFactory(parent=self.node, creator=self.user)
+        node = NodeFactory()
         self.view = setup_log_view(self.plain_view(), self.request,
                                    guid=node._id)
         count = AdminLogEntry.objects.count()
@@ -186,7 +178,7 @@ class TestNodeDeleteView(AdminTestCase):
 
     @mock.patch('website.util.quota.update_user_used_quota')
     def test_restore_node_is_not_project_type(self, mock_update_user_used_quota_method):
-        node = NodeFactory(parent=self.node, creator=self.user)
+        node = NodeFactory()
         self.view = setup_log_view(self.plain_view(), self.request,
                                    guid=node._id)
         self.view.delete(self.request)
@@ -231,7 +223,6 @@ class TestRemoveContributor(AdminTestCase):
     def setUp(self):
         super(TestRemoveContributor, self).setUp()
         self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
         self.node = ProjectFactory(creator=self.user)
         self.user_2 = AuthUserFactory()
         self.node.add_contributor(self.user_2)
@@ -319,7 +310,6 @@ class TestNodeReindex(AdminTestCase):
         self.request = RequestFactory().post('/fake_path')
 
         self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
         self.node = ProjectFactory(creator=self.user)
         self.registration = RegistrationFactory(project=self.node, creator=self.user)
 
@@ -373,7 +363,6 @@ class TestNodeConfirmHamView(AdminTestCase):
 
         self.request = RequestFactory().post('/fake_path')
         self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
 
         self.node = ProjectFactory(creator=self.user)
         self.registration = RegistrationFactory(creator=self.user)
@@ -402,7 +391,6 @@ class TestAdminNodeLogView(AdminTestCase):
 
         self.request = RequestFactory().post('/fake_path')
         self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
         self.auth = Auth(self.user)
         self.node = ProjectFactory(creator=self.user)
 
@@ -466,7 +454,6 @@ class TestRestartStuckRegistrationsView(AdminTestCase):
     def setUp(self):
         super(TestRestartStuckRegistrationsView, self).setUp()
         self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
         self.registration = RegistrationFactory(creator=self.user)
         self.registration.save()
         self.view = RestartStuckRegistrationsView
@@ -496,31 +483,11 @@ class TestRestartStuckRegistrationsView(AdminTestCase):
 
         nt.assert_equal(self.registration.archive_job.status, u'SUCCESS')
 
-    def test_restart_stuck_registration_exception(self):
-        # Prevents circular import that prevents admin app from starting up
-        from django.contrib.messages.storage.fallback import FallbackStorage
-
-        view = RestartStuckRegistrationsView()
-        view = setup_log_view(view, self.request, guid=self.registration._id)
-        nt.assert_equal(self.registration.archive_job.status, u'INITIATED')
-
-        # django.contrib.messages has a bug which effects unittests
-        # more info here -> https://code.djangoproject.com/ticket/17971
-        setattr(self.request, 'session', 'session')
-        messages = FallbackStorage(self.request)
-        setattr(self.request, '_messages', messages)
-
-        with mock.patch('osf.management.commands.force_archive.archive', side_effect=Exception('mocked error')):
-            view.post(self.request)
-
-            nt.assert_equal(self.registration.archive_job.status, u'INITIATED')
-
 
 class TestRemoveStuckRegistrationsView(AdminTestCase):
     def setUp(self):
         super(TestRemoveStuckRegistrationsView, self).setUp()
         self.user = UserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
         self.registration = RegistrationFactory(creator=self.user)
         # Make the registration "stuck"
         archive_job = self.registration.archive_job

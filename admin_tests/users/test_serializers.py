@@ -4,7 +4,7 @@ from django.utils import timezone
 from nose import tools as nt
 
 from tests.base import AdminTestCase
-from osf_tests.factories import NodeFactory, UserFactory, PreprintFactory, InstitutionFactory
+from osf_tests.factories import NodeFactory, UserFactory, PreprintFactory
 
 from admin.users.serializers import serialize_user, serialize_simple_node, serialize_simple_preprint
 
@@ -44,9 +44,7 @@ class TestUserSerializers(AdminTestCase):
         nt.assert_is_instance(info['disabled'], datetime)
 
     def test_serialize_simple_node(self):
-        user = UserFactory()
-        user.affiliated_institutions = [InstitutionFactory()]
-        node = NodeFactory(parent=None, creator=user)
+        node = NodeFactory()
         info = serialize_simple_node(node)
         nt.assert_is_instance(info, dict)
         nt.assert_equal(info['id'], node._id)

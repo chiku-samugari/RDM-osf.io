@@ -8,7 +8,6 @@ import random
 import base64
 from urllib.parse import urlencode
 from urllib.parse import urlparse
-from future.moves.urllib.parse import quote,unquote
 
 from django.utils import timezone
 
@@ -1455,8 +1454,7 @@ class TestAuthViewsLoginByEppn(OsfTestCase):
         url = '/confirm/{}/{}/?logout=1'.format(self.user._id, token, self.user.username)
         res = self.app.get(url)
         assert_equal(res.status_code, 302)
-        cas_redirect_url = '{}/logout?service={}%2Flogin%3Fservice%3D{}myprojects%252F'.format(settings.CAS_SERVER_URL, settings.CAS_SERVER_URL, settings.DOMAIN)
-        #assert_in(cas_redirect_url, res.headers.get('Location'))
+        cas_redirect_url = '{}/logout?service={}/login?service={}myprojects/'.format(settings.CAS_SERVER_URL, settings.CAS_SERVER_URL, settings.DOMAIN)
         assert_in(cas_redirect_url, res.headers.get('Location'))
 
         self.user.reload()

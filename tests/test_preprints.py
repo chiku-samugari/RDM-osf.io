@@ -1776,7 +1776,7 @@ class TestPreprintProvider(OsfTestCase):
         super(TestPreprintProvider, self).setUp()
         self.user = AuthUserFactory()
         self.auth = Auth(user=self.user)
-        self.provider_osf = PreprintProviderFactory(_id='osf1')
+        self.provider_osf = PreprintProviderFactory(_id='osf')
         self.preprint = PreprintFactory(provider=None, is_published=False)
         self.provider = PreprintProviderFactory(name='WWEArxiv')
         self.provider_one = PreprintProviderFactory(name='DoughnutArxiv')
@@ -1864,7 +1864,7 @@ class TestPreprintProvider(OsfTestCase):
     def test_change_preprint_provider_from_osf(self):
         subject_two = SubjectFactory(provider=self.provider_one,
             bepress_subject=self.subject_osf)
-        preprint = PreprintFactory(subjects=[[subject_two._id]], provider=self.provider_osf, creator=self.user)
+        preprint = PreprintFactory(subjects=[[self.subject_osf._id]], provider=self.provider_osf, creator=self.user)
         subject_problems = preprint.map_subjects_between_providers(self.provider_osf, self.provider_one, self.auth)
         preprint.refresh_from_db()
         assert subject_problems == []
@@ -1873,7 +1873,7 @@ class TestPreprintProvider(OsfTestCase):
     def test_change_preprint_provider_to_osf(self):
         subject_two = SubjectFactory(provider=self.provider_one,
             bepress_subject=self.subject_osf)
-        preprint = PreprintFactory(subjects=[[self.subject_osf._id]], provider=self.provider_one, creator=self.user)
+        preprint = PreprintFactory(subjects=[[subject_two._id]], provider=self.provider_one, creator=self.user)
         subject_problems = preprint.map_subjects_between_providers(self.provider_one, self.provider_osf, self.auth)
         preprint.refresh_from_db()
         assert subject_problems == []
@@ -2222,7 +2222,7 @@ class TestOnPreprintUpdatedTask(OsfTestCase):
         user.save()
 
         node = format_user(user)
-        assert {x.attrs['uri'] for x in node.get_related()} == {user.absolute_url, 'mailto:' + user.username}
+        assert {x.attrs['uri'] for x in node.get_related()} == {user.absolute_url}
 
     def test_verified_orcid(self):
         user = UserFactory.build(is_registered=True)
@@ -2230,7 +2230,7 @@ class TestOnPreprintUpdatedTask(OsfTestCase):
         user.save()
 
         node = format_user(user)
-        assert {x.attrs['uri'] for x in node.get_related()} == {'fake-orcid', user.absolute_url, user.profile_image_url(), 'mailto:' + user.username}
+        assert {x.attrs['uri'] for x in node.get_related()} == {'fake-orcid', user.absolute_url, user.profile_image_url()}
 
     def test_unverified_orcid(self):
         user = UserFactory.build(is_registered=True)
@@ -2238,7 +2238,7 @@ class TestOnPreprintUpdatedTask(OsfTestCase):
         user.save()
 
         node = format_user(user)
-        assert {x.attrs['uri'] for x in node.get_related()} == {user.absolute_url, user.profile_image_url(),'mailto:' + user.username}
+        assert {x.attrs['uri'] for x in node.get_related()} == {user.absolute_url, user.profile_image_url()}
 
 
 class TestPreprintSaveShareHook(OsfTestCase):
@@ -2349,7 +2349,7 @@ class TestPreprintConfirmationEmails(OsfTestCase):
         self.user = AuthUserFactory()
         self.write_contrib = AuthUserFactory()
         self.project = ProjectFactory(creator=self.user)
-        self.preprint = PreprintFactory(creator=self.user, project=self.project, provider=PreprintProviderFactory(_id='osf2'), is_published=False)
+        self.preprint = PreprintFactory(creator=self.user, project=self.project, provider=PreprintProviderFactory(_id='osf'), is_published=False)
         self.preprint.add_contributor(self.write_contrib, permissions=WRITE)
         self.preprint_branded = PreprintFactory(creator=self.user, is_published=False)
 
@@ -2371,7 +2371,7 @@ class TestPreprintConfirmationEmails(OsfTestCase):
             is_creator=True,
             provider_name=self.preprint.provider.name,
             no_future_emails=[],
-            logo='osf2',
+            logo=settings.OSF_PREPRINTS_LOGO,
         )
         assert_equals(send_mail.call_count, 1)
 
@@ -2413,7 +2413,6 @@ class TestPreprintOsfStorage(OsfTestCase):
         options = {'payload': jwe.encrypt(jwt.encode({'data': dict(dict(
             action='download',
             nid=self.preprint._id,
-            path='/',
             provider='osfstorage'), **kwargs),
             'exp': timezone.now() + datetime.timedelta(seconds=500),
         }, settings.WATERBUTLER_JWT_SECRET, algorithm=settings.WATERBUTLER_JWT_ALGORITHM), self.JWE_KEY)}

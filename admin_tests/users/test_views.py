@@ -13,7 +13,6 @@ from django.urls import reverse
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth.models import Permission
 from django.contrib.messages.storage.fallback import FallbackStorage
-from framework.exceptions import HTTPError
 
 from api.base import settings as api_settings
 from tests.base import AdminTestCase
@@ -22,14 +21,12 @@ from framework.auth import Auth
 from osf.models.user import OSFUser
 from osf.models.spam import SpamStatus
 from osf.models import UserQuota
-from osf.models.user_storage_quota import UserStorageQuota
 from osf_tests.factories import (
     UserFactory,
     AuthUserFactory,
     ProjectFactory,
     UnconfirmedUserFactory,
-    InstitutionFactory,
-    RegionFactory,
+    InstitutionFactory
 )
 from admin_tests.utilities import setup_view, setup_log_view, setup_form_view
 
@@ -286,7 +283,6 @@ class TestHamUserRestore(AdminTestCase):
 class TestDisableSpamUser(AdminTestCase):
     def setUp(self):
         self.user = UserFactory()
-        self.user.affiliated_institutions.add(InstitutionFactory())
         self.public_node = ProjectFactory(creator=self.user, is_public=True)
         self.private_node = ProjectFactory(creator=self.user, is_public=False)
         self.request = RequestFactory().post('/fake_path')
@@ -477,7 +473,6 @@ class TestUserWorkshopFormView(AdminTestCase):
 
     def setUp(self):
         self.user = AuthUserFactory()
-        self.user.affiliated_institutions.add(InstitutionFactory())
         self.auth = Auth(self.user)
         self.view = views.UserWorkshopFormView()
         self.node = ProjectFactory(creator=self.user)
@@ -778,9 +773,7 @@ class TestGetLinkView(AdminTestCase):
         nt.assert_equal(link_path, ideal_link_path)
 
     def test_get_unclaimed_node_links(self):
-        user = UnconfirmedUserFactory()
-        user.affiliated_institutions.add(InstitutionFactory())
-        project = ProjectFactory(creator=user)
+        project = ProjectFactory()
         unregistered_contributor = project.add_unregistered_contributor(fullname='Brother Nero', email='matt@hardyboyz.biz', auth=Auth(project.creator))
         project.save()
 
@@ -874,24 +867,20 @@ class TestSetUserQuota(AdminTestCase):
     def setUp(self):
         super(TestSetUserQuota, self).setUp()
 
-        self.user = UserFactory(fullname='fullname')
-        self.institution = InstitutionFactory()
-        self.region = RegionFactory(_id=self.institution._id, name='Storage')
-        self.user.affiliated_institutions.add(self.institution)
-        self.user.save()
+        self.user = UserFactory()
         self.view = views.UserQuotaView.as_view()
 
     def test_new_quota(self):
         response = self.view(
             RequestFactory().post(
                 reverse('users:quota', kwargs={'guid': self.user._id}),
-                {'maxQuota': 150, 'region_id': self.region.id}),
+                {'maxQuota': 150}),
             guid=self.user._id
         )
         nt.assert_equal(response.status_code, 302)
 
-        user_quota = UserStorageQuota.objects.filter(
-            user=self.user, region=self.region
+        user_quota = UserQuota.objects.filter(
+            user=self.user, storage_type=UserQuota.NII_STORAGE
         ).first()
         nt.assert_is_not_none(user_quota)
         nt.assert_equal(user_quota.max_quota, 150)
@@ -900,58 +889,56 @@ class TestSetUserQuota(AdminTestCase):
         response = self.view(
             RequestFactory().post(
                 reverse('users:quota', kwargs={'guid': self.user._id}),
-                {'maxQuota': '', 'region_id': self.region.id}),
+                {'maxQuota': ''}),
             guid=self.user._id
         )
 
         nt.assert_equal(response.status_code, 302)
-        nt.assert_false(UserStorageQuota.objects.filter(
-            user=self.user, region=self.region
+        nt.assert_false(UserQuota.objects.filter(
+            user=self.user, storage_type=UserQuota.NII_STORAGE
         ).exists())
 
     def test_new_quota_missing_parameter(self):
         response = self.view(
-            RequestFactory().post(
-                reverse('users:quota', kwargs={'guid': self.user._id})
-            ),
+            RequestFactory().post(reverse('users:quota', kwargs={'guid': self.user._id})),
             guid=self.user._id
         )
 
         nt.assert_equal(response.status_code, 302)
-        nt.assert_false(UserStorageQuota.objects.filter(
-            user=self.user, region=self.region
+        nt.assert_false(UserQuota.objects.filter(
+            user=self.user, storage_type=UserQuota.NII_STORAGE
         ).exists())
 
     def test_update_quota(self):
-        UserStorageQuota.objects.create(user=self.user, region=self.region, max_quota=100)
+        UserQuota.objects.create(user=self.user, max_quota=100)
 
         response = self.view(
             RequestFactory().post(
                 reverse('users:quota', kwargs={'guid': self.user._id}),
-                {'maxQuota': 200, 'region_id': self.region.id}),
+                {'maxQuota': 200}),
             guid=self.user._id
         )
         nt.assert_equal(response.status_code, 302)
 
-        user_quota = UserStorageQuota.objects.filter(
-            user=self.user, region=self.region
+        user_quota = UserQuota.objects.filter(
+            user=self.user, storage_type=UserQuota.NII_STORAGE
         ).first()
         nt.assert_is_not_none(user_quota)
         nt.assert_equal(user_quota.max_quota, 200)
 
     def test_update_quota_negative(self):
-        UserStorageQuota.objects.create(user=self.user, region=self.region, max_quota=100)
+        UserQuota.objects.create(user=self.user, max_quota=100)
 
         response = self.view(
             RequestFactory().post(
                 reverse('users:quota', kwargs={'guid': self.user._id}),
-                {'maxQuota': -200, 'region_id': self.region.id}),
+                {'maxQuota': -200}),
             guid=self.user._id
         )
         nt.assert_equal(response.status_code, 302)
 
-        user_quota = UserStorageQuota.objects.filter(
-            user=self.user, region=self.region
+        user_quota = UserQuota.objects.filter(
+            user=self.user, storage_type=UserQuota.NII_STORAGE
         ).first()
         nt.assert_is_not_none(user_quota)
         nt.assert_equal(user_quota.max_quota, 1)
@@ -962,10 +949,8 @@ class TestGetUserInstitutionQuota(AdminTestCase):
         super(TestGetUserInstitutionQuota, self).setUp()
 
         self.institution = InstitutionFactory()
-        self.region = RegionFactory(_id=self.institution._id, name='Storage')
         self.user = UserFactory()
         self.user.affiliated_institutions.add(self.institution)
-        self.user.save()
         self.view = views.UserDetailsView()
 
     def test_admin_login(self):
@@ -988,53 +973,31 @@ class TestGetUserInstitutionQuota(AdminTestCase):
         nt.assert_equal(context['quota'], api_settings.DEFAULT_MAX_QUOTA)
 
     def test_get_custom_quota(self):
-        UserStorageQuota.objects.create(user=self.user, region=self.region, max_quota=200)
+        UserQuota.objects.create(
+            storage_type=UserQuota.CUSTOM_STORAGE,
+            user=self.user,
+            max_quota=200
+        )
         response = setup_view(
             self.view,
-            RequestFactory().get(
-                reverse('users:user_details', kwargs={'guid': self.user._id}),
-                {'region_id': self.region.id}
-            ),
+            RequestFactory().get(reverse('users:user_details', kwargs={'guid': self.user._id})),
             guid=self.user._id
         )
         context = response.get_object()
         nt.assert_equal(context['quota'], 200)
 
-    def test_get_quota_region(self):
-        region = RegionFactory(_id=self.institution._id)
-        region_id = region.id
-        UserStorageQuota.objects.create(
-            user=self.user,
-            max_quota=150,
-            region=region
-        )
-        request = RequestFactory().get(
-            reverse('users:user_details', kwargs={'guid': self.user._id}),
-            {'region_id': region_id}
-        )
-        request.user = self.user
-        response = setup_view(
-            self.view,
-            request,
-            guid=self.user._id
-        )
-        context = response.get_object()
-        nt.assert_equal(context['quota'], 150)
-
 
 class TestSetUserInstitutionQuota(AdminTestCase):
     def setUp(self):
-        self.user = AuthUserFactory(fullname='fullname')
-        self.institution = InstitutionFactory()
-        self.region = RegionFactory(_id=self.institution._id, name='Storage')
-        self.user.affiliated_institutions.add(self.institution)
-        self.user.save()
+        self.user = AuthUserFactory()
         self.view = views.UserInstitutionQuotaView()
+        self.institution = InstitutionFactory()
+        self.user.affiliated_institutions.add(self.institution)
 
     def test_permissions_staff(self):
         request = RequestFactory().post(
             reverse('users:quota', kwargs={'guid': self.user._id}),
-            {'maxQuota': 200, 'region_id': self.region.id})
+            {'maxQuota': 200})
         request.user = self.user
         request.user.is_superuser = False
         request.user.is_staff = True
@@ -1047,7 +1010,7 @@ class TestSetUserInstitutionQuota(AdminTestCase):
     def test_permissions_superuser(self):
         request = RequestFactory().post(
             reverse('users:quota', kwargs={'guid': self.user._id}),
-            {'maxQuota': 200, 'region_id': self.region.id})
+            {'maxQuota': 200})
         request.user = self.user
         request.user.is_superuser = True
         request.user.is_staff = False
@@ -1060,58 +1023,45 @@ class TestSetUserInstitutionQuota(AdminTestCase):
     def test_new_quota(self):
         request = RequestFactory().post(
             reverse('users:quota', kwargs={'guid': self.user._id}),
-            {'maxQuota': 150, 'region_id': self.region.id})
+            {'maxQuota': 150})
         self.view = setup_view(self.view, request, guid=self.user._id)
         response = self.view.post(request)
         nt.assert_equal(response.status_code, 302)
 
-        user_quota = UserStorageQuota.objects.filter(
-            user=self.user, region=self.region
+        user_quota = UserQuota.objects.filter(
+            user=self.user, storage_type=UserQuota.CUSTOM_STORAGE
         ).first()
         nt.assert_is_not_none(user_quota)
         nt.assert_equal(user_quota.max_quota, 150)
 
     def test_update_quota(self):
-        UserStorageQuota.objects.create(user=self.user, region=self.region, max_quota=100)
+        UserQuota.objects.create(user=self.user, max_quota=100)
 
         request = RequestFactory().post(
             reverse('users:quota', kwargs={'guid': self.user._id}),
-            {'maxQuota': 200, 'region_id': self.region.id})
+            {'maxQuota': 200})
         self.view = setup_view(self.view, request, guid=self.user._id)
         response = self.view.post(request)
         nt.assert_equal(response.status_code, 302)
 
-        user_quota = UserStorageQuota.objects.filter(
-            user=self.user, region=self.region
+        user_quota = UserQuota.objects.filter(
+            user=self.user, storage_type=UserQuota.CUSTOM_STORAGE
         ).first()
         nt.assert_is_not_none(user_quota)
         nt.assert_equal(user_quota.max_quota, 200)
 
     def test_update_quota_negative(self):
-        UserStorageQuota.objects.create(user=self.user, region=self.region, max_quota=100)
+        UserQuota.objects.create(user=self.user, max_quota=100)
 
         request = RequestFactory().post(
             reverse('users:quota', kwargs={'guid': self.user._id}),
-            {'maxQuota': -200, 'region_id': self.region.id})
+            {'maxQuota': -200})
         self.view = setup_view(self.view, request, guid=self.user._id)
         response = self.view.post(request)
         nt.assert_equal(response.status_code, 302)
 
-        user_quota = UserStorageQuota.objects.filter(
-            user=self.user, region=self.region
+        user_quota = UserQuota.objects.filter(
+            user=self.user, storage_type=UserQuota.CUSTOM_STORAGE
         ).first()
         nt.assert_is_not_none(user_quota)
         nt.assert_equal(user_quota.max_quota, 1)
-
-    @mock.patch('admin.users.views.Region.objects.get')
-    def test_update_quota_not_match_region(self, region):
-        region.return_value = None
-        UserStorageQuota.objects.create(user=self.user, region=self.region, max_quota=100)
-        with nt.assert_raises(HTTPError) as exc_info:
-            request = RequestFactory().post(
-                reverse('users:quota', kwargs={'guid': self.user._id}),
-                {'maxQuota': 150, 'region_id': 1}, )
-            self.view = setup_view(self.view, request, guid=self.user._id)
-            self.view.post(request)
-
-        nt.assert_equal(exc_info.exception.code, 400)

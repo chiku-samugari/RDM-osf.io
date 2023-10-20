@@ -111,8 +111,6 @@ var FileEditor = {
                 var message;
                 if (xhr.status === 507) {
                     message = _('Could not update file. Insufficient storage space in your Dropbox.');
-                } else if (xhr.status === 406) {
-                    message = _(xhr.responseJSON.message);
                 } else {
                     message = _('The file could not be updated.');
                 }

@@ -40,7 +40,6 @@ def generic_root_folder(addon_short_name):
             node_settings=node_settings,
             name=node_settings.fetch_folder_name(),
             permissions=auth,
-            user=auth.user,
             nodeUrl=node.url,
             nodeApiUrl=node.api_url,
             private_key=kwargs.get('view_only', None),
