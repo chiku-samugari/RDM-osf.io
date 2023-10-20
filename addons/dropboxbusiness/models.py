@@ -158,7 +158,7 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
     team_folder_id = models.CharField(null=True, blank=True, max_length=255)
     group_id = models.CharField(null=True, blank=True, max_length=255)
     region = models.ForeignKey(Region, blank=True, null=True, related_name='dropbox_business_region_id', on_delete=models.CASCADE)
-    root_node = models.ForeignKey(BaseFileNode, related_name="dropbox_business_root_node_id", blank=True, null=True, default=None, on_delete=models.CASCADE)
+    root_node = models.ForeignKey(BaseFileNode, related_name='dropbox_business_root_node_id', blank=True, null=True, default=None, on_delete=models.CASCADE)
     owner = models.ForeignKey(AbstractNode, related_name='dropbox_business_addon_node_settings', null=True, blank=True, on_delete=models.CASCADE)
 
     def _get_token(self, name):

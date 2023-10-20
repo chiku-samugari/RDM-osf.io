@@ -73,7 +73,7 @@ class NodeSettings(BaseOAuthNodeSettings, BaseStorageAddon):
     folder_location = models.TextField(blank=True, null=True)
     user_settings = models.ForeignKey(UserSettings, null=True, blank=True, on_delete=models.CASCADE)
     region = models.ForeignKey(Region, blank=True, null=True, related_name='one_drive_business_region_id', on_delete=models.CASCADE)
-    root_node = models.ForeignKey(BaseFileNode, related_name="one_drive_business_root_node_id", blank=True, null=True, default=None, on_delete=models.CASCADE)
+    root_node = models.ForeignKey(BaseFileNode, related_name='one_drive_business_root_node_id', blank=True, null=True, default=None, on_delete=models.CASCADE)
     owner = models.ForeignKey(AbstractNode, related_name='one_drive_business_node_settings', null=True, blank=True, on_delete=models.CASCADE)
 
     @property

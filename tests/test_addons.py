@@ -117,7 +117,7 @@ class TestAddonAuth(OsfTestCase):
         assert_equal(res.status_code, 200)
 
     def test_auth_render_action_requires_read_permission(self):
-        node = ProjectFactory(is_public=False,creator=self.user)
+        node = ProjectFactory(is_public=False)
         url = self.build_url(action='render', nid=node._id)
         res = self.app.get(url, auth=self.user.auth, expect_errors=True)
         #Fix assert result
@@ -129,8 +129,8 @@ class TestAddonAuth(OsfTestCase):
         assert_equal(res.status_code, 200)
 
     def test_auth_export_action_requires_read_permission(self):
-        node = ProjectFactory(is_public=False,creator=self.user)
-        url = self.build_url(action='export', nid=node._id, )
+        node = ProjectFactory(is_public=False)
+        url = self.build_url(action='export', nid=node._id)
         res = self.app.get(url, auth=self.user.auth, expect_errors=True)
         #Fix assert result
         assert_equal(res.status_code, 400)
@@ -203,7 +203,7 @@ class TestAddonAuth(OsfTestCase):
 
     def test_action_download_non_contrib(self):
         noncontrib = AuthUserFactory()
-        node = ProjectFactory(is_public=True,creator=self.user,parent=None)
+        node = ProjectFactory(is_public=True)
         test_file = create_test_file(node, self.user)
         url = self.build_url(nid=node._id, action='download', provider='osfstorage', path=test_file.path, version=1)
         nlogs = node.logs.count()
@@ -227,7 +227,7 @@ class TestAddonAuth(OsfTestCase):
 
     def test_action_download_mfr_views_non_contrib(self):
         noncontrib = AuthUserFactory()
-        node = ProjectFactory(is_public=True,creator=self.user)
+        node = ProjectFactory(is_public=True)
         test_file = create_test_file(node, self.user)
         url = self.build_url(nid=node._id, action='render', provider='osfstorage', path=test_file.path, version=1)
         nlogs = node.logs.count()
@@ -663,7 +663,7 @@ class TestAddonLogs(OsfTestCase):
         # Rename the folder
         newfoldername = 'folder_ver2'
         self.app.put_json(wb_log_url, self.build_payload(
-            request_meta={'url': wb_url}, 
+            request_meta={'url': wb_url},
             root_path=file_node._id,
             action='move',
             metadata={
@@ -740,7 +740,7 @@ class TestAddonLogs(OsfTestCase):
         # Move the file
         movedfilepath = 'cool_folder/' + filename
         self.app.put_json(wb_log_url, self.build_payload(
-            request_meta={'url': wb_log_url}, 
+            request_meta={'url': wb_log_url},
             root_path=file_node._id,
             action='move',
             metadata={
