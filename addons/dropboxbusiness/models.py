@@ -8,7 +8,7 @@ from django.dispatch import receiver
 from dropbox.dropbox import DropboxTeam
 from dropbox.exceptions import DropboxException
 
-from osf.models.node import Node
+from osf.models.node import Node, AbstractNode
 from osf.models.contributor import Contributor
 from osf.models.files import File, Folder, BaseFileNode
 from osf.models.institution import Institution
@@ -23,6 +23,7 @@ from framework.auth import Auth
 from framework.exceptions import HTTPError
 from framework.logging import logging
 from admin.rdm.utils import get_institution_id
+from addons.osfstorage.models import Region, NodeSettings as OsfStorageNodeSettings
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,9 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
     list_cursor = models.TextField(null=True, blank=True)  # unused
     team_folder_id = models.CharField(null=True, blank=True, max_length=255)
     group_id = models.CharField(null=True, blank=True, max_length=255)
+    region = models.ForeignKey(Region, blank=True, null=True, related_name='dropbox_business_region_id', on_delete=models.CASCADE)
+    root_node = models.ForeignKey(BaseFileNode, related_name='dropbox_business_root_node_id', blank=True, null=True, default=None, on_delete=models.CASCADE)
+    owner = models.ForeignKey(AbstractNode, related_name='dropbox_business_addon_node_settings', null=True, blank=True, on_delete=models.CASCADE)
 
     def _get_token(self, name):
         # fileacces_option, management_option
@@ -269,7 +273,8 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
                 admin_group,
                 team_name
             )
-        except DropboxException:
+        except DropboxException as e:
+            logger.debug(f'DropboxException {e}')
             logger.exception(u'Failed to auto mount of Dropbox Business.: team_folder_name={}'.format(self.team_folder_name))
             raise
 
@@ -295,6 +300,7 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
             logger.info('Addon is not configured: node={}'.format(self.owner._id))
             return None
         return {
+            'nid': self.owner._id,
             'folder': '/',
             'admin_dbmid': self.admin_dbmid,
             'team_folder_id': self.team_folder_id
@@ -316,7 +322,7 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
             params={
                 'project': self.owner.parent_id,
                 'node': self.owner._id,
-                'path': metadata['path'],
+                'path': metadata['materialized'],
                 'folder': '/',
                 'urls': {
                     'view': url,
@@ -330,8 +336,6 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
 
     @property
     def complete(self):
-        if self._institutions_disabled:
-            return False
         return self.has_auth and self.group_id and self.team_folder_id
 
     @property
@@ -374,6 +378,11 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
         if save:
             self.save()
 
+    def set_root_node(self, root_node, save=False):
+        self.root_node = root_node
+        if save:
+            self.save()
+
 
 def get_admin_info(node, f_option, m_option, f_token, m_token):
     try:
@@ -391,37 +400,57 @@ def get_admin_info(node, f_option, m_option, f_token, m_token):
 # mount dropboxbusiness automatically
 def init_addon(node, addon_name):
     if node.creator.eppn is None:
-        # logger.info(u'{} has no ePPN.'.format(node.creator.username))
+        logger.info(u'{} has no ePPN.'.format(node.creator.username))
         return  # disabled
     institution_id = get_institution_id(node.creator)
     if institution_id is None:
-        # logger.info(u'{} has no institution.'.format(node.creator.username))
+        logger.info(u'{} has no institution.'.format(node.creator.username))
         return  # disabled
-    fm = utils.get_two_addon_options(institution_id)
-    if fm is None:
-        institution = Institution.objects.get(id=institution_id)
+    fms = utils.get_two_addon_options(institution_id)
+    institution = Institution.objects.get(id=institution_id)
+    if fms is None:
         logger.info(u'Institution({}) has no valid oauth keys.'.format(institution.name))
         return  # disabled
 
-    f_option, m_option = fm
-    f_token = utils.addon_option_to_token(f_option)
-    m_token = utils.addon_option_to_token(m_option)
-    if f_token is None or m_token is None:
-        return  # disabled
+    regions = Region.objects.filter(_id=institution._id, waterbutler_settings__storage__provider=DropboxBusinessAddonAppConfig.short_name).order_by('id')
 
-    ### ----- enabled -----
-    # checking the validity of Dropbox API here
-    team_name, admin_group, admin_dbmid = get_admin_info(node,
-                                                         f_option, m_option,
-                                                         f_token, m_token)
-    addon = node.add_addon(addon_name, auth=Auth(node.creator), log=True)
-    addon.set_two_options(f_option, m_option)
-    addon.set_admin_dbmid(admin_dbmid)
+    for index, fm in enumerate(fms):
+        f_option, m_option = fm
+        f_token = utils.addon_option_to_token(f_option)
+        m_token = utils.addon_option_to_token(m_option)
+        if f_token is None or m_token is None:
+            return  # disabled
 
-    # On post_save of Node, self.owner.contributors is empty.
-    addon.create_team_folder([utils.eppn_to_email(node.creator.eppn)],
-                             admin_group, team_name,
-                             save=True)
+        ### ----- enabled -----
+        # checking the validity of Dropbox API here
+        team_name, admin_group, admin_dbmid = get_admin_info(node,
+                                                             f_option, m_option,
+                                                             f_token, m_token)
+        region = regions[index]
+        addon = node.add_addon(addon_name, auth=Auth(node.creator), log=True, region_id=region.id)
+        addon.set_two_options(f_option, m_option)
+        addon.set_admin_dbmid(admin_dbmid)
+        osfstorage_nodesettings = OsfStorageNodeSettings.objects.filter(owner_id=node.get_root().id, is_deleted=False, region_id=region.id).first()
+        if osfstorage_nodesettings:
+            base_file_node = osfstorage_nodesettings.root_node
+            if base_file_node:
+                addon.set_root_node(base_file_node, save=True)
+
+        team_info = utils.TeamInfo(f_token, m_token,
+                                   admin=True, groups=True)
+        group_id = team_info.group_name_to_id.get(addon.group_name)
+        if group_id:
+            # Already have group_id, set team_folder and group_id to addon
+            team_folder_id = utils.get_team_folder_id(team_info, admin_dbmid, addon.team_folder_name)
+            if team_folder_id:
+                addon.team_folder_id = team_folder_id
+            addon.group_id = group_id
+            addon.save()
+        else:
+            # On post_save of Node, self.owner.contributors is empty.
+            addon.create_team_folder([utils.eppn_to_email(node.creator.eppn)],
+                                    admin_group, team_name,
+                                    save=True)
 
 
 # store values in a short time to detect changed fields
@@ -466,18 +495,26 @@ def node_post_save(sender, instance, created, **kwargs):
     addon_name = DropboxBusinessAddonAppConfig.short_name
     if addon_name not in website_settings.ADDONS_AVAILABLE_DICT:
         return
+    institution = None
+    if instance.creator:
+        institution = instance.creator.affiliated_institutions.first()
+    institution_id = None
+    if institution:
+        institution_id = institution._id
     if created:
         init_addon(instance, addon_name)
     else:
-        ns = instance.get_addon(addon_name)
-        if ns is None or not ns.complete:  # disabled
-            return
-        syncinfo = SyncInfo.get(instance.id)
-        if ns.owner.title != syncinfo.old_node_title:
-            ns.rename_team_folder()
-        if syncinfo.need_to_update_members:
-            ns.sync_members()
-            syncinfo.need_to_update_members = False
+        regions = Region.objects.filter(_id=institution_id, waterbutler_settings__storage__provider='dropboxbusiness').order_by('id')
+        for region in regions:
+            ns = instance.get_addon(addon_name, region_id=region.id)
+            if ns is None or not ns.complete:  # disabled
+                return
+            syncinfo = SyncInfo.get(instance.id)
+            if ns.owner.title != syncinfo.old_node_title:
+                ns.rename_team_folder()
+            if syncinfo.need_to_update_members:
+                ns.sync_members()
+                syncinfo.need_to_update_members = False
 
 
 @receiver(post_save, sender=Contributor)

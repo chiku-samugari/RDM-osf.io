@@ -1,8 +1,8 @@
 import mock
 import unittest
-
 import pytest
 
+from nose.tools import assert_equal
 from addons.base.tests.models import OAuthAddonNodeSettingsTestSuiteMixin
 from addons.base.tests.models import OAuthAddonUserSettingTestSuiteMixin
 from addons.box.models import NodeSettings
@@ -43,6 +43,15 @@ class TestBoxNodeSettings(OAuthAddonNodeSettingsTestSuiteMixin, unittest.TestCas
     def test_serialize_credentials(self, mock_refresh):
         mock_refresh.return_value = True
         super(TestBoxNodeSettings, self).test_serialize_credentials()
+
+    @mock.patch('addons.box.models.Provider.refresh_oauth_key')
+    def test_serialize_settings(self, mock_refresh):
+        mock_refresh.return_value = True
+        settings = self.node_settings.serialize_waterbutler_settings()
+        expected = {
+            'folder': self.node_settings.folder_id,
+        }
+        assert_equal(settings, expected)
 
     @mock.patch('addons.box.models.UserSettings.revoke_remote_oauth_access', mock.PropertyMock())
     def test_complete_has_auth_not_verified(self):

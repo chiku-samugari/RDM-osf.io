@@ -72,7 +72,7 @@ class TestApiBaseViews(ApiTestCase):
             url = '/{}{}/'.format(API_BASE, 'notapage')
             res = self.app.get(url, expect_errors=True)
             errors = res.json['errors']
-            assert(isinstance(errors, list))
+            assert (isinstance(errors, list))
             assert_equal(errors[0], {'detail': 'Not found.'})
 
     def test_view_classes_have_minimal_set_of_permissions_classes(self):

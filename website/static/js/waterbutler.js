@@ -2,6 +2,7 @@
 
 var $ = require('jquery');
 var $osf = require('./osfHelpers');
+var ADDON_PROVIDER = ['s3compatinstitutions','nextcloudinstitutions','ociinstitutions','dropboxbusiness','onedrivebusiness'];
 
 function buildUrl(path, provider, nid, options) {
     path = path || '/';
@@ -43,9 +44,19 @@ function getViewOnly() {
 }
 
 function buildFromTreebeard(item, options) {
-    options = options || {};
-    options.waterbutlerURL = item.data.waterbutlerURL;
-    return buildUrl(item.data.path, item.data.provider, item.data.nodeId, options);
+  console.log('build here...!! ');
+  console.log(item.data);
+  if (item.data.links !== undefined) {
+    console.log(item.data.links.delete);
+  }
+  console.log(options);
+  options = options || {};
+  options.waterbutlerURL = item.data.waterbutlerURL;
+  var provider_url = item.data.provider;
+  if (ADDON_PROVIDER.includes(provider_url) && item.data.root_path !== undefined && item.data.root_path != null) {
+    provider_url = item.data.provider + '/' + item.data.root_path;
+  }
+  return buildUrl(item.data.path, provider_url, item.data.nodeId, options);
 }
 
 function addToken(options) {

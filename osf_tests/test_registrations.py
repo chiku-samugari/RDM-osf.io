@@ -208,7 +208,7 @@ class TestRegisterNode:
 
         # Registration has the nodes
         assert registration._nodes.count() == 2
-        assert(
+        assert (
             set(registration._nodes.values_list('title', flat=True)) ==
             set(project._nodes.values_list('title', flat=True))
         )

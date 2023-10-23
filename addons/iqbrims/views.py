@@ -126,8 +126,8 @@ def iqbrims_get_status(**kwargs):
     user_settings = IQBRIMSWorkflowUserSettings(access_token, management_node_addon.folder_id)
     status = iqbrims.get_status()
     logger.debug('extracting settings from management_node...')
-    status['labo_list'] = [u'{}:{}'.format(l['id'], l['text'])
-                           for l in user_settings.LABO_LIST]
+    status['labo_list'] = [u'{}:{}'.format(labo['id'], labo['text'])
+                           for labo in user_settings.LABO_LIST]
     status['review_folders'] = REVIEW_FOLDERS
     is_admin = management_node._id == node._id
     status['is_admin'] = is_admin
@@ -888,9 +888,9 @@ def _iqbrims_fill_spreadsheet_values(node, status, folder_link, columns,
         elif tcol == '_node_contributors':
             values[i] = ','.join([u.fullname for u in node.contributors])
         elif tcol == '_labo_name':
-            labos = [l['text']
-                     for l in user_settings.LABO_LIST
-                     if l['id'] == status['labo_id']]
+            labos = [labo['text']
+                     for labo in user_settings.LABO_LIST
+                     if labo['id'] == status['labo_id']]
             values[i] = labos[0] if len(labos) > 0 \
                         else 'Unknown ID: {}'.format(status['labo_id'])
         elif tcol == '_drive_url':

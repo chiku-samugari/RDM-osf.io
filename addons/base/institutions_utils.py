@@ -8,7 +8,6 @@ from django.db import models
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 
-from osf.models import Institution
 from osf.models.node import Node
 from osf.models.rdm_addons import RdmAddonOption
 from website import settings as website_settings
@@ -18,6 +17,9 @@ from admin.rdm_addons.utils import get_rdm_addon_option
 from addons.base import exceptions
 from addons.base.models import BaseNodeSettings, BaseStorageAddon
 from framework.auth import Auth
+from addons.osfstorage.models import Region, NodeSettings
+from osf.models.institution import Institution
+
 
 logger = logging.getLogger(__name__)
 
@@ -49,16 +51,7 @@ class InstitutionsNodeSettings(BaseNodeSettings):
     ###
     @property
     def complete(self):
-        if self._institutions_disabled:
-            return False
         return self.has_auth and self.folder_id
-
-    @property
-    def _institutions_disabled(self):
-        if not self.config.for_institutions:
-            raise ValueError('_institutions_disabled is only valid for institutional storage addons')
-        _, region_provider = get_region_provider(self.owner)
-        return region_provider != self.config.short_name
 
     @property
     def has_auth(self):
@@ -175,14 +168,15 @@ class InstitutionsStorageAddon(BaseStorageAddon):
     ###
     @classmethod
     def cls_get_addon_option(cls, institution_id, addon_short_name):
-        addon_option = get_rdm_addon_option(
+        # Note: May be impact when multiple
+        addon_options = get_rdm_addon_option(
             institution_id, addon_short_name,
             create=False)
-        if addon_option is None:
+        if addon_options is None:
             return None
-        if not addon_option.is_allowed:
+        if not addon_options.exists():
             return None
-        return addon_option
+        return addon_options
 
     @classmethod
     def cls_provider_switch(cls, addon_option):
@@ -197,33 +191,57 @@ class InstitutionsStorageAddon(BaseStorageAddon):
 
     @classmethod
     def cls_init_addon(cls, node, institution_id, addon_name):
-        addon_option = cls.cls_get_addon_option(institution_id, addon_name)
-        if addon_option is None:
+        logger.debug(f'addon_name is {addon_name}')
+        logger.debug('root node id is {node}')
+        # Note: May be impact when multiple
+        addon_options = cls.cls_get_addon_option(institution_id, addon_name)
+        if addon_options is None or not addon_options.exists():
             logger.debug('No addon option for institution_id={}, addon_name={}'.format(institution_id, addon_name))
             return None  # disabled
 
-        provider = cls.cls_provider_switch(addon_option)
-        client = cls.get_client(provider)
+        addons = []
+        institution = Institution.objects.get(id=institution_id)
+        regions = Region.objects.filter(_id=institution._id, waterbutler_settings__storage__provider=addon_name).order_by('id')
+        idx = 0
+        rdm_options = RdmAddonOption.objects.filter(institution_id=institution_id).order_by('id')
+        rdm_option_indexs = []
+        index = 0
+        for rdm_option in rdm_options:
+            if rdm_option.provider == addon_name:
+                rdm_option_indexs.append(index)
+            index = index + 1
 
-        base_folder = cls.cls_base_folder(addon_option)
-        cls.can_access(client, base_folder)
+        for addon_option in addon_options:
+            # For each addon option will create a addon node setting
+            if addon_option.is_allowed:
+                provider = cls.cls_provider_switch(addon_option)
+                client = cls.get_client(provider)
 
-        folder_name = cls.cls_folder_name_from_node(node)
-        # create_folder() may raise
-        cls.create_folder(client, base_folder, folder_name)
-        try:
-            addon = node.add_addon(addon_name, auth=Auth(node.creator),
-                                   log=True)
-            addon.set_addon_option(addon_option)
-            addon.set_folder_id(folder_name)
-            addon.save()
-            return addon
-        except Exception:
-            try:
-                cls.remove_folder(client, base_folder, folder_name)
-            except Exception:
-                logger.exception(u'cannot remove unnecessary folder: ({})/{}, {}'.format(addon_name, base_folder, folder_name))
-            raise
+                base_folder = cls.cls_base_folder(addon_option)
+                cls.can_access(client, base_folder)
+
+                folder_name = cls.cls_folder_name_from_node(node)
+                # create_folder() may raise
+                cls.create_folder(client, base_folder, folder_name)
+                try:
+                    region = regions[idx]
+                    osfstorage_nodesetting = NodeSettings.objects.filter(owner_id=node.get_root().id, is_deleted=False, region_id=region.id).first()
+                    addon = node.add_addon(addon_name, auth=Auth(node.creator),
+                                        log=True, region_id=region.id)
+                    addon.set_addon_option(addon_option)
+                    addon.set_folder_id(folder_name)
+                    addon.set_region_id(region.id)
+                    addon.set_root_node_id(osfstorage_nodesetting.root_node.id)
+                    addon.save()
+                    addons.append(addon)
+                    idx = idx + 1
+                except Exception:
+                    try:
+                        cls.remove_folder(client, base_folder, folder_name)
+                    except Exception:
+                        logger.exception(u'cannot remove unnecessary folder: ({})/{}, {}'.format(addon_name, base_folder, folder_name))
+                    raise
+        return addons
 
     @classmethod
     def cls_base_folder(cls, addon_option):
@@ -280,6 +298,13 @@ class InstitutionsStorageAddon(BaseStorageAddon):
     # NOTE: override in s3compatinstitutions
     def set_folder_id(self, folder_id, auth=None):
         self.folder_id = folder_id
+        # NOTE: override in s3compatinstitutions
+
+    def set_region_id(self, region_id, auth=None):
+        self.region_id = region_id
+
+    def set_root_node_id(self, root_node_id, auth=None):
+        self.root_node_id = root_node_id
 
     def sync_title(self):
         new_folder_name = self.cls_folder_name_from_node(self.owner)
@@ -484,24 +509,6 @@ def check_existence_and_create(node, ns, op_name):
         logger.warning(u'{}: cannot create external storage folder: addon_name={}, project title={}, GUID={}: {}'.format(op_name, ns.SHORT_NAME, node.title, node._id, str(e)))
         return False
 
-# get region_provider information ... in_institutions, region_disabled, region_provider
-def get_region_provider(node):
-    osfstorage = node.get_addon('osfstorage')
-    if not osfstorage:
-        return False, None
-    region = osfstorage.region
-    if not region or not region.waterbutler_settings:
-        return False, None  # No valid regions
-    region_id = region._id
-    if not Institution.objects.filter(_id=region_id).exists():
-        return False, None  # No regions for institutional storage
-    region_provider = None
-    region_disabled = region.waterbutler_settings.get(
-        'disabled', False)
-    storage = region.waterbutler_settings.get('storage', None)
-    if storage:
-        region_provider = storage.get('provider', None)
-    return region_disabled, region_provider
 
 # sleep time (sec.) to limit API calls
 SYNC_WAIT = 1

@@ -189,7 +189,7 @@ class BaseFileNode(TypedModel, CommentableMixin, OptionalGuidMixin, Taggable, Ob
         return cls(**kwargs)
 
     @classmethod
-    def get_or_create(cls, target, path):
+    def get_or_create(cls, target, path, parent_id=None):
         content_type = ContentType.objects.get_for_model(target)
 
         ### BaseFileNode cannot be created atomically,
@@ -201,9 +201,15 @@ class BaseFileNode(TypedModel, CommentableMixin, OptionalGuidMixin, Taggable, Ob
         #     obj = cls(target_object_id=target.id, target_content_type=content_type, _path='/' + path.lstrip('/'))
         # return obj
 
-        kwargs = {'target_object_id': target.id,
+        if parent_id:
+            kwargs = {'target_object_id': target.id,
                   'target_content_type': content_type,
-                  '_path': '/' + path.lstrip('/')}
+                  '_path': '/' + path.lstrip('/'),
+                  'parent_id': parent_id}
+        else:
+            kwargs = {'target_object_id': target.id,
+                    'target_content_type': content_type,
+                    '_path': '/' + path.lstrip('/')}
         #objs = cls.objects.filter(**kwargs)
         #if objs.exists():
         #    return objs.first()
@@ -225,7 +231,7 @@ class BaseFileNode(TypedModel, CommentableMixin, OptionalGuidMixin, Taggable, Ob
             return first_obj
 
     @classmethod
-    def get_file_guids(cls, materialized_path, provider, target):
+    def get_file_guids(cls, materialized_path, provider, target, root_path=None):
         content_type = ContentType.objects.get_for_model(target)
         guids = []
         materialized_path = '/' + materialized_path.lstrip('/')
@@ -240,9 +246,14 @@ class BaseFileNode(TypedModel, CommentableMixin, OptionalGuidMixin, Taggable, Ob
         else:
             # it's a file
             try:
-                file_obj = cls.objects.get(
-                    target_object_id=target.id, target_content_type=content_type, _materialized_path=materialized_path
-                )
+                if root_path:
+                    file_obj = cls.objects.get(
+                        target_object_id=target.id, target_content_type=content_type, _path='/' + root_path + materialized_path
+                    )
+                else:
+                    file_obj = cls.objects.get(
+                        target_object_id=target.id, target_content_type=content_type, _materialized_path=materialized_path
+                    )
             except cls.DoesNotExist:
                 return guids
             guid = file_obj.get_guid()
@@ -320,6 +331,7 @@ class BaseFileNode(TypedModel, CommentableMixin, OptionalGuidMixin, Taggable, Ob
             return None
 
     def generate_waterbutler_url(self, **kwargs):
+        logger.debug(f'self path is {self.path}')
         base_url = None
         if hasattr(self.target, 'osfstorage_region'):
             base_url = self.target.osfstorage_region.waterbutler_url
@@ -371,7 +383,10 @@ class BaseFileNode(TypedModel, CommentableMixin, OptionalGuidMixin, Taggable, Ob
         if resp.status_code != 200:
             logger.warning('Unable to find {} got status code {}'.format(self, resp.status_code))
             return None
-        return self.update(revision, resp.json()['data']['attributes'])
+        parent_id = None
+        if 'parent_id' in kwargs:
+            parent_id = kwargs['parent_id']
+        return self.update(revision, resp.json()['data']['attributes'], parent_id=parent_id)
         # TODO Switch back to head requests
         # return self.update(revision, json.loads(resp.headers['x-waterbutler-metadata']))
 
@@ -506,7 +521,7 @@ class File(models.Model):
     def kind(self):
         return 'file'
 
-    def update(self, revision, data, user=None, save=True):
+    def update(self, revision, data, user=None, save=True, parent_id=None):
         """Using revision and data update all data pretaining to self
         :param str or None revision: The revision that data points to
         :param dict data: Metadata received from waterbutler
@@ -514,6 +529,8 @@ class File(models.Model):
         """
         self.name = data['name']
         self.materialized_path = data['materialized']
+        if parent_id:
+            self.parent_id = parent_id
 
         version = FileVersion(identifier=revision)
         version.update_metadata(data, save=False)
@@ -790,6 +807,9 @@ class FileVersion(ObjectIDMixin, BaseModel):
     region = models.ForeignKey('addons_osfstorage.Region', null=True, blank=True, on_delete=models.CASCADE)
 
     includable_objects = IncludeManager()
+
+    def __str__(self):
+        return self.pk
 
     @property
     def location_hash(self):

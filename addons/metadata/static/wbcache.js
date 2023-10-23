@@ -244,9 +244,7 @@ function WaterButlerCache() {
         resolve('__PROVIDER__');
         return;
       }
-      if (item.data.links) {
-        self.setCache('self', item.data.provider + item.data.materialized, item);
-      }
+      self.setCache('self', item.data.provider + item.data.materialized, item);
       if (item.kind === 'file') {
         if (item.data.etag) {
           resolve(item.data.etag);

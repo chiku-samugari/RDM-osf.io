@@ -44,7 +44,6 @@ from website.project.model import NodeUpdateError
 from website.util import quota
 from osf.utils import permissions as osf_permissions
 from api.base import settings as api_settings
-from website import settings as website_settings
 
 
 class RegistrationProviderRelationshipField(RelationshipField):
@@ -100,7 +99,7 @@ class RegionRelationshipField(RelationshipField):
 
     def to_internal_value(self, data):
         try:
-            region_id = Region.objects.filter(_id=data).values_list('id', flat=True).get()
+            region_id = Region.objects.filter(id=data).values_list('id', flat=True).get()
         except Region.DoesNotExist:
             raise exceptions.ValidationError(detail='Region {} is invalid.'.format(data))
         return {'region_id': region_id}
@@ -755,11 +754,11 @@ class NodeSerializer(TaxonomizableSerializerMixin, JSONAPISerializer):
     def get_region_id(self, obj):
         try:
             # use the annotated value if possible
-            region_id = obj.region
+            region_id = obj.region.id
         except AttributeError:
             # use computed property if region annotation does not exist
             # i.e. after creating a node
-            region_id = obj.osfstorage_region._id
+            region_id = obj.osfstorage_region.id
         return region_id
 
     def get_wiki_enabled(self, obj):
@@ -799,7 +798,6 @@ class NodeSerializer(TaxonomizableSerializerMixin, JSONAPISerializer):
             validated_data.pop('creator')
             changed_data = {template_from: validated_data}
             node = template_node.use_as_template(auth=get_user_auth(request), changes=changed_data)
-            node._parent = validated_data.pop('parent', None)
         else:
             node = Node(**validated_data)
         try:
@@ -858,12 +856,15 @@ class NodeSerializer(TaxonomizableSerializerMixin, JSONAPISerializer):
             except ValidationError as e:
                 raise InvalidModelValueError(detail=str(e.message))
 
-        if not region_id:
-            region_id = self.context.get('region_id')
-        if region_id:
-            node_settings = node.get_addon('osfstorage')
-            node_settings.region_id = region_id
-            node_settings.save()
+        # If there is no affiliated institution, set the node setting region by the user's default one,
+        # else continue to use the setting of affiliated institutions.
+        if not user.affiliated_institutions.exists():
+            if not region_id:
+                region_id = self.context.get('region_id')
+            if region_id:
+                node_settings = node.get_addon('osfstorage')
+                node_settings.region_id = region_id
+                node_settings.save()
 
         return node
 
@@ -1392,8 +1393,6 @@ class NodeStorageProviderSerializer(JSONAPISerializer):
     name = ser.CharField(read_only=True)
     path = ser.CharField(read_only=True)
     node = ser.CharField(source='node_id', read_only=True)
-    # GRDM-37149: Attribute value indicating whether it is an institutional storage
-    for_institutions = ser.SerializerMethodField(read_only=True, help_text='Whether the addon is institutional storage')
     provider = ser.CharField(read_only=True)
     files = NodeFileHyperLinkField(
         related_view='nodes:node-files',
@@ -1439,12 +1438,6 @@ class NodeStorageProviderSerializer(JSONAPISerializer):
                 'filter[categories]': 'storage',
             },
         )
-
-    def get_for_institutions(self, obj):
-        # GRDM-37149: Attribute value indicating whether it is an institutional storage
-        if obj.provider not in website_settings.ADDONS_AVAILABLE_DICT:
-            return False
-        return website_settings.ADDONS_AVAILABLE_DICT[obj.provider].for_institutions
 
 class InstitutionRelated(JSONAPIRelationshipSerializer):
     id = ser.CharField(source='_id', required=False, allow_null=True)

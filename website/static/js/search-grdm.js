@@ -93,7 +93,6 @@ var isValidSort = function (sort_name, filter_name) {
         case 'project':
         case 'file':
         case 'wiki':
-        case 'metadata':
         case 'total':
             return true;
 
@@ -104,7 +103,7 @@ var isValidSort = function (sort_name, filter_name) {
 
     case 'file_asc':
     case 'file_desc':
-        if (filter_name === 'file' || filter_name === 'metadata' || filter_name === 'total') {
+        if (filter_name === 'file' || filter_name === 'total') {
             return true;
         } else {
             return false;

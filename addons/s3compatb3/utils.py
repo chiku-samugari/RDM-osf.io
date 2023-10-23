@@ -177,8 +177,9 @@ def get_user_info(host, access_key, secret_key):
         connection = connect_s3compatb3(host, access_key, secret_key)
         buckets = connection.buckets.all()
         [bucket.name for bucket in buckets]
-        identity = boto3.client('sts').get_caller_identity()
-        return identity
+        return connection
+        #identity = boto3.client('sts').get_caller_identity()
+        #return identity
     except ClientError:
         return None
     return None

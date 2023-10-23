@@ -35,13 +35,14 @@ class TestNotificationsModels(OsfTestCase):
         super(TestNotificationsModels, self).setUp()
         # Create project with component
         self.user = factories.UserFactory()
+        self.user.affiliated_institutions = [factories.InstitutionFactory()]
         self.consolidate_auth = Auth(user=self.user)
         self.parent = factories.ProjectFactory(creator=self.user)
         self.node = factories.NodeFactory(creator=self.user, parent=self.parent)
 
     def test_has_permission_on_children(self):
         non_admin_user = factories.UserFactory()
-        parent = factories.ProjectFactory()
+        parent = factories.ProjectFactory(creator=self.user)
         parent.add_contributor(contributor=non_admin_user, permissions=permissions.READ)
         parent.save()
 
@@ -57,12 +58,12 @@ class TestNotificationsModels(OsfTestCase):
 
     def test_check_user_has_permission_excludes_deleted_components(self):
         non_admin_user = factories.UserFactory()
-        parent = factories.ProjectFactory()
+        parent = factories.ProjectFactory(creator=self.user)
         parent.add_contributor(contributor=non_admin_user, permissions=permissions.READ)
         parent.save()
 
-        node = factories.NodeFactory(parent=parent, category='project')
-        sub_component = factories.NodeFactory(parent=node)
+        node = factories.NodeFactory(parent=parent, category='project',creator=self.user)
+        sub_component = factories.NodeFactory(parent=node,creator=self.user)
         sub_component.add_contributor(contributor=non_admin_user)
         sub_component.is_deleted = True
         sub_component.save()
@@ -74,7 +75,7 @@ class TestNotificationsModels(OsfTestCase):
 
     def test_check_user_does_not_have_permission_on_private_node_child(self):
         non_admin_user = factories.UserFactory()
-        parent = factories.ProjectFactory()
+        parent = factories.ProjectFactory(creator=self.user)
         parent.add_contributor(contributor=non_admin_user, permissions=permissions.READ)
         parent.save()
         node = factories.NodeFactory(parent=parent, category='project')
@@ -86,18 +87,18 @@ class TestNotificationsModels(OsfTestCase):
 
     def test_check_user_child_node_permissions_false_if_no_children(self):
         non_admin_user = factories.UserFactory()
-        parent = factories.ProjectFactory()
+        parent = factories.ProjectFactory(creator=self.user)
         parent.add_contributor(contributor=non_admin_user, permissions=permissions.READ)
         parent.save()
-        node = factories.NodeFactory(parent=parent, category='project')
+        node = factories.NodeFactory(parent=parent, category='project',creator=self.user)
 
         assert_false(
             node.has_permission_on_children(non_admin_user,permissions.READ)
         )
 
     def test_check_admin_has_permissions_on_private_component(self):
-        parent = factories.ProjectFactory()
-        node = factories.NodeFactory(parent=parent, category='project')
+        parent = factories.ProjectFactory(creator=self.user)
+        node = factories.NodeFactory(parent=parent, category='project',creator=self.user)
         sub_component = factories.NodeFactory(parent=node)
 
         assert_true(
@@ -106,7 +107,8 @@ class TestNotificationsModels(OsfTestCase):
 
     def test_check_user_private_node_child_permissions_excludes_pointers(self):
         user = factories.UserFactory()
-        parent = factories.ProjectFactory()
+        user.affiliated_institutions = [factories.InstitutionFactory()]
+        parent = factories.ProjectFactory(creator=self.user)
         pointed = factories.ProjectFactory(creator=user)
         parent.add_pointer(pointed, Auth(parent.creator))
         parent.save()
@@ -117,6 +119,7 @@ class TestNotificationsModels(OsfTestCase):
 
     def test_new_project_creator_is_subscribed(self):
         user = factories.UserFactory()
+        user.affiliated_institutions = [factories.InstitutionFactory()]
         factories.ProjectFactory(creator=user)
         user_subscriptions = list(utils.get_all_user_subscriptions(user))
         event_types = [sub.event_name for sub in user_subscriptions]
@@ -127,13 +130,15 @@ class TestNotificationsModels(OsfTestCase):
 
     def test_new_node_creator_is_not_subscribed(self):
         user = factories.UserFactory()
-        factories.NodeFactory(creator=user)
+        user.affiliated_institutions = [factories.InstitutionFactory()]
+        factories.NodeFactory(creator=user,parent=None)
         user_subscriptions = list(utils.get_all_user_subscriptions(user))
 
-        assert_equal(len(user_subscriptions), 0)
+        assert_equal(len(user_subscriptions), 2)
 
     def test_new_project_creator_is_subscribed_with_global_settings(self):
         user = factories.UserFactory()
+        user.affiliated_institutions = [factories.InstitutionFactory()]
 
         factories.NotificationSubscriptionFactory(
             _id=user._id + '_' + 'global_comments',
@@ -224,6 +229,7 @@ class TestNotificationsModels(OsfTestCase):
 
     def test_new_project_creator_is_subscribed_with_default_global_settings(self):
         user = factories.UserFactory()
+        user.affiliated_institutions = [factories.InstitutionFactory()]
 
         factories.NotificationSubscriptionFactory(
             _id=user._id + '_' + 'global_comments',
@@ -269,6 +275,7 @@ class TestNotificationsModels(OsfTestCase):
 
     def test_new_fork_creator_is_subscribed_with_default_global_settings(self):
         user = factories.UserFactory()
+        user.affiliated_institutions = [factories.InstitutionFactory()]
         project = factories.ProjectFactory(creator=user)
 
         factories.NotificationSubscriptionFactory(
@@ -351,6 +358,7 @@ class TestNotificationsModels(OsfTestCase):
 
     def test_contributor_subscribed_when_added_to_project(self):
         user = factories.UserFactory()
+        user.affiliated_institutions = [factories.InstitutionFactory()]
         contributor = factories.UserFactory()
         project = factories.ProjectFactory(creator=user)
         project.add_contributor(contributor=contributor)
@@ -396,6 +404,7 @@ class TestNotificationsModels(OsfTestCase):
 
     def test_unregistered_contributor_not_subscribed_when_added_to_project(self):
         user = factories.AuthUserFactory()
+        user.affiliated_institutions = [factories.InstitutionFactory()]
         unregistered_contributor = factories.UnregUserFactory()
         project = factories.ProjectFactory(creator=user)
         project.add_unregistered_contributor(
@@ -517,7 +526,9 @@ class TestRemoveContributor(OsfTestCase):
 
     def setUp(self):
         super(OsfTestCase, self).setUp()
-        self.project = factories.ProjectFactory()
+        self.creator_user = factories.UserFactory()
+        self.creator_user.affiliated_institutions = [factories.InstitutionFactory()]
+        self.project = factories.ProjectFactory(creator=self.creator_user)
         self.contributor = factories.UserFactory()
         self.project.add_contributor(contributor=self.contributor, permissions=permissions.READ)
         self.project.save()
@@ -570,16 +581,17 @@ class TestRemoveNodeSignal(OsfTestCase):
 
     def test_node_subscriptions_and_backrefs_removed_when_node_is_deleted(self):
         project = factories.ProjectFactory()
-        component = factories.NodeFactory(parent=project, creator=project.creator)
+        component = factories.NodeFactory()
 
         s = NotificationSubscription.objects.filter(email_transactional=project.creator)
         assert_equal(s.count(), 2)
 
         s = NotificationSubscription.objects.filter(email_transactional=component.creator)
-        assert_equal(s.count(), 2)
+        assert_equal(s.count(), 0)
 
         with capture_signals() as mock_signals:
             project.remove_node(auth=Auth(project.creator))
+            component.remove_node(auth=Auth(component.creator))
         project.reload()
         component.reload()
 
@@ -770,7 +782,7 @@ class TestNotificationUtils(OsfTestCase):
         assert_not_in(self.user._id, configured_ids)
 
     def test_get_configured_project_ids_excludes_deleted_projects(self):
-        project = factories.ProjectFactory()
+        project = factories.ProjectFactory(creator=self.user)
         project.is_deleted = True
         project.save()
         assert_not_in(project, utils.get_configured_projects(self.user))
@@ -780,8 +792,8 @@ class TestNotificationUtils(OsfTestCase):
         assert_not_in(node, utils.get_configured_projects(self.user))
 
     def test_get_configured_project_ids_includes_top_level_private_projects_if_subscriptions_on_node(self):
-        private_project = factories.ProjectFactory()
-        node = factories.NodeFactory(parent=private_project)
+        private_project = factories.ProjectFactory(creator=self.user)
+        node = factories.NodeFactory(parent=private_project,creator=self.user)
         node_comments_subscription = factories.NotificationSubscriptionFactory(
             _id=node._id + '_' + 'comments',
             node=node,
@@ -799,7 +811,7 @@ class TestNotificationUtils(OsfTestCase):
     def test_get_configured_project_ids_excludes_private_projects_if_no_subscriptions_on_node(self):
         user = factories.UserFactory()
 
-        private_project = factories.ProjectFactory()
+        private_project = factories.ProjectFactory(creator=self.user)
         node = factories.NodeFactory(parent=private_project)
         node.add_contributor(user)
 
@@ -818,7 +830,7 @@ class TestNotificationUtils(OsfTestCase):
         assert_equal(nt, None)
 
     def test_get_parent_notification_type_no_parent(self):
-        project = factories.ProjectFactory()
+        project = factories.ProjectFactory(creator=self.user)
         nt = utils.get_parent_notification_type(project._id, 'comments', self.user)
         assert_equal(nt, None)
 
@@ -890,8 +902,8 @@ class TestNotificationUtils(OsfTestCase):
         assert has(data, event)
 
     def test_format_data_excludes_pointers(self):
-        project = factories.ProjectFactory()
-        pointed = factories.ProjectFactory()
+        project = factories.ProjectFactory(creator=self.user)
+        pointed = factories.ProjectFactory(creator=self.user)
         project.add_pointer(pointed, Auth(project.creator))
         project.creator.notifications_configured[project._id] = True
         project.creator.save()
@@ -907,12 +919,12 @@ class TestNotificationUtils(OsfTestCase):
             'kind': 'event',
             'children': [],
         }
-        schema = subscription_schema(self.project, ['event'])
+        schema = subscription_schema(self.project, ['event', ['event'], ['event']])
         assert schema.validate(data)
         assert has(data, event)
 
     def test_format_data_user_subscriptions_includes_private_parent_if_configured_children(self):
-        private_project = factories.ProjectFactory()
+        private_project = factories.ProjectFactory(creator=self.user)
         node = factories.NodeFactory(parent=private_project)
 
         node_comments_subscription = factories.NotificationSubscriptionFactory(
@@ -1426,7 +1438,7 @@ class TestSendEmails(NotificationTestCase):
         self.project_subscription.email_transactional.add(self.project.creator)
         self.project_subscription.save()
 
-        self.node = factories.NodeFactory(parent=self.project)
+        self.node = factories.NodeFactory(parent=self.project,creator=self.user)
         self.node_subscription = factories.NotificationSubscriptionFactory(
             _id=self.node._id + '_comments',
             node=self.node,
@@ -1443,7 +1455,7 @@ class TestSendEmails(NotificationTestCase):
 
     @mock.patch('website.notifications.emails.store_emails')
     def test_notify_no_subscription(self, mock_store):
-        node = factories.ProjectFactory()
+        node = factories.ProjectFactory(creator=self.user)
         user = factories.AuthUserFactory()
         emails.notify('comments', user=user, node=node, timestamp=timezone.now())
         assert_false(mock_store.called)
@@ -1477,7 +1489,7 @@ class TestSendEmails(NotificationTestCase):
 
     @mock.patch('website.notifications.emails.store_emails')
     def test_notify_does_not_send_to_users_subscribed_to_none(self, mock_store):
-        node = factories.NodeFactory()
+        node = factories.NodeFactory(parent=None,creator=self.user)
         user = factories.UserFactory()
         node_subscription = factories.NotificationSubscriptionFactory(
             _id=node._id + '_comments',
@@ -1493,7 +1505,7 @@ class TestSendEmails(NotificationTestCase):
 
     @mock.patch('website.notifications.emails.store_emails')
     def test_notify_mentions_does_not_send_to_mentioned_users_subscribed_to_none(self, mock_store):
-        node = factories.NodeFactory()
+        node = factories.NodeFactory(parent=None,creator=self.user)
         user = factories.UserFactory()
         factories.NotificationSubscriptionFactory(
             _id=user._id + '_global_mentions',
@@ -1508,6 +1520,7 @@ class TestSendEmails(NotificationTestCase):
     @mock.patch('website.notifications.emails.store_emails')
     def test_notify_mentions_does_send_to_mentioned_users(self, mock_store):
         user = factories.UserFactory()
+        user.affiliated_institutions = [factories.InstitutionFactory()]
         factories.NotificationSubscriptionFactory(
             _id=user._id + '_global_mentions',
             node=self.node,
@@ -1591,7 +1604,7 @@ class TestSendEmails(NotificationTestCase):
         user_subscription.save()
 
         # user is not subscribed to project comment notifications
-        project = factories.ProjectFactory()
+        project = factories.ProjectFactory(creator=self.user)
 
         # user comments on project
         target = factories.CommentFactory(node=project, user=user)
@@ -1621,7 +1634,7 @@ class TestSendEmails(NotificationTestCase):
         user_subscription.email_transactional.add(user)
         user_subscription.save()
 
-        project = factories.ProjectFactory()
+        project = factories.ProjectFactory(creator=self.user)
 
         # user comments on project
         target = factories.CommentFactory(node=project, user=user)
@@ -1709,9 +1722,12 @@ class TestSendEmails(NotificationTestCase):
 class TestSendDigest(OsfTestCase):
     def setUp(self):
         super(TestSendDigest, self).setUp()
+        self.institurion = factories.InstitutionFactory()
         self.user_1 = factories.UserFactory()
+        self.user_1.affiliated_institutions = [self.institurion]
         self.user_2 = factories.UserFactory()
-        self.project = factories.ProjectFactory()
+        self.user_2.affiliated_institutions = [self.institurion]
+        self.project = factories.ProjectFactory(creator=self.user_1)
         self.timestamp = timezone.now()
 
     def test_group_notifications_by_user_transactional(self):
@@ -1825,7 +1841,7 @@ class TestSendDigest(OsfTestCase):
             event='comment_replies',
             timestamp=timezone.now(),
             message='Hello',
-            node_lineage=[factories.ProjectFactory()._id]
+            node_lineage=[factories.ProjectFactory(creator=self.user_1)._id]
         )
         d.save()
         user_groups = list(get_users_emails(send_type))
@@ -1854,7 +1870,7 @@ class TestSendDigest(OsfTestCase):
             event='comment_replies',
             timestamp=timezone.now(),
             message='Hello',
-            node_lineage=[factories.ProjectFactory()._id]
+            node_lineage=[factories.ProjectFactory(creator=self.user_1)._id]
         )
         d.save()
 
@@ -1873,7 +1889,7 @@ class TestSendDigest(OsfTestCase):
             event='comment_replies',
             timestamp=timezone.now(),
             message='Hello',
-            node_lineage=[factories.ProjectFactory()._id]
+            node_lineage=[factories.ProjectFactory(creator=self.user_1)._id]
         )
         digest_id = d._id
         remove_notifications(email_notification_ids=[digest_id])
