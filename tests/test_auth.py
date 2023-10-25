@@ -140,12 +140,12 @@ class TestAuthUtils(OsfTestCase):
         ticket = fake.md5()
         resp = cas.make_response_from_ticket(ticket, service_url)
         assert_equal(resp.status_code, 302, 'redirect to CAS login')
-        assert_in('%2Flogin%3Fservice%3D', resp.location)
+        assert_in('login?service=', resp.location)
 
         # the valid username will be double quoted as it is furl quoted in both get_login_url and get_logout_url in order
         username_quoted = quote(quote(user.username, safe='@'), safe='@')
-        assert_in('username%3D{}'.format(username_quoted.replace('@','%2540')), resp.location)
-        assert_in('verification_key%3D{}'.format(user.verification_key), resp.location)
+        assert_in('username={}'.format(username_quoted), resp.location)
+        assert_in('verification_key={}'.format(user.verification_key), resp.location)
 
     @mock.patch('framework.auth.cas.get_user_from_cas_resp')
     @mock.patch('framework.auth.cas.CasClient.service_validate')

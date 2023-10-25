@@ -2222,7 +2222,7 @@ class TestOnPreprintUpdatedTask(OsfTestCase):
         user.save()
 
         node = format_user(user)
-        assert {x.attrs['uri'] for x in node.get_related()} == {user.absolute_url, 'mailto:' + user.username}
+        assert {x.attrs['uri'] for x in node.get_related()} == {user.absolute_url}
 
     def test_verified_orcid(self):
         user = UserFactory.build(is_registered=True)
@@ -2230,7 +2230,7 @@ class TestOnPreprintUpdatedTask(OsfTestCase):
         user.save()
 
         node = format_user(user)
-        assert {x.attrs['uri'] for x in node.get_related()} == {'fake-orcid', user.absolute_url, user.profile_image_url(), 'mailto:' + user.username}
+        assert {x.attrs['uri'] for x in node.get_related()} == {'fake-orcid', user.absolute_url, user.profile_image_url()}
 
     def test_unverified_orcid(self):
         user = UserFactory.build(is_registered=True)
@@ -2238,7 +2238,7 @@ class TestOnPreprintUpdatedTask(OsfTestCase):
         user.save()
 
         node = format_user(user)
-        assert {x.attrs['uri'] for x in node.get_related()} == {user.absolute_url, user.profile_image_url(),'mailto:' + user.username}
+        assert {x.attrs['uri'] for x in node.get_related()} == {user.absolute_url, user.profile_image_url()}
 
 
 class TestPreprintSaveShareHook(OsfTestCase):
