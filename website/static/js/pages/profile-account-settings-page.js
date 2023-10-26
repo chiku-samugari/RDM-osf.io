@@ -15,7 +15,9 @@ $(function() {
     $osf.applyBindings(viewModel, '#connectedEmails');
     viewModel.init();
 
-    new passwordForms.ChangePassword('#changePassword');
+    if($('#changePassword').length){
+        new passwordForms.ChangePassword('#changePassword');
+    }
 
     $osf.applyBindings(
         new accountSettings.DeactivateAccountViewModel(),
