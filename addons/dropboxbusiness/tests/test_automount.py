@@ -1,6 +1,6 @@
 import unittest
 
-from mock import patch, Mock
+from mock import patch, Mock, MagicMock
 import pytest
 from nose.tools import *  # noqa (PEP8 asserts)
 from framework.auth.core import Auth
@@ -15,10 +15,13 @@ from osf_tests.factories import (
     ExternalAccountFactory,
     UserFactory,
     ProjectFactory,
-    RegionFactory
+    RegionFactory,
 )
 from addons.dropboxbusiness.models import NodeSettings
 from admin_tests.rdm_addons import factories as rdm_addon_factories
+from addons.osfstorage.models import Region,NodeSettings as osfNodeSettings
+from admin_tests.rdm_addons import factories as rdm_addon_factories
+from osf.models.files import BaseFileNode
 
 pytestmark = pytest.mark.django_db
 
@@ -28,6 +31,7 @@ class DropboxBusinessAccountFactory(ExternalAccountFactory):
 FILEACCESS_NAME = 'dropboxbusiness'
 MANAGEMENT_NAME = 'dropboxbusiness_manage'
 DBXBIZ = 'addons.dropboxbusiness'
+
 
 class TestDropboxBusiness(unittest.TestCase):
 
@@ -43,9 +47,9 @@ class TestDropboxBusiness(unittest.TestCase):
         self.user.save()
 
         self.f_option = get_rdm_addon_option(self.institution.id,
-                                             FILEACCESS_NAME)
+                                             FILEACCESS_NAME).first()
         self.m_option = get_rdm_addon_option(self.institution.id,
-                                             MANAGEMENT_NAME)
+                                             MANAGEMENT_NAME).first()
 
         f_account = ExternalAccountFactory(provider=FILEACCESS_NAME)
         m_account = ExternalAccountFactory(provider=MANAGEMENT_NAME)
@@ -57,10 +61,24 @@ class TestDropboxBusiness(unittest.TestCase):
         with patch(DBXBIZ + '.utils.TeamInfo') as mock1, \
              patch(DBXBIZ + '.utils.get_current_admin_group_and_sync') as mock2, \
              patch(DBXBIZ + '.utils.get_current_admin_dbmid') as mock3, \
-             patch(DBXBIZ + '.utils.create_team_folder') as mock4:
+             patch(DBXBIZ + '.utils.create_team_folder') as mock4, \
+             patch( 'admin.institutions.views.Region.objects.filter') as mock5,\
+             patch( 'admin.institutions.views.Region.objects.get') as mock6,\
+             patch( 'addons.osfstorage.models.NodeSettings.objects.filter') as mock7:
             mock2.return_value = (Mock(), Mock())
             mock3.return_value = 'dbmid:dummy'
             mock4.return_value = ('dbtid:dummy', 'g:dummy')
+            region = RegionFactory()
+            region_filter = MagicMock ()
+            region_filter.order_by.return_value = [region]
+            mock5.return_value = region_filter
+            mock6.return_value = region
+            node = osfNodeSettings()
+            basefileNode= BaseFileNode()
+            node.root_node = basefileNode
+            node_filter = MagicMock ()
+            node_filter.first.return_value = node
+            mock7.return_value = node_filter
             self.project = ProjectFactory(creator=self.user)
 
     def _allowed(self):
@@ -118,17 +136,15 @@ class TestAppDropboxbussiness(OsfTestCase):
         self.ADDON_SHORT_NAME = 'dropboxbusiness'
         self.node_settings.save()
 
-    @patch('admin.institutions.views.Region.objects')
-    def test_dropboxbusiness_root(self, mock_region_objects_filter):
+
+    def test_dropboxbusiness_root(self):
         institution = InstitutionFactory(_id=123456)
-        region = RegionFactory()
+        region = Region()
         region._id = institution._id
         region.waterbutler_settings__storage__provider = self.ADDON_SHORT_NAME
-        self.node_settings.fileaccess_option = get_rdm_addon_option(institution.id, FILEACCESS_NAME)
+        self.node_settings.fileaccess_option = get_rdm_addon_option(institution.id, FILEACCESS_NAME).first()
+        self.node_settings.region = region
+        self.node_settings.root_node = BaseFileNode()
         region.save()
-        mock_region_objects_filter.return_value = region
-        mock_region_objects_filter.return_value.exists.return_value = True
         result = dropboxbusiness_root(addon_config='', node_settings=self.node_settings, auth=self.auth)
         assert isinstance(result, list)
-
-

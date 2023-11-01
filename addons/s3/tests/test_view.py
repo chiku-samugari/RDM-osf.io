@@ -71,7 +71,7 @@ class TestS3Views(S3AddonTestCase, OAuthAddonConfigViewsTestCaseMixin, OsfTestCa
         institution = InstitutionFactory()
         self.user.affiliated_institutions.add(institution)
         self.user.save()
-        rdm_addon_option = get_rdm_addon_option(institution.id, self.ADDON_SHORT_NAME)
+        rdm_addon_option = get_rdm_addon_option(institution.id, self.ADDON_SHORT_NAME).first()
         rdm_addon_option.is_allowed = False
         rdm_addon_option.save()
         url = self.project.api_url_for('s3_add_user_account')

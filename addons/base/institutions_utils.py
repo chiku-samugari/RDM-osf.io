@@ -192,7 +192,7 @@ class InstitutionsStorageAddon(BaseStorageAddon):
     @classmethod
     def cls_init_addon(cls, node, institution_id, addon_name):
         logger.debug(f'addon_name is {addon_name}')
-        logger.debug('root node id is {node}')
+        logger.debug(f'root node id is {node}')
         # Note: May be impact when multiple
         addon_options = cls.cls_get_addon_option(institution_id, addon_name)
         if addon_options is None or not addon_options.exists():
