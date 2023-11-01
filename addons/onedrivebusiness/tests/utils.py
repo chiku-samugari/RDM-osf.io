@@ -96,7 +96,7 @@ class OneDriveBusinessAddonTestCase(OAuthAddonTestCaseMixin, AddonTestCase):
         mock_region_objects_filter.return_value = mock_region_object
         mock_region_external_object = mock.Mock()
         mock_region_external_object.exists.return_value = True
-        mock_region_external_object.first.return_value = {'test': True} 
+        mock_region_external_object.first.return_value = {'test': True}
         mock_region_external_account_objects_filter.return_value = mock_region_external_object
 
         ret = utils.get_region_external_account(mock_node)
