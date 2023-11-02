@@ -23,7 +23,8 @@ class TestDropboxNodeSettings(OAuthAddonNodeSettingsTestSuiteMixin, unittest.Tes
         return {
             'user_settings': self.user_settings,
             'folder': '1234567890',
-            'owner': self.node
+            'owner': self.node,
+            'nid': self.node._id
         }
 
     def test_folder_defaults_to_none(self):

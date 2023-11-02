@@ -30,14 +30,10 @@ from django.contrib.auth.models import Permission
 from framework.auth.core import Auth
 
 from tests.base import AdminTestCase
-from osf_tests.factories import UserFactory, AuthUserFactory, ProjectFactory, RegistrationFactory, NodeFactory, InstitutionFactory
+from osf_tests.factories import UserFactory, AuthUserFactory, ProjectFactory, RegistrationFactory, NodeFactory
 
 
 class TestNodeView(AdminTestCase):
-    def setUp(self):
-        super(TestNodeView, self).setUp()
-        self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
 
     def test_get_flagged_spam(self):
         user = AuthUserFactory()
@@ -74,7 +70,7 @@ class TestNodeView(AdminTestCase):
             view.get_object()
 
     def test_load_data(self):
-        node = ProjectFactory(creator=self.user)
+        node = ProjectFactory()
         guid = node._id
         request = RequestFactory().get('/fake_path')
         view = NodeView()
@@ -83,7 +79,7 @@ class TestNodeView(AdminTestCase):
         nt.assert_is_instance(res, dict)
 
     def test_name_data(self):
-        node = ProjectFactory(creator=self.user)
+        node = ProjectFactory()
         guid = node._id
         request = RequestFactory().get('/fake_path')
         view = NodeView()
@@ -95,8 +91,7 @@ class TestNodeView(AdminTestCase):
 
     def test_no_user_permissions_raises_error(self):
         user = AuthUserFactory()
-        user.affiliated_institutions = [InstitutionFactory()]
-        node = ProjectFactory(creator=user)
+        node = ProjectFactory()
         guid = node._id
         request = RequestFactory().get(reverse('nodes:node', kwargs={'guid': guid}))
         request.user = user
@@ -106,8 +101,7 @@ class TestNodeView(AdminTestCase):
 
     def test_correct_view_permissions(self):
         user = AuthUserFactory()
-        user.affiliated_institutions = [InstitutionFactory()]
-        node = ProjectFactory(creator=user)
+        node = ProjectFactory()
         guid = node._id
 
         change_permission = Permission.objects.get(codename='view_node')
@@ -124,9 +118,7 @@ class TestNodeView(AdminTestCase):
 class TestNodeDeleteView(AdminTestCase):
     def setUp(self):
         super(TestNodeDeleteView, self).setUp()
-        self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
-        self.node = ProjectFactory(creator=self.user)
+        self.node = ProjectFactory()
         self.request = RequestFactory().post('/fake_path')
         self.plain_view = NodeDeleteView
         self.view = setup_log_view(self.plain_view(), self.request,
@@ -143,8 +135,8 @@ class TestNodeDeleteView(AdminTestCase):
         nt.assert_in('guid', res)
         nt.assert_equal(res.get('guid'), self.node._id)
 
-    @mock.patch('website.util.quota.update_user_used_quota')
-    def test_remove_node(self, mock_update_user_used_quota_method):
+    @mock.patch('website.util.quota.recalculate_used_quota_by_user')
+    def test_remove_node(self, mock_recalculate_used_quota_by_user_method):
         count = AdminLogEntry.objects.count()
         mock_now = datetime.datetime(2017, 3, 16, 11, 00, tzinfo=pytz.utc)
         with mock.patch.object(timezone, 'now', return_value=mock_now):
@@ -153,11 +145,11 @@ class TestNodeDeleteView(AdminTestCase):
         nt.assert_true(self.node.is_deleted)
         nt.assert_equal(AdminLogEntry.objects.count(), count + 1)
         nt.assert_equal(self.node.deleted, mock_now)
-        mock_update_user_used_quota_method.assert_called()
+        mock_recalculate_used_quota_by_user_method.assert_called()
 
-    @mock.patch('website.util.quota.update_user_used_quota')
-    def test_remove_node_is_not_project_type(self, mock_update_user_used_quota_method):
-        node = NodeFactory(parent=self.node, creator=self.user)
+    @mock.patch('website.util.quota.recalculate_used_quota_by_user')
+    def test_remove_node_is_not_project_type(self, mock_recalculate_used_quota_by_user_method):
+        node = NodeFactory()
         self.view = setup_log_view(self.plain_view(), self.request,
                                    guid=node._id)
         count = AdminLogEntry.objects.count()
@@ -168,10 +160,10 @@ class TestNodeDeleteView(AdminTestCase):
         nt.assert_true(node.is_deleted)
         nt.assert_equal(AdminLogEntry.objects.count(), count + 1)
         nt.assert_equal(node.deleted, mock_now)
-        mock_update_user_used_quota_method.assert_not_called()
+        mock_recalculate_used_quota_by_user_method.assert_not_called()
 
-    @mock.patch('website.util.quota.update_user_used_quota')
-    def test_restore_node(self, mock_update_user_used_quota_method):
+    @mock.patch('website.util.quota.recalculate_used_quota_by_user')
+    def test_restore_node(self, mock_recalculate_used_quota_by_user_method):
         self.view.delete(self.request)
         self.node.refresh_from_db()
         nt.assert_true(self.node.is_deleted)
@@ -182,11 +174,11 @@ class TestNodeDeleteView(AdminTestCase):
         nt.assert_false(self.node.is_deleted)
         nt.assert_true(self.node.deleted is None)
         nt.assert_equal(AdminLogEntry.objects.count(), count + 1)
-        mock_update_user_used_quota_method.assert_called()
+        mock_recalculate_used_quota_by_user_method.assert_called()
 
-    @mock.patch('website.util.quota.update_user_used_quota')
-    def test_restore_node_is_not_project_type(self, mock_update_user_used_quota_method):
-        node = NodeFactory(parent=self.node, creator=self.user)
+    @mock.patch('website.util.quota.recalculate_used_quota_by_user')
+    def test_restore_node_is_not_project_type(self, mock_recalculate_used_quota_by_user_method):
+        node = NodeFactory()
         self.view = setup_log_view(self.plain_view(), self.request,
                                    guid=node._id)
         self.view.delete(self.request)
@@ -199,7 +191,7 @@ class TestNodeDeleteView(AdminTestCase):
         nt.assert_false(node.is_deleted)
         nt.assert_true(node.deleted is None)
         nt.assert_equal(AdminLogEntry.objects.count(), count + 1)
-        mock_update_user_used_quota_method.assert_not_called()
+        mock_recalculate_used_quota_by_user_method.assert_not_called()
 
     def test_no_user_permissions_raises_error(self):
         user = AuthUserFactory()
@@ -231,7 +223,6 @@ class TestRemoveContributor(AdminTestCase):
     def setUp(self):
         super(TestRemoveContributor, self).setUp()
         self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
         self.node = ProjectFactory(creator=self.user)
         self.user_2 = AuthUserFactory()
         self.node.add_contributor(self.user_2)
@@ -319,7 +310,6 @@ class TestNodeReindex(AdminTestCase):
         self.request = RequestFactory().post('/fake_path')
 
         self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
         self.node = ProjectFactory(creator=self.user)
         self.registration = RegistrationFactory(project=self.node, creator=self.user)
 
@@ -373,7 +363,6 @@ class TestNodeConfirmHamView(AdminTestCase):
 
         self.request = RequestFactory().post('/fake_path')
         self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
 
         self.node = ProjectFactory(creator=self.user)
         self.registration = RegistrationFactory(creator=self.user)
@@ -402,7 +391,6 @@ class TestAdminNodeLogView(AdminTestCase):
 
         self.request = RequestFactory().post('/fake_path')
         self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
         self.auth = Auth(self.user)
         self.node = ProjectFactory(creator=self.user)
 
@@ -466,7 +454,6 @@ class TestRestartStuckRegistrationsView(AdminTestCase):
     def setUp(self):
         super(TestRestartStuckRegistrationsView, self).setUp()
         self.user = AuthUserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
         self.registration = RegistrationFactory(creator=self.user)
         self.registration.save()
         self.view = RestartStuckRegistrationsView
@@ -520,7 +507,6 @@ class TestRemoveStuckRegistrationsView(AdminTestCase):
     def setUp(self):
         super(TestRemoveStuckRegistrationsView, self).setUp()
         self.user = UserFactory()
-        self.user.affiliated_institutions = [InstitutionFactory()]
         self.registration = RegistrationFactory(creator=self.user)
         # Make the registration "stuck"
         archive_job = self.registration.archive_job
