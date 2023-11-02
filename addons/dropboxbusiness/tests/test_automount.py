@@ -22,7 +22,7 @@ from admin_tests.rdm_addons import factories as rdm_addon_factories
 from addons.osfstorage.models import Region,NodeSettings as osfNodeSettings
 from admin_tests.rdm_addons import factories as rdm_addon_factories
 from osf.models.files import BaseFileNode
-
+from tests.test_websitefiles import TestFile
 pytestmark = pytest.mark.django_db
 
 class DropboxBusinessAccountFactory(ExternalAccountFactory):
@@ -65,6 +65,9 @@ class TestDropboxBusiness(unittest.TestCase):
              patch( 'admin.institutions.views.Region.objects.filter') as mock5,\
              patch( 'admin.institutions.views.Region.objects.get') as mock6,\
              patch( 'addons.osfstorage.models.NodeSettings.objects.filter') as mock7:
+            team_info = Mock()
+            team_info.group_name_to_id = {'dropboxbusiness':'g:dummy'}
+            mock1.return_value = team_info
             mock2.return_value = (Mock(), Mock())
             mock3.return_value = 'dbmid:dummy'
             mock4.return_value = ('dbtid:dummy', 'g:dummy')
@@ -74,7 +77,8 @@ class TestDropboxBusiness(unittest.TestCase):
             mock5.return_value = region_filter
             mock6.return_value = region
             node = osfNodeSettings()
-            basefileNode= BaseFileNode()
+            basefileNode=TestFile.get_or_create(ProjectFactory(), 'folder/path')
+            basefileNode.save()
             node.root_node = basefileNode
             node_filter = MagicMock ()
             node_filter.first.return_value = node
