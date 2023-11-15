@@ -16,6 +16,7 @@ from rest_framework.parsers import JSONParser
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from requests.exceptions import ReadTimeout, ConnectionError
 
 from addons.osfstorage.models import Region
 from admin.rdm_custom_storage_location import tasks
@@ -234,12 +235,17 @@ def export_data_process(task, cookies, export_data_id, **kwargs):
             if task.is_aborted():  # check before each steps
                 raise ExportDataTaskException(MSG_EXPORT_ABORTED)
             # copy data file from source storage to location storage
-            response = export_data.copy_export_data_file_to_location(
-                cookies, project_id, provider, file_path, file_name, **kwargs)
-            # 201: created -> update cache list
-            if response.status_code == 201:
-                created_filename_list.append(file_name)
-            else:
+            try:
+                response = export_data.copy_export_data_file_to_location(
+                    cookies, project_id, provider, file_path, file_name, **kwargs)
+                # 201: created -> update cache list
+                if response.status_code == 201:
+                    created_filename_list.append(file_name)
+                else:
+                    list_file_id_not_found.append(file_id)
+                    continue
+            except (ReadTimeout, ConnectionError):
+                logger.error(f'Timeout exception occurs. Add file_id to list failed files. file_id: {file_id}')
                 list_file_id_not_found.append(file_id)
                 continue
 
