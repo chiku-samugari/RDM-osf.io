@@ -499,6 +499,8 @@ var LogPieces = {
                     'nextcloudinstitutions_file_added', 'nextcloudinstitutions_file_updated',
                     'dropboxbusiness_file_added', 'dropboxbusiness_file_updated',
                     's3compatinstitutions_file_added', 's3compatinstitutions_file_updated',
+                    'ociinstitutions_file_added', 'ociinstitutions_file_updated',
+                    'onedrivebusiness_file_added', 'onedrive_file_updated',
                     'timestamp_added'];
                     if (acceptableLinkedItems.indexOf(action) !== -1 && logObject.attributes.params.urls) {
                        return logObject.attributes.params.urls.view;

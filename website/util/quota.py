@@ -119,56 +119,87 @@ def get_project_storage_type(node):
 @file_signals.file_updated.connect
 def update_used_quota(self, target, user, event_type, payload):
     data = dict(payload.get('metadata', {}))
+    logger.debug(f'payload data is {dict(payload)}')
     provider = data.get('provider')
-
+    # Case move/copy
+    if not provider and payload.get('destination'):
+        provider = payload['destination']['provider']
     if provider not in ENABLE_QUOTA_PROVIDERS:
         return
-
+    kind = data.get('kind')
+    # Case move
+    if not kind:
+        kind = payload['destination']['kind']
     action = dict(payload).get('action')
     target_content_type_id = ContentType.objects.get_for_model(AbstractNode)
+    file_node = None
+    # When move/rename won't get basefilenode
+    if event_type != FileLog.FILE_MOVED and event_type != FileLog.FILE_COPIED and event_type != FileLog.FILE_RENAMED:
+        try:
+            if provider not in ADDON_METHOD_PROVIDER:
+                if data.get('path'):
+                    file_node = BaseFileNode.objects.get(
+                        _id=data.get('path').strip('/'),
+                        target_object_id=target.id,
+                        target_content_type_id=target_content_type_id
+                    )
+                # elif payload['destination']['path']:
+                #     logger.warning('dest path '+str(payload['destination']['path']))
+                #     file_node = BaseFileNode.objects.get(
+                #         _id=payload['destination']['path'].strip('/'),
+                #         target_object_id=target.id,
+                #         target_content_type_id=target_content_type_id
+                #     )
+            else:
+                if data.get('kind') == 'folder' and action == 'create_folder':
+                    return
+                if payload.get('root_path'):
+                    root_path = payload.get('root_path').strip('/')
+                # elif payload ['destination']['root_path']:
+                #     root_path = payload ['destination']['root_path'].strip('/')
+                materialized = data.get('materialized')
+                name = data.get('name')
+                # if event_type == FileLog.FILE_MOVED:
+                #     root_path = payload['destination']['root_path'].strip('/')
+                #     materialized = payload['destination']['materialized']
+                #     name = payload['destination']['name']
+                logger.debug(f'provider is {provider}')
+                logger.debug(f'root_path is {root_path}')
+                logger.debug(f'materialized is {materialized}')
+                # If provider is onedrivebusiness will find by materialized_path
+                if provider == 'onedrivebusiness':
+                    file_node = BaseFileNode.objects.filter(
+                        _materialized_path='/' + materialized.strip('/'),
+                        name=name,
+                        provider=provider,
+                        type='osf.onedrivebusinessfile',
+                        target_object_id=target.id,
+                        target_content_type=target_content_type_id,
+                    ).order_by('-id').first()
+                else:
+                    file_node = BaseFileNode.objects.filter(
+                        _path='/' + root_path + '/' + materialized.strip('/'),
+                        name=name,
+                        provider=provider,
+                        target_object_id=target.id,
+                        target_content_type=target_content_type_id
+                    ).order_by('-id').first()
 
-    try:
-        if provider not in ADDON_METHOD_PROVIDER:
-            file_node = BaseFileNode.objects.get(
-                _id=data.get('path').strip('/'),
-                target_object_id=target.id,
-                target_content_type_id=target_content_type_id
-            )
-        else:
-            if data.get('kind') == 'folder' and action == 'create_folder':
-                base_file_node = BaseFileNode(
-                    type='osf.{}folder'.format(provider),
-                    provider=provider,
-                    _path=data.get('materialized'),
-                    _materialized_path=data.get('materialized'),
-                    target_object_id=target.id,
-                    target_content_type=target_content_type_id
-                )
-                base_file_node.save()
-                return
-
-            file_node = BaseFileNode.objects.filter(
-                _path=data.get('materialized'),
-                name=data.get('name'),
-                provider=provider,
-                target_object_id=target.id,
-                target_content_type=target_content_type_id
-            ).order_by('-id').first()
-
-        if file_node is None:
-            raise BaseFileNode.DoesNotExist
-    except BaseFileNode.DoesNotExist:
-        logger.error('FileNode not found, cannot update used quota!')
-        return
-
-    storage_type = get_project_storage_type(target)
+            if file_node is None and kind != 'folder':
+                raise BaseFileNode.DoesNotExist
+        except BaseFileNode.DoesNotExist:
+            logger.error('FileNode not found, cannot update used quota!')
+            return
+        storage_type = get_project_storage_type(target)
 
     if event_type == FileLog.FILE_ADDED:
         file_added(target, payload, file_node, storage_type)
     elif event_type == FileLog.FILE_REMOVED:
+        # Remove from bulkmount
         if provider not in ADDON_METHOD_PROVIDER:
             node_removed(target, payload, file_node, storage_type)
-        elif data.get('kind') == 'file':
+        # Remove file from addon
+        elif kind == 'file':
             file_node.is_deleted = True
             file_node.deleted = timezone.now()
             file_node.deleted_on = file_node.deleted
@@ -176,14 +207,26 @@ def update_used_quota(self, target, user, event_type, payload):
             file_node.deleted_by_id = user.id
             file_node.save()
             node_removed(target, payload, file_node, storage_type)
-        elif data.get('kind') == 'folder':
+        # Remove folder from addon
+        elif kind == 'folder':
+            # if provider in ADDON_METHOD_PROVIDER:
+            root_file_node = BaseFileNode.objects.get(_id=payload.get('root_path').strip('/'))
             list_file_node = BaseFileNode.objects.filter(
                 _materialized_path__startswith=data.get('materialized'),
                 provider=provider,
                 deleted=None,
                 target_object_id=target.id,
-                target_content_type_id=target_content_type_id
+                target_content_type_id=target_content_type_id,
+                parent_id=root_file_node.id if root_file_node else None
             ).all()
+            # else:
+            #     list_file_node = BaseFileNode.objects.filter(
+            #         _materialized_path__startswith=data.get('materialized'),
+            #         provider=provider,
+            #         deleted=None,
+            #         target_object_id=target.id,
+            #         target_content_type_id=target_content_type_id
+            #     ).all()
             for file_node in list_file_node:
                 file_node.is_deleted = True
                 file_node.deleted = timezone.now()
@@ -200,7 +243,8 @@ def update_used_quota(self, target, user, event_type, payload):
         file_modified(target, user, payload, file_node, storage_type)
     elif event_type == FileLog.FILE_MOVED:
         file_moved(target, payload)
-
+    elif event_type == FileLog.FILE_COPIED:
+        file_copied(target, payload)
 
 def file_added(target, payload, file_node, storage_type):
     file_size = int(payload['metadata']['size'])
@@ -208,7 +252,7 @@ def file_added(target, payload, file_node, storage_type):
         return
 
     region_id = get_region_id_of_institutional_storage_by_path(
-        target, payload['provider'], payload['metadata']['path'], storage_type)
+        target, payload['provider'], payload['metadata']['path'], storage_type, file_node)
     if region_id is None:
         logging.error('Institutional storage not found, cannot update used quota!')
         return
@@ -227,7 +271,7 @@ def file_added(target, payload, file_node, storage_type):
 
 def node_removed(target, payload, file_node, storage_type):
     region_id = get_region_id_of_institutional_storage_by_path(
-        target, payload['provider'], payload['metadata']['path'], storage_type)
+        target, payload['provider'], payload['metadata']['path'], storage_type, file_node)
     if region_id is None:
         logging.error('Institutional storage not found, cannot update used quota!')
         return
@@ -259,7 +303,7 @@ def file_modified(target, user, payload, file_node, storage_type):
     if file_size < 0:
         return
 
-    region_id = get_region_id_of_institutional_storage_by_path(target, payload['provider'], payload['metadata']['path'], storage_type)
+    region_id = get_region_id_of_institutional_storage_by_path(target, payload['provider'], payload['metadata']['path'], storage_type, file_node)
     if region_id is None:
         logging.error('Institutional storage not found, cannot update used quota!')
         return
@@ -283,6 +327,18 @@ def file_modified(target, user, payload, file_node, storage_type):
     file_info.file_size = file_size
     file_info.save()
 
+
+def get_file_size(children):
+    children = children.get('children', [])
+    size = 0
+    for child in children:
+        if child['kind'] == 'file':
+            size += int(child['size'])
+        else:
+            size += get_file_size(child)
+    return size
+
+
 def file_moved(target, payload):
     """Update per-user-per-storage used quota when moving file
 
@@ -295,14 +351,38 @@ def file_moved(target, payload):
     if isinstance(target, AbstractNode):
         storage_type = get_project_storage_type(target)
         if storage_type == ProjectStorageType.CUSTOM_STORAGE:
-            file_size = int(payload['destination']['size'])
+            file_size = -1
+            dest_size = payload['destination'].get('size', None)
+            children = payload['destination'].get('children', None)
+            # Move file
+            if dest_size is not None:
+                file_size = int(dest_size)
+            # Move folder
+            elif children is not None:
+                file_size = get_file_size(payload['destination'])
+            logger.debug(f'file size is {file_size}')
             if file_size < 0:
                 return
 
+            # Move to bulkmount
             if payload['destination']['provider'] == 'osfstorage':
                 node_addon_destination = get_addon_osfstorage_by_path(
                     target,
-                    payload['destination']['path'],
+                    payload['destination']['path'] if payload['destination']['kind'] == 'file' else payload['destination']['root_path'] + '/' + payload['destination']['materialized'],
+                    payload['destination']['provider']
+                )
+
+                if node_addon_destination is not None:
+                    update_institutional_storage_used_quota(
+                        target.creator,
+                        node_addon_destination.region,
+                        file_size
+                    )
+            # Move to addon
+            elif payload['destination']['provider'] in ADDON_METHOD_PROVIDER:
+                node_addon_destination = get_addon_osfstorage_by_path(
+                    target,
+                    payload['destination']['root_path'] + '/' + payload['destination']['materialized'],
                     payload['destination']['provider']
                 )
 
@@ -315,6 +395,7 @@ def file_moved(target, payload):
 
             source_node_id = payload['source']['nid']
             source_node = AbstractNode.objects.get(guids___id=source_node_id)
+            # Move from bulkmount
             if payload['source']['provider'] == 'osfstorage' \
                     and source_node.type != 'osf.quickfilesnode':
                 node_addon_source = get_addon_osfstorage_by_path(
@@ -330,9 +411,24 @@ def file_moved(target, payload):
                         file_size,
                         add=False
                     )
+            # Move to addon
+            elif payload['source']['provider'] in ADDON_METHOD_PROVIDER \
+                    and source_node.type != 'osf.quickfilesnode':
+                node_addon_source = get_addon_osfstorage_by_path(
+                    target,
+                    payload['source']['root_path'] + '/' + payload['source']['materialized'],
+                    payload['source']['provider']
+                )
+                if node_addon_source is not None:
+                    update_institutional_storage_used_quota(
+                        target.creator,
+                        node_addon_source.region,
+                        file_size,
+                        add=False
+                    )
 
 def update_default_storage(user):
-    # logger.debug('----{}:{}::{} from {}:{}::{}'.format(*inspect_info(inspect.currentframe(), inspect.stack())))
+    #logger.debug('----{}:{}::{} from {}:{}::{}'.format(*inspect_info(inspect.currentframe(), inspect.stack())))
     # logger.info(user)
     if user is not None:
         user_settings = user.get_addon('osfstorage')
@@ -368,7 +464,7 @@ def get_node_file_list(file_node):
     return file_list
 
 
-def get_region_id_of_institutional_storage_by_path(target, provider, path, storage_type):
+def get_region_id_of_institutional_storage_by_path(target, provider, path, storage_type, file_node=None, root_path=None):
     region_id = NII_STORAGE_REGION_ID
     if storage_type != ProjectStorageType.CUSTOM_STORAGE:
         return region_id
@@ -380,11 +476,20 @@ def get_region_id_of_institutional_storage_by_path(target, provider, path, stora
         else:
             return None
     elif provider in ADDON_METHOD_PROVIDER:
+        node_addon = None
+        if file_node and hasattr(file_node, 'parent_id'):
+            if hasattr(target, 'get_addon'):
+                node_addon = target.get_addon(provider, root_id=file_node.parent_id)
+        elif root_path:
+            root_file_node = BaseFileNode.objects.filter(_id=root_path).first()
+            if root_file_node:
+                node_addon = target.get_addon(provider, root_id=root_file_node.id)
         institution = target.creator.affiliated_institutions.first()
-        if institution:
+        if institution and node_addon:
             regions = Region.objects.filter(
                 _id=institution._id,
-                waterbutler_settings__storage__provider=provider
+                waterbutler_settings__storage__provider=provider,
+                id=node_addon.region.id
             )
             region = regions.first()
             if region is None:
@@ -440,6 +545,7 @@ def update_institutional_storage_used_quota(creator, region, size, add=True):
             user_storage_quota.used = 0
 
         user_storage_quota.save()
+        logger.debug(f'used quota was updated is {user_storage_quota}')
     except UserStorageQuota.DoesNotExist:
         storage_max_quota = api_settings.DEFAULT_MAX_QUOTA
 
@@ -701,3 +807,57 @@ def update_institutional_storage_max_quota(user, region, max_quota):
             storage_type=UserQuota.CUSTOM_STORAGE,
             max_quota=max_quota,
         )
+
+def file_copied(target, payload):
+    """Update per-user-per-storage used quota when moving file
+
+    :param Object target: Id of project
+    :param str path: _Id of file or folder
+    :param str provider: The addon name
+    :return Object: The addon is found
+
+    """
+    if isinstance(target, AbstractNode):
+        storage_type = get_project_storage_type(target)
+        if storage_type == ProjectStorageType.CUSTOM_STORAGE:
+            file_size = -1
+            dest_size = payload['destination'].get('size', None)
+            children = payload['destination'].get('children', None)
+            # Move file
+            if dest_size is not None:
+                file_size = int(dest_size)
+            # Move folder
+            elif children is not None:
+                file_size = get_file_size(payload['destination'])
+            logger.debug(f'file size is {file_size}')
+            if file_size < 0:
+                return
+
+            # Move to bulkmount
+            if payload['destination']['provider'] == 'osfstorage':
+                node_addon_destination = get_addon_osfstorage_by_path(
+                    target,
+                    payload['destination']['path'] if payload['destination']['kind'] == 'file' else payload['destination']['root_path'] + '/' + payload['destination']['materialized'],
+                    payload['destination']['provider']
+                )
+
+                if node_addon_destination is not None:
+                    update_institutional_storage_used_quota(
+                        target.creator,
+                        node_addon_destination.region,
+                        file_size
+                    )
+            # Move to addon
+            elif payload['destination']['provider'] in ADDON_METHOD_PROVIDER:
+                node_addon_destination = get_addon_osfstorage_by_path(
+                    target,
+                    payload['destination']['root_path'] + '/' + payload['destination']['materialized'],
+                    payload['destination']['provider']
+                )
+
+                if node_addon_destination is not None:
+                    update_institutional_storage_used_quota(
+                        target.creator,
+                        node_addon_destination.region,
+                        file_size
+                    )

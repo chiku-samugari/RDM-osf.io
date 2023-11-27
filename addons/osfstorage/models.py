@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 import logging
 
 from django.apps import apps
+from django.db.models import IntegerField
+from django.db.models.functions import Cast
 from django.dispatch import receiver
 from django.db import models, connection
 from django.db.models.signals import post_save
@@ -170,11 +172,11 @@ class OsfStorageFileNode(BaseFileNode):
     def update_region_from_latest_version(self, destination_parent):
         raise NotImplementedError
 
-    def move_under(self, destination_parent, name=None):
-        if self.is_preprint_primary:
+    def move_under(self, destination_parent, name=None, is_check_permission=True):
+        if self.is_preprint_primary and is_check_permission:
             if self.target != destination_parent.target or self.provider != destination_parent.provider:
                 raise exceptions.FileNodeIsPrimaryFile()
-        if self.is_checked_out:
+        if self.is_checked_out and is_check_permission:
             raise exceptions.FileNodeCheckedOutError()
         self.update_region_from_latest_version(destination_parent)
         return super(OsfStorageFileNode, self).move_under(destination_parent, name)
@@ -236,7 +238,7 @@ class OsfStorageFile(OsfStorageFileNode, File):
 
     @property
     def _hashes(self):
-        last_version = self.versions.last()
+        last_version = self.versions_sorted_by_identifier.last()
         if not last_version:
             return None
         return {
@@ -248,7 +250,7 @@ class OsfStorageFile(OsfStorageFileNode, File):
 
     @property
     def last_known_metadata(self):
-        last_version = self.versions.last()
+        last_version = self.versions_sorted_by_identifier.last()
         if not last_version:
             size = None
         else:
@@ -262,9 +264,19 @@ class OsfStorageFile(OsfStorageFileNode, File):
 
     def touch(self, bearer, version=None, revision=None, **kwargs):
         try:
+            if version is None and revision is None:
+                return self.versions_sorted_by_identifier.first()
+
             return self.get_version(revision or version)
         except ValueError:
             return None
+
+    @property
+    def versions_sorted_by_identifier(self):
+        versions_order_by_identifier = self.versions.annotate(version_identifier=Cast('identifier', IntegerField())).order_by('-version_identifier')
+        if versions_order_by_identifier.exists():
+            return versions_order_by_identifier
+        return self.versions
 
     @property
     def history(self):
@@ -307,6 +319,7 @@ class OsfStorageFile(OsfStorageFileNode, File):
             most_recent_fileversion.save()
 
     def create_version(self, creator, location, metadata=None):
+        logger.warning(f'create version here {creator}')
         latest_version = self.get_version()
         version = FileVersion(identifier=self.versions.count() + 1, creator=creator, location=location)
 
@@ -504,6 +517,10 @@ class Region(models.Model):
     def __unicode__(self):
         return '{}'.format(self.name)
 
+    def __str__(self):
+        """The string representation"""
+        return '{} : ({})'.format(self.name, self._id)
+
     def get_absolute_url(self):
         return '{}regions/{}'.format(self.absolute_api_v2_url, self._id)
 
@@ -514,6 +531,10 @@ class Region(models.Model):
 
     class Meta:
         unique_together = ('_id', 'name')
+
+    @property
+    def guid(self):
+        return self._id
 
     @property
     def provider_name(self):
@@ -550,6 +571,9 @@ class Region(models.Model):
 class UserSettings(BaseUserSettings):
     default_region = models.ForeignKey(Region, null=True, on_delete=models.CASCADE)
 
+    def __str__(self):
+        return f'{self.pk}'
+
     def on_add(self):
         default_region = Region.objects.get(_id=DEFAULT_REGION_ID)
         self.default_region = default_region
@@ -580,6 +604,9 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
     user_settings = models.ForeignKey(UserSettings, null=True, blank=True, on_delete=models.CASCADE)
     owner = models.ForeignKey(AbstractNode, related_name='%(app_label)s_node_settings',
                               null=True, blank=True, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f'{self.pk}'
 
     @property
     def folder_name(self):

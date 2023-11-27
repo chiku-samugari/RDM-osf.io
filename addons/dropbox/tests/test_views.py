@@ -17,7 +17,7 @@ from addons.dropbox.tests.utils import (
     MockListFolderResult,
     patch_client,
 )
-from osf_tests.factories import AuthUserFactory
+from osf_tests.factories import AuthUserFactory, AuthFactory
 
 from framework.auth import Auth
 from addons.dropbox.serializer import DropboxSerializer
@@ -141,7 +141,7 @@ class TestFilebrowserViews(DropboxAddonTestCase, OsfTestCase):
     def test_dropbox_root_folder_if_folder_is_none(self):
         # Something is returned on normal circumstances
         with mock.patch.object(type(self.node_settings), 'has_auth', True):
-            root = dropbox_root_folder(node_settings=self.node_settings, auth=self.user.auth)
+            root = dropbox_root_folder(node_settings=self.node_settings, auth=AuthFactory())
 
         assert root is not None
 

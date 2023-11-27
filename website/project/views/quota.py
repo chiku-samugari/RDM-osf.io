@@ -8,7 +8,9 @@ from flask import request
 from rest_framework import status as http_status
 from framework.exceptions import HTTPError
 from website.util.quota import get_region_id_of_institutional_storage_by_path
+import logging
 
+logger = logging.getLogger(__name__)
 
 @must_be_signed
 def waterbutler_creator_quota(pid, **kwargs):
@@ -23,14 +25,16 @@ def get_creator_quota(pid, **kwargs):
 def waterbutler_institution_storage_user_quota(pid, payload, **kwargs):
     provider = payload.get('provider', None)
     fid = payload.get('path', None)
-    return get_institution_user_quota_from_pid(pid, provider, fid)
+    root_path = payload.get('root_path', None)
+    return get_institution_user_quota_from_pid(pid, provider, fid, root_path)
 
 
 @must_be_contributor_or_public
 def get_institution_storage_user_quota(pid, **kwargs):
     provider = request.json.get('provider', None)
     fid = request.json.get('path', None)
-    return get_institution_user_quota_from_pid(pid, provider, fid)
+    root_path = request.json.get('root_path', None)
+    return get_institution_user_quota_from_pid(pid, provider, fid, root_path)
 
 
 def get_quota_from_pid(pid):
@@ -46,17 +50,17 @@ def get_quota_from_pid(pid):
     }
 
 
-def get_institution_user_quota_from_pid(pid, provider, fid):
+def get_institution_user_quota_from_pid(pid, provider, fid, root_path=None):
     node = AbstractNode.load(pid)
     if provider is None or fid is None:
         raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-
-    region_id = get_region_id_of_institutional_storage_by_path(node, provider, fid, node.projectstoragetype.storage_type)
+    region_id = get_region_id_of_institutional_storage_by_path(node, provider, fid, node.projectstoragetype.storage_type, root_path=root_path)
     if region_id is not None:
         try:
             user_storage_quota = node.creator.userstoragequota_set.get(
                 region_id=region_id
             )
+            logger.debug(f'quota used is {user_storage_quota.used}')
             return {
                 'max': user_storage_quota.max_quota * api_settings.SIZE_UNIT_GB,
                 'used': user_storage_quota.used

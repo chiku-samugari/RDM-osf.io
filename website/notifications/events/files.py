@@ -20,6 +20,7 @@ from website.notifications.events import utils as event_utils
 from osf.models import AbstractNode, NodeLog, Preprint
 from addons.base.signals import file_updated as signal
 from addons.base.utils import get_root_institutional_storage
+from api.base.settings.defaults import ADDON_METHOD_PROVIDER
 
 
 @signal.connect
@@ -137,7 +138,11 @@ class ComplexFileEvent(FileEvent):
         root_id = None
         try:
             if payload['destination']['provider'] == 'osfstorage':
-                root_id = get_root_institutional_storage(payload['destination']['path'].strip('/').split('/')[0])
+                root_id = get_root_institutional_storage(payload['destination']['root_path'].strip('/').split('/')[0])
+                if root_id is not None:
+                    root_id = root_id.id
+            elif payload['destination']['provider'] in ADDON_METHOD_PROVIDER:
+                root_id = get_root_institutional_storage(payload['destination']['root_path'].strip('/').split('/')[0])
                 if root_id is not None:
                     root_id = root_id.id
         except KeyError:

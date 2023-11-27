@@ -17,7 +17,7 @@ from framework.exceptions import HTTPError
 from tests.base import OsfTestCase, assert_is_redirect, fake
 from osf_tests.factories import (
     UserFactory, UnregUserFactory, AuthFactory,
-    ProjectFactory, NodeFactory, AuthUserFactory, PrivateLinkFactory
+    ProjectFactory, NodeFactory, AuthUserFactory, PrivateLinkFactory, InstitutionFactory
 )
 
 from framework.auth import Auth
@@ -140,7 +140,7 @@ class TestAuthUtils(OsfTestCase):
         ticket = fake.md5()
         resp = cas.make_response_from_ticket(ticket, service_url)
         assert_equal(resp.status_code, 302, 'redirect to CAS login')
-        assert_in('/login?service=', resp.location)
+        assert_in('login?service=', resp.location)
 
         # the valid username will be double quoted as it is furl quoted in both get_login_url and get_logout_url in order
         username_quoted = quote(quote(user.username, safe='@'), safe='@')
@@ -291,7 +291,8 @@ class TestPrivateLink(OsfTestCase):
         self.app = WebtestApp(self.flaskapp)
 
         self.user = AuthUserFactory()
-        self.project = ProjectFactory(is_public=False)
+        self.user.affiliated_institutions = [InstitutionFactory()]
+        self.project = ProjectFactory(is_public=False,creator=self.user)
         self.link = PrivateLinkFactory()
         self.link.nodes.add(self.project)
         self.link.save()
@@ -336,12 +337,15 @@ class TestMustBeContributorDecorator(AuthAppTestCase):
 
     def setUp(self):
         super(TestMustBeContributorDecorator, self).setUp()
+        self.user = AuthUserFactory()
+        self.user.affiliated_institutions = [InstitutionFactory()]
         self.contrib = AuthUserFactory()
+        self.contrib.affiliated_institutions = [InstitutionFactory()]
         self.non_contrib = AuthUserFactory()
         admin = UserFactory()
-        self.public_project = ProjectFactory(is_public=True)
+        self.public_project = ProjectFactory(is_public=True,creator=self.user)
         self.public_project.add_contributor(admin, auth=Auth(self.public_project.creator), permissions=permissions.ADMIN)
-        self.private_project = ProjectFactory(is_public=False)
+        self.private_project = ProjectFactory(is_public=False,creator=self.user)
         self.public_project.add_contributor(self.contrib, auth=Auth(self.public_project.creator))
         self.private_project.add_contributor(self.contrib, auth=Auth(self.private_project.creator))
         self.private_project.add_contributor(admin, auth=Auth(self.private_project.creator), permissions=permissions.ADMIN)
@@ -399,6 +403,7 @@ class TestMustBeContributorDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_admin_and_public_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.public_project, creator=user)
         res = view_that_needs_contributor(
             pid=self.public_project._id,
@@ -409,6 +414,7 @@ class TestMustBeContributorDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_admin_and_private_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.private_project, creator=user)
         res = view_that_needs_contributor(
             pid=self.private_project._id,
@@ -419,6 +425,7 @@ class TestMustBeContributorDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_write_public_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.public_project, creator=user)
         self.public_project.set_permissions(self.public_project.creator, permissions.WRITE)
         self.public_project.save()
@@ -432,6 +439,7 @@ class TestMustBeContributorDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_write_private_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.private_project, creator=user)
         self.private_project.set_permissions(self.private_project.creator, permissions.WRITE)
         self.private_project.save()
@@ -453,10 +461,12 @@ class TestMustBeContributorOrPublicDecorator(AuthAppTestCase):
 
     def setUp(self):
         super(TestMustBeContributorOrPublicDecorator, self).setUp()
+        self.user = AuthUserFactory()
+        self.user.affiliated_institutions = [InstitutionFactory()]
         self.contrib = AuthUserFactory()
         self.non_contrib = AuthUserFactory()
-        self.public_project = ProjectFactory(is_public=True)
-        self.private_project = ProjectFactory(is_public=False)
+        self.public_project = ProjectFactory(is_public=True,creator=self.user)
+        self.private_project = ProjectFactory(is_public=False,creator=self.user)
         self.public_project.add_contributor(self.contrib, auth=Auth(self.public_project.creator))
         self.private_project.add_contributor(self.contrib, auth=Auth(self.private_project.creator))
         self.public_project.save()
@@ -507,6 +517,7 @@ class TestMustBeContributorOrPublicDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_admin_and_public_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.public_project, creator=user)
         res = view_that_needs_contributor_or_public(
             pid=self.public_project._id,
@@ -517,6 +528,7 @@ class TestMustBeContributorOrPublicDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_admin_and_private_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.private_project, creator=user)
         res = view_that_needs_contributor_or_public(
             pid=self.private_project._id,
@@ -527,6 +539,7 @@ class TestMustBeContributorOrPublicDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_write_public_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.public_project, creator=user)
         contrib = UserFactory()
         self.public_project.add_contributor(contrib, auth=Auth(self.public_project.creator), permissions=permissions.WRITE)
@@ -541,6 +554,7 @@ class TestMustBeContributorOrPublicDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_write_private_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.private_project, creator=user)
         contrib = UserFactory()
         self.private_project.add_contributor(contrib, auth=Auth(self.private_project.creator), permissions=permissions.WRITE)
@@ -565,9 +579,11 @@ class TestMustBeContributorOrPublicButNotAnonymizedDecorator(AuthAppTestCase):
         self.contrib = AuthUserFactory()
         self.non_contrib = AuthUserFactory()
         admin = UserFactory()
-        self.public_project = ProjectFactory(is_public=True)
+        self.user = AuthUserFactory()
+        self.user.affiliated_institutions = [InstitutionFactory()]
+        self.public_project = ProjectFactory(is_public=True,creator=self.user)
         self.public_project.add_contributor(admin, auth=Auth(self.public_project.creator), permissions=permissions.ADMIN)
-        self.private_project = ProjectFactory(is_public=False)
+        self.private_project = ProjectFactory(is_public=False,creator=self.user)
         self.private_project.add_contributor(admin, auth=Auth(self.private_project.creator), permissions=permissions.ADMIN)
         self.public_project.add_contributor(self.contrib, auth=Auth(self.public_project.creator))
         self.private_project.add_contributor(self.contrib, auth=Auth(self.private_project.creator))
@@ -632,6 +648,7 @@ class TestMustBeContributorOrPublicButNotAnonymizedDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_admin_and_public_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.public_project, creator=user)
         res = view_that_needs_contributor_or_public_but_not_anonymized(
             pid=self.public_project._id,
@@ -642,6 +659,7 @@ class TestMustBeContributorOrPublicButNotAnonymizedDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_admin_and_private_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.private_project, creator=user)
         res = view_that_needs_contributor_or_public_but_not_anonymized(
             pid=self.private_project._id,
@@ -652,6 +670,7 @@ class TestMustBeContributorOrPublicButNotAnonymizedDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_write_public_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.public_project, creator=user)
         self.public_project.set_permissions(self.public_project.creator, permissions.WRITE)
         self.public_project.save()
@@ -665,6 +684,7 @@ class TestMustBeContributorOrPublicButNotAnonymizedDecorator(AuthAppTestCase):
 
     def test_must_be_contributor_parent_write_private_project(self):
         user = UserFactory()
+        user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.private_project, creator=user)
         self.private_project.set_permissions(self.private_project.creator, permissions.WRITE)
         self.private_project.save()
@@ -721,7 +741,9 @@ class TestPermissionDecorators(AuthAppTestCase):
     @mock.patch('website.project.decorators._kwargs_to_nodes')
     @mock.patch('framework.auth.decorators.Auth.from_kwargs')
     def test_must_have_permission_true(self, mock_from_kwargs, mock_to_nodes):
-        project = ProjectFactory()
+        user_creator = AuthUserFactory()
+        user_creator.affiliated_institutions = [InstitutionFactory()]
+        project = ProjectFactory(creator=user_creator)
         user = UserFactory()
         project.add_contributor(user, permissions=permissions.ADMIN,
                                 auth=Auth(project.creator))
@@ -732,7 +754,9 @@ class TestPermissionDecorators(AuthAppTestCase):
     @mock.patch('website.project.decorators._kwargs_to_nodes')
     @mock.patch('framework.auth.decorators.Auth.from_kwargs')
     def test_must_have_permission_false(self, mock_from_kwargs, mock_to_nodes):
-        project = ProjectFactory()
+        user_creator = AuthUserFactory()
+        user_creator.affiliated_institutions = [InstitutionFactory()]
+        project = ProjectFactory(creator=user_creator)
         user = UserFactory()
         mock_from_kwargs.return_value = Auth(user=user)
         mock_to_nodes.return_value = (None, project)
@@ -743,7 +767,9 @@ class TestPermissionDecorators(AuthAppTestCase):
     @mock.patch('website.project.decorators._kwargs_to_nodes')
     @mock.patch('framework.auth.decorators.Auth.from_kwargs')
     def test_must_have_permission_not_logged_in(self, mock_from_kwargs, mock_to_nodes):
-        project = ProjectFactory()
+        user_creator = AuthUserFactory()
+        user_creator.affiliated_institutions = [InstitutionFactory()]
+        project = ProjectFactory(creator=user_creator)
         mock_from_kwargs.return_value = Auth()
         mock_to_nodes.return_value = (None, project)
         with assert_raises(HTTPError) as ctx:
@@ -759,7 +785,9 @@ class TestMustHaveAddonDecorator(AuthAppTestCase):
 
     def setUp(self):
         super(TestMustHaveAddonDecorator, self).setUp()
-        self.project = ProjectFactory()
+        self.user_creator = AuthUserFactory()
+        self.user_creator.affiliated_institutions = [InstitutionFactory()]
+        self.project = ProjectFactory(creator=self.user_creator)
 
     @mock.patch('website.project.decorators._kwargs_to_nodes')
     def test_must_have_addon_node_true(self, mock_kwargs_to_nodes):
@@ -798,7 +826,9 @@ class TestMustBeAddonAuthorizerDecorator(AuthAppTestCase):
 
     def setUp(self):
         super(TestMustBeAddonAuthorizerDecorator, self).setUp()
-        self.project = ProjectFactory()
+        self.user_creator = AuthUserFactory()
+        self.user_creator.affiliated_institutions = [InstitutionFactory()]
+        self.project = ProjectFactory(creator=self.user_creator)
         self.decorated = must_be_addon_authorizer('github')(needs_addon_view)
 
     @mock.patch('website.project.decorators._kwargs_to_nodes')

@@ -233,7 +233,7 @@ class UserListByInstitutionStorageID(RdmPermissionMixin, QuotaUserStorageList):
         )
         return institution.first()
 
-    def get_userlist(self):
+    def get_user_list(self):
         user_list = []
         for user in OSFUser.objects.filter(
                 affiliated_institutions=self.kwargs['institution_id']

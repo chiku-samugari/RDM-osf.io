@@ -2374,6 +2374,7 @@ class AbstractNode(DirtyFieldsMixin, TypedModel, AddonModelMixin, IdentifierMixi
         try:
             metadata = payload['metadata']
             file_id = metadata['path']
+
             if payload['provider'] == 'osfstorage' and file_id is None:
                 raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
             root_folder_id = None
@@ -2382,8 +2383,14 @@ class AbstractNode(DirtyFieldsMixin, TypedModel, AddonModelMixin, IdentifierMixi
                 root_folder_id = get_root_institutional_storage(file_id.strip('/').split('/')[0])
                 if root_folder_id is not None:
                     root_folder_id = root_folder_id.id
-
+            else:
+                if payload['root_path']:
+                    root_folder_id = get_root_institutional_storage(payload['root_path'])
+                if root_folder_id is not None:
+                    root_folder_id = root_folder_id.id
+                    metadata['path'] = payload['root_path'] + metadata['path']
             node_addon = self.get_addon(payload['provider'], root_id=root_folder_id)
+            logger.debug(f'node_addon is {node_addon}')
         except KeyError:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 

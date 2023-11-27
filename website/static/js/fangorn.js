@@ -93,7 +93,7 @@ var OPERATIONS = {
 var COMMAND_KEYS = [224, 17, 91, 93];
 var ESCAPE_KEY = 27;
 var ENTER_KEY = 13;
-
+var ADDON_PROVIDER = ['s3compatinstitutions','nextcloudinstitutions','ociinstitutions','dropboxbusiness','onedrivebusiness'];
 function findByTempID(parent, tmpID) {
     var child;
     var item;
@@ -619,6 +619,7 @@ function doItemOp(operation, to, from, rename, conflict) {
         return;
     }
 
+    var origFrom = Object.assign({}, from);
     if (operation === OPERATIONS.COPY) {
         from = tb.createItem($.extend(true, {status: operation.status}, from.data), to.id);
     } else {
@@ -644,15 +645,23 @@ function doItemOp(operation, to, from, rename, conflict) {
             path: to.data.path || '/',
             conflict: conflict,
             resource: to.data.nodeId,
-            provider: to.data.provider
+            provider: to.data.provider,
+            size: from.data.size,
         };
     } else if (operation === OPERATIONS.MOVE) {
+        var to_path = '/';
+        if ( ADDON_PROVIDER.includes(to.data.provider) && to.data.root_path!== undefined && to.data.root_path!= null){
+           to_path='/'+to.data.root_path+ to.data.path ||'/';
+        }else {
+           to_path=to.data.path || '/';
+        }
         moveSpec = {
             action: 'move',
-            path: to.data.path || '/',
+            path: to_path,
             conflict: conflict,
             resource: to.data.nodeId,
-            provider: to.data.provider
+            provider: to.data.provider,
+            size: from.data.size,
         };
     }
 
@@ -664,7 +673,6 @@ function doItemOp(operation, to, from, rename, conflict) {
 
     from.inProgress = true;
     tb.clearMultiselect();
-
     $.ajax({
         type: 'POST',
         beforeSend: $osf.setXHRAuthorization,
@@ -711,6 +719,7 @@ function doItemOp(operation, to, from, rename, conflict) {
         }
         // no need to redraw because fangornOrderFolder does it
         orderFolder.call(tb, from.parent());
+        resolveconfigOption.call(tb, from, 'onMoveComplete', [from, origFrom, to, moveSpec]);
     }).fail(function(xhr, textStatus) {
         if (to.data.provider === from.provider) {
             tb.pendingFileOps.pop();
@@ -1101,7 +1110,9 @@ function _uploadEvent(event, item, col) {
     } catch (e) {
         window.event.cancelBubble = true;
     }
+
     self.dropzone.hiddenFileInput.removeAttribute('webkitdirectory');
+
     self.dropzoneItemCache = item;
     self.dropzone.hiddenFileInput.click();
     if (!item.open) {
@@ -1155,6 +1166,7 @@ function _uploadFolderEvent(event, item, mode, col) {
     }
     tb.dropzone.hiddenFileInput.addEventListener('change', _onchange);
 
+
     function _onchange() {
         var node_parent = tb.multiselected()[0];
         var root_parent = tb.multiselected()[0];
@@ -1179,9 +1191,45 @@ function _uploadFolderEvent(event, item, mode, col) {
         node_parent.open = true;
         total_files_size = parseFloat(total_files_size).toFixed(2);
         var quota = null;
+        var storage_quota;
 
         if (!item.data.provider) {
             return;
+        }
+
+        // call api get used quota and max quota
+        quota = $.ajax({
+            async: false,
+            method: 'GET',
+            url: item.data.nodeApiUrl + 'get_creator_quota/',
+        });
+
+        if (!quota.responseJSON) {
+            return;
+        }
+
+        quota = quota.responseJSON;
+
+		var storage_quota_data = {
+			root_path:item.data.path.split('/')[0],
+            provider:item.data.provider,
+            path:item.data.path,
+        };
+        storage_quota = $.ajax({
+                    async: false,
+                    method: 'POST',
+                    url: item.data.nodeApiUrl + 'get_institution_storage_user_quota/',
+                    contentType: 'application/json',
+                    data: JSON.stringify(storage_quota_data)
+        });
+		storage_quota = storage_quota.responseJSON;
+
+        // check upload quota for upload folder
+        if (parseFloat(storage_quota.used) + parseFloat(total_files_size) > storage_quota.max) {
+            $osf.growl('Error', sprintf(gettext('Not enough quota to upload. The total size of the folder %1$s.'),
+            formatProperUnit(total_files_size)),
+            'danger', 5000);
+            return root_parent;
         }
 
         var created_folders = [];
@@ -1289,6 +1337,9 @@ function _uploadFolderEvent(event, item, mode, col) {
             // prepare data for request new folder
             var extra = {};
             var path = node_parent.data.path || '/';
+            if ( ADDON_PROVIDER.includes(node_parent.data.provider) && node_parent.data.root_path) {
+                path = node_parent.data.root_path + path;
+            }
             var options = {name: folder_name, kind: 'folder', waterbutlerURL: node_parent.data.waterbutlerURL};
             if ((node_parent.data.provider === 'github') || (node_parent.data.provider === 'gitlab')) {
                 extra.branch = node_parent.data.branch;
@@ -1318,7 +1369,7 @@ function _uploadFolderEvent(event, item, mode, col) {
                 var next_folder_index = ++index;
                 return next(node_parent, next_folder_index, list_paths, file, file_index, next);
             }, function (data) {
-                if (data && (data.code === 409 || data.code === 406)) {
+                if (data && data.code === 409) {
                     $osf.growl(data.message);
                     m.redraw();
                 } else {
@@ -1374,6 +1425,9 @@ function _createFolder(event, dismissCallback, helpText) {
 
     var extra = {};
     var path = parent.data.path || '/';
+    if ( ADDON_PROVIDER.includes(parent.data.provider) && parent.data.root_path) {
+        path = parent.data.root_path + path;
+    }
     var options = {name: val, kind: 'folder', waterbutlerURL: parent.data.waterbutlerURL};
 
     if ((parent.data.provider === 'github') || (parent.data.provider === 'gitlab')) {
@@ -1707,9 +1761,12 @@ function gotoFileEvent (item, toUrl) {
         toUrl = '/';
     var tb = this;
     var redir = new URI(item.data.nodeUrl);
+    if ( ADDON_PROVIDER.includes(item.data.provider)&&item.data.root_path!==undefined&&item.data.root_path!=null){
+            redir.segment('files').segment(item.data.provider).segment(item.data.root_path).segmentCoded(item.data.path.substring(1));
+    }else{
     redir.segment('files').segment(item.data.provider).segmentCoded(item.data.path.substring(1));
+    }
     var fileurl  = redir.toString() + toUrl;
-
     // construct view only link into file url as it gets removed from url params in IE
     if ($osf.isIE()) {
         var viewOnly = $osf.urlParams().view_only;
@@ -1744,7 +1801,11 @@ function getPersistentLinkFor(item) {
         }
         redir.segment('files/dir').segment(item.data.provider).segment(path.substring(1));
     } else {
-        redir.segment('files').segment(item.data.provider).segmentCoded(item.data.path.substring(1));
+        if ( ADDON_PROVIDER.includes(item.data.provider)&&item.data.root_path!==undefined&&item.data.root_path!=null){
+            redir.segment('files').segment(item.data.provider).segment(item.data.root_path).segmentCoded(item.data.path.substring(1));
+        }else{
+            redir.segment('files').segment(item.data.provider).segmentCoded(item.data.path.substring(1));
+        }
     }
     return redir.toString();
 }
@@ -2159,8 +2220,7 @@ function setCurrentFileID(tree, nodeID, file) {
         for (var j = 0; j < tree.children.length; j++) {
             child = tree.children[j];
             var isSelectedItem = child.data.id.includes(file.id);
-            // find selected item on detail file page
-            if (nodeID === child.data.nodeId && child.data.provider === file.provider && (isSelectedItem || file.path === child.data.path)) {
+            if (nodeID === child.data.nodeId && child.data.provider === file.provider && isSelectedItem) {
                 tb.fangornFolderIndex++;
                 if (child.data.kind === 'folder') {
                     tb.updateFolder(null, child);
@@ -2320,15 +2380,13 @@ var FGItemButtons = {
                         icon: 'fa fa-plus',
                         className: 'text-success'
                     }, gettext('Create Folder')));
-                if (item.data.path) {
-                    if (!item.data.hasOwnProperty('isAddonRoot') || !item.data.isAddonRoot) {
-                        rowButtons.push(
-                            m.component(FGButton, {
-                                onclick: function(event) {_removeEvent.call(tb, event, [item]); },
-                                icon: 'fa fa-trash',
-                                className : 'text-danger'
-                            }, gettext('Delete Folder')));
-                    }
+                if (!item.data.isAddonRoot && item.data.path) {
+                    rowButtons.push(
+                        m.component(FGButton, {
+                            onclick: function(event) {_removeEvent.call(tb, event, [item]); },
+                            icon: 'fa fa-trash',
+                            className : 'text-danger'
+                        }, gettext('Delete Folder')));
                 }
             }
             if (item.kind === 'file') {
@@ -3418,6 +3476,13 @@ tbOptions = {
         var maxSize;
         var displaySize;
         var msgText;
+        var quota;
+        var storage_quota;
+		var storage_quota_data = {
+			root_path:item.data.path.split('/')[0],
+            provider:item.data.provider,
+            path:item.data.path,
+        };
         if (_fangornCanDrop(treebeard, item)) {
             if (item.data.accept && item.data.accept.maxSize) {
                 size = file.size / 1000000;
@@ -3430,6 +3495,37 @@ tbOptions = {
                     addFileStatus(treebeard, file, false, msgText, '');
                     removeFromUI(file, treebeard);
                     return false;
+                }
+            }
+            if (item.data.provider === 'osfstorage' || ADDON_PROVIDER.includes(item.data.provider)) {
+                storage_quota = $.ajax({
+                    async: false,
+                    method: 'POST',
+                    url: item.data.nodeApiUrl + 'get_institution_storage_user_quota/',
+                    contentType: 'application/json',
+                    data: JSON.stringify(storage_quota_data)
+                });
+                quota = $.ajax({
+                    async: false,
+                    method: 'GET',
+                    url: item.data.nodeApiUrl + 'get_creator_quota/'
+                });
+                if (quota.responseJSON || storage_quota.responseJSON) {
+                    quota = quota.responseJSON;
+                    storage_quota = storage_quota.responseJSON;
+                    if (quota.used + file.size > quota.max || storage_quota.used + file.size > storage_quota.max) {
+                        msgText = gettext('Not enough quota to upload the file.');
+                        item.notify.update(msgText, 'warning', undefined, 3000);
+                        addFileStatus(treebeard, file, false, msgText, '');
+                        return false;
+                    }
+                    if (quota.used + file.size > quota.max * window.contextVars.threshold || storage_quota.used + file.size > storage_quota.max * window.contextVars.threshold) {
+                        $osf.growl(
+                            gettext('Quota usage alert'),
+                            sprintf(gettext('You have used more than %1$s% of your quota.'),(window.contextVars.threshold * 100)),
+                            'warning'
+                        );
+                    }
                 }
             }
             return true;

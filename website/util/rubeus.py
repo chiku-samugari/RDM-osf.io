@@ -4,6 +4,7 @@ formatted hgrid list/folders.
 """
 import logging
 import re
+import traceback
 from django.utils import timezone
 
 from framework import sentry
@@ -122,6 +123,9 @@ def build_addon_root(node_settings, name, permissions=None,
     }
 
     if node_settings.config.short_name == 'osfstorage':
+        # Add path for root institutional storage folder
+        ret.update({'path': '{}/'.format(node_settings.root_node._id)})
+    elif node_settings.config.short_name in ADDON_METHOD_PROVIDER:
         # Add path for root institutional storage folder
         ret.update({'path': '{}/'.format(node_settings.root_node._id)})
 
@@ -289,6 +293,7 @@ class NodeFileCollector(object):
         data = {}
         institution_id = None
         for osf_addon in osf_addons:
+            logger.debug(f'osf_addon is {osf_addon}')
             region = osf_addon.region
             institution_id = region._id
             if region and region.waterbutler_settings:
@@ -315,9 +320,13 @@ class NodeFileCollector(object):
                     if addon.config.short_name not in region_provider_set:
                         continue  # skip (hide this *institutions)
                     if institution_id is not None:
-                        region = Region.objects.filter(
-                            _id=institution_id,
-                            waterbutler_settings__storage__provider=addon.short_name).first()
+                        if addon.short_name != 'osfstorage':
+                            region = Region.objects.filter(id=addon.region.id).first()
+                            logger.debug(f'region is {region}')
+                        else:
+                            region = Region.objects.filter(
+                                _id=institution_id,
+                                waterbutler_settings__storage__provider=addon.short_name).first()
                         if region is not None:
                             region.is_allowed = check_authentication_attribute(self.auth.user,
                                                                                region.allow_expression,
@@ -329,6 +338,7 @@ class NodeFileCollector(object):
                 try:
                     temp = addon.config.get_hgrid_data(addon, self.auth, **self.extra)
                 except Exception as e:
+                    traceback.print_exc()
                     logger.warn(
                         getattr(
                             e,

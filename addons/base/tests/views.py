@@ -59,7 +59,7 @@ class OAuthAddonAuthViewsTestCaseMixin(OAuthAddonTestCaseMixin):
         institution = InstitutionFactory()
         self.user.affiliated_institutions.add(institution)
         self.user.save()
-        rdm_addon_option = get_rdm_addon_option(institution.id, self.ADDON_SHORT_NAME)
+        rdm_addon_option = get_rdm_addon_option(institution.id, self.ADDON_SHORT_NAME).first()
         rdm_addon_option.is_allowed = False
         rdm_addon_option.save()
         url = api_url_for(
@@ -90,6 +90,7 @@ class OAuthAddonAuthViewsTestCaseMixin(OAuthAddonTestCaseMixin):
         assert_equal(res.status_code, http_status.HTTP_200_OK)
         name, args, kwargs = mock_callback.mock_calls[0]
         assert_equal(kwargs['user']._id, self.user._id)
+
 
     def test_delete_external_account(self):
         url = api_url_for(

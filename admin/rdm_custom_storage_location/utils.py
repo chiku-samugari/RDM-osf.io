@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import inspect  # noqa
+import logging
 import traceback
 
 from boxsdk import Client as BoxClient, OAuth2
@@ -43,6 +45,9 @@ from osf.models.external import ExternalAccountTemporary, ExternalAccount
 from osf.utils import external_util
 import datetime
 
+from website.util import inspect_info  # noqa
+
+logger = logging.getLogger(__name__)
 
 providers = None
 
@@ -65,7 +70,8 @@ no_storage_name_providers = ['osfstorage', 'onedrivebusiness']
 def have_storage_name(provider_name):
     return provider_name not in no_storage_name_providers
 
-def get_providers():
+
+def get_providers(available_list=None):
     provider_list = []
     for provider in osf_settings.ADDONS_AVAILABLE:
         if 'storage' in provider.categories and provider.short_name in enabled_providers_list:
@@ -74,6 +80,8 @@ def get_providers():
             provider.modal_path = get_modal_path(provider.short_name)
             provider_list.append(provider)
     provider_list.sort(key=lambda x: x.full_name.lower())
+    if isinstance(available_list, list):
+        return [addon for addon in provider_list if addon.short_name in available_list]
     return provider_list
 
 def get_addon_by_name(addon_short_name):
@@ -103,9 +111,11 @@ def get_oauth_info_notification(institution_id, provider_short_name):
         }
 
 def set_allowed(institution, provider_name, is_allowed):
-    addon_option = get_rdm_addon_option(institution.id, provider_name)
-    addon_option.is_allowed = is_allowed
-    addon_option.save()
+    # Note: May be impact when multiple
+    addon_options = get_rdm_addon_option(institution.id, provider_name)
+    for addon_option in addon_options:
+        addon_option.is_allowed = is_allowed
+        addon_option.save()
     # NOTE: ExternalAccounts is not cleared even if other storage is selected.
     # if not is_allowed:
     #     addon_option.external_accounts.clear()
@@ -255,6 +265,7 @@ def test_s3compat_connection(host_url, access_key, secret_key, bucket):
             'message': 'All the fields above are required.'
         }, http_status.HTTP_400_BAD_REQUEST)
 
+    logger.debug(f'Check to make sure that the above credentials are valid, and that they have permission to list buckets.')
     try:
         user_info = s3compat_utils.get_user_info(host, access_key, secret_key)
         e_message = ''
@@ -269,6 +280,7 @@ def test_s3compat_connection(host_url, access_key, secret_key, bucket):
             'e_message': e_message
         }, http_status.HTTP_400_BAD_REQUEST)
 
+    logger.debug(f'Listing buckets is required permission that can be changed via IAM')
     try:
         res = s3compat_utils.can_list(host, access_key, secret_key)
         e_message = ''
@@ -282,6 +294,7 @@ def test_s3compat_connection(host_url, access_key, secret_key, bucket):
             'e_message': e_message
         }, http_status.HTTP_400_BAD_REQUEST)
 
+    logger.debug(f'Check buckets is existing')
     try:
         res = s3compat_utils.bucket_exists(host, access_key, secret_key, bucket)
         e_message = ''
@@ -511,7 +524,7 @@ def test_dropboxbusiness_connection(institution):
             'message': u'Invalid Institution ID.: {}'.format(institution.id)
         }, http_status.HTTP_400_BAD_REQUEST)
 
-    f_option, m_option = fm
+    f_option, m_option = fm[0]
     f_token = dropboxbusiness_utils.addon_option_to_token(f_option)
     m_token = dropboxbusiness_utils.addon_option_to_token(m_option)
     if f_token is None or m_token is None:
@@ -920,17 +933,19 @@ def save_basic_storage_institutions_credentials_common(
         if provider.account.oauth_key != password:
             provider.account.oauth_key = password
             provider.account.save()
-
+    # Note: May be impact when multiple
     # Storage Addons for Institutions must have only one ExternalAccont.
-    rdm_addon_option = get_rdm_addon_option(institution.id, provider_name)
-    if rdm_addon_option.external_accounts.count() > 0:
-        rdm_addon_option.external_accounts.clear()
-    rdm_addon_option.external_accounts.add(provider.account)
-
-    rdm_addon_option.extended[KEYNAME_BASE_FOLDER] = folder
-    if type(extended_data) is dict:
-        rdm_addon_option.extended.update(extended_data)
-    rdm_addon_option.save()
+    rdm_addon_options = get_rdm_addon_option(institution.id, provider_name, need_create=True)
+    # if rdm_addon_option.external_accounts.count() > 0:
+    #     rdm_addon_option.external_accounts.clear()
+    if len(rdm_addon_options) > 0:
+        rdm_addon_option = rdm_addon_options[len(rdm_addon_options) - 1]
+        rdm_addon_option.external_accounts.add(provider.account)
+        rdm_addon_option.extended[KEYNAME_BASE_FOLDER] = folder
+        if type(extended_data) is dict:
+            rdm_addon_option.extended.update(extended_data)
+        rdm_addon_option.save()
+        save_usermap_from_tmp(rdm_addon_option)
 
     wb_credentials, wb_settings = wd_info_for_institutions(provider_name)
     region = update_storage(institution._id,  # not institution.id
@@ -938,12 +953,12 @@ def save_basic_storage_institutions_credentials_common(
                             wb_credentials, wb_settings, new_storage_name)
     external_util.remove_region_external_account(region)
 
-    save_usermap_from_tmp(provider_name, institution)
     sync_all(institution._id, target_addons=[provider_name])
 
     return ({
         'message': 'Saved credentials successfully!!'
     }, http_status.HTTP_200_OK)
+
 
 def save_nextcloudinstitutions_credentials(
         institution, storage_name, host_url, username, password, folder, notification_secret, provider_name, new_storage_name=None):
@@ -993,10 +1008,12 @@ def save_ociinstitutions_credentials(institution, storage_name, host_url, access
 
 def get_credentials_common(institution, provider_name):
     clear_usermap_tmp(provider_name, institution)
-    rdm_addon_option = get_rdm_addon_option(institution.id, provider_name,
+    # Note: May be impact when multiple
+    rdm_addon_options = get_rdm_addon_option(institution.id, provider_name,
                                             create=False)
-    if not rdm_addon_option:
+    if not rdm_addon_options.exists():
         return None
+    rdm_addon_option = rdm_addon_options.order_by('-id').first()
     exacc = rdm_addon_option.external_accounts.first()
     if not exacc:
         return None
@@ -1099,29 +1116,37 @@ def extuser_exists(provider_name, post_params, extuser):
         return None  # ok
 
 def get_usermap(provider_name, institution):
-    rdm_addon_option = get_rdm_addon_option(institution.id, provider_name,
+    # Note: May be impact when multiple
+    rdm_addon_options = get_rdm_addon_option(institution.id, provider_name,
                                             create=False)
-    if not rdm_addon_option:
+    if not rdm_addon_options.exists():
         return None
+    rdm_addon_option = rdm_addon_options.order_by('-id').first()
     return rdm_addon_option.extended.get(KEYNAME_USERMAP)
 
 def save_usermap_to_tmp(provider_name, institution, usermap):
-    rdm_addon_option = get_rdm_addon_option(institution.id, provider_name)
-    rdm_addon_option.extended[KEYNAME_USERMAP_TMP] = usermap
-    rdm_addon_option.save()
+    # Note: May be impact when multiple
+    rdm_addon_options = get_rdm_addon_option(institution.id, provider_name)
+    if rdm_addon_options.exists():
+        rdm_addon_option = rdm_addon_options.order_by('-id').first()
+        rdm_addon_option.extended[KEYNAME_USERMAP_TMP] = usermap
+        rdm_addon_option.save()
 
 def clear_usermap_tmp(provider_name, institution):
-    rdm_addon_option = get_rdm_addon_option(institution.id, provider_name,
+    # Note: May be impact when multiple
+    rdm_addon_options = get_rdm_addon_option(institution.id, provider_name,
                                             create=False)
-    if not rdm_addon_option:
+    if not rdm_addon_options.exists():
         return
+    rdm_addon_option = rdm_addon_options.order_by('-id').first()
     new_usermap = rdm_addon_option.extended.get(KEYNAME_USERMAP_TMP)
     if new_usermap:
         del rdm_addon_option.extended[KEYNAME_USERMAP_TMP]
         rdm_addon_option.save()
 
-def save_usermap_from_tmp(provider_name, institution):
-    rdm_addon_option = get_rdm_addon_option(institution.id, provider_name)
+# Note: May be impact when multiple
+def save_usermap_from_tmp(rdm_addon_option):
+    #rdm_addon_option = get_rdm_addon_option(institution.id, provider_name, create=False)
     new_usermap = rdm_addon_option.extended.get(KEYNAME_USERMAP_TMP)
     if new_usermap:
         rdm_addon_option.extended[KEYNAME_USERMAP] = new_usermap

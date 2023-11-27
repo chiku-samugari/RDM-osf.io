@@ -153,7 +153,7 @@ class TestUserListByInstitutionStorageID(AdminTestCase):
 
         view = setup_view(self.view, request,
                           institution_id=self.institution.id)
-        user_list = view.get_userlist()
+        user_list = view.get_user_list()
 
         nt.assert_equal(len(user_list), 1)
 

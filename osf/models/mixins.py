@@ -46,7 +46,7 @@ from website.project import signals as project_signals
 from website import settings, mails, language
 from website.project.licenses import set_license
 from api.base.rdmlogger import RdmLogger, rdmlog
-
+from api.base.settings.defaults import ADDON_METHOD_PROVIDER
 
 logger = logging.getLogger(__name__)
 
@@ -520,9 +520,15 @@ class AddonModelMixin(models.Model):
                 for osf_addon in osf_addons:
                     addons.append(osf_addon)
             else:
-                addon = self.get_addon(config.short_name)
-                if addon:
-                    addons.append(addon)
+                if config.short_name in ADDON_METHOD_PROVIDER:
+                    multi_addon = self.get_multi_addon(config.short_name)
+                    if multi_addon and len(multi_addon) > 0:
+                        addons.extend(multi_addon)
+                else:
+                    addon = self.get_addon(config.short_name)
+                    if addon:
+                        addons.append(addon)
+        logger.debug(f'addons is {addons}')
         return addons
 
     def get_oauth_addons(self):
@@ -555,6 +561,10 @@ class AddonModelMixin(models.Model):
         return self.add_addon(name, *args, **kwargs)
 
     def get_addon(self, name, is_deleted=False, region_id=None, root_id=None):
+        logger.debug(f'addon name is {name}')
+        logger.debug(f'addon region_id is {region_id}')
+        logger.debug(f'addon root_id is {root_id}')
+
         try:
             settings_model = self._settings_model(name)
         except LookupError:
@@ -573,10 +583,34 @@ class AddonModelMixin(models.Model):
             elif region_id:
                 settings_obj = settings_model.objects.filter(owner=self,
                                                              region_id=region_id).first()
+            else:
+                logger.debug('get the first addon')
+                settings_obj = settings_model.objects.filter(owner=self).first()
         if settings_obj and (not settings_obj.is_deleted or is_deleted):
             return settings_obj
         else:
             return None
+
+    def get_multi_addon(self, name, is_deleted=False):
+        logger.debug(f'addon name is {name}')
+        addon_settings = []
+        try:
+            settings_model = self._settings_model(name)
+        except LookupError:
+            return None
+        if not settings_model:
+            return None
+        try:
+            settings_objs = None
+            settings_objs = settings_model.objects.filter(owner=self)
+        except ObjectDoesNotExist:
+            pass
+
+        if settings_objs.exists():
+            for settings_obj in settings_objs:
+                if not settings_obj.is_deleted or is_deleted:
+                    addon_settings.append(settings_obj)
+        return addon_settings
 
     def get_osfstorage_addons(self):
         """Get all osfstorage addons were owned
@@ -638,6 +672,7 @@ class AddonModelMixin(models.Model):
             addon = settings_model.objects.filter(owner=self, region_id=region_id).first()
         else:
             addon = self.get_addon(addon_name, is_deleted=True)
+        logger.debug(f'addon is {addon}')
         if addon:
             if addon.deleted:
                 addon.undelete(save=True)
@@ -680,6 +715,7 @@ class AddonModelMixin(models.Model):
         """
         from website.util import timestamp
         addon = self.get_addon(addon_name, region_id=region_id)
+        logger.debug(f'addon is {addon}')
         if not addon:
             return False
         if self.settings_type in addon.config.added_mandatory and not _force:

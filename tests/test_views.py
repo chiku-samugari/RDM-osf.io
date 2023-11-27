@@ -12,7 +12,7 @@ import shutil
 import tempfile
 import time
 import unittest
-from future.moves.urllib.parse import quote
+from future.moves.urllib.parse import quote,unquote
 import uuid
 from website.project.views.file import update_custom_storage_icon_url
 from flask import request
@@ -4036,7 +4036,7 @@ class TestAuthViews(OsfTestCase):
         assert_equal(self.user.email_verifications[token]['confirmed'], True)
         assert_equal(res.status_code, 302)
         login_url = 'login?service'
-        assert_in(login_url, res.body.decode())
+        assert_in(login_url, unquote(res.body.decode()))
 
     def test_get_email_to_add_no_email(self):
         email_verifications = self.user.unconfirmed_email_info
@@ -4576,8 +4576,8 @@ class TestExternalAuthViews(OsfTestCase):
         url = self.user.get_confirmation_url(self.user.username, external_id_provider='orcid', destination='dashboard')
         res = self.app.get(url, auth=another_user.auth)
         assert_equal(res.status_code, 302, 'redirects to cas logout')
-        assert_in('/logout?service=', res.location)
-        assert_in(url, res.location)
+        assert_in('/logout?service=', unquote(res.location))
+        assert_in(url, unquote(res.location))
 
     def test_external_login_confirm_email_get_without_destination(self):
         url = self.user.get_confirmation_url(self.user.username, external_id_provider='orcid')
@@ -4590,8 +4590,8 @@ class TestExternalAuthViews(OsfTestCase):
         url = self.user.get_confirmation_url(self.user.username, external_id_provider='orcid', destination='dashboard')
         res = self.app.get(url, auth=self.auth)
         assert_equal(res.status_code, 302, 'redirects to cas login')
-        assert_in('/login?service=', res.location)
-        assert_in('new=true', res.location)
+        assert_in('/login?service=', unquote(res.location))
+        assert_in('new=true', unquote(res.location))
 
         assert_equal(mock_welcome.call_count, 1)
 
@@ -5537,7 +5537,7 @@ class TestResetPassword(OsfTestCase):
         assert_equal(res.status_code, 302)
         location = res.headers.get('Location')
         assert_true('login?service=' in location)
-        assert_true('username={}'.format(quote(self.user.username, safe='@')) in location)
+        assert_true('username={}'.format(self.user.username, safe='@') in unquote(location))
         assert_true('verification_key={}'.format(self.user.verification_key) in location)
 
         # check if password was updated
@@ -5619,7 +5619,7 @@ class TestResolveGuid(OsfTestCase):
 
 
     def test_preprint_provider_with_osf_domain(self):
-        provider = PreprintProviderFactory(_id='osf', domain='https://rdm.nii.ac.jp/')
+        provider = PreprintProviderFactory(_id='osftest', domain='https://rdm.nii.ac.jp/')
         preprint = PreprintFactory(provider=provider)
         url = web_url_for('resolve_guid', _guid=True, guid=preprint._id)
         res = self.app.get(url)

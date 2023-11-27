@@ -1054,6 +1054,7 @@ class RegionFactory(DjangoModelFactory):
     waterbutler_credentials = generic_waterbutler_credentials
     waterbutler_settings = generic_waterbutler_settings
     waterbutler_url = 'http://123.456.test.woo'
+    mfr_url = 'http://localhost:7778'
     is_allowed = True
     is_readonly = False
     allow_expression = None
@@ -1135,6 +1136,15 @@ class BrandFactory(DjangoModelFactory):
     primary_color = factory.Faker('hex_color')
     secondary_color = factory.Faker('hex_color')
 
+
+class BaseFileNodeFactory(DjangoModelFactory):
+    class Meta:
+        model = models.BaseFileNode
+
+    id = 1
+    provider = 'osfstorage'
+    path = 'fake_path'
+    name = factory.Faker('company')
 
 class RegionExtraFactory:
     def __init__(self, institution_id, name):

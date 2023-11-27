@@ -5,7 +5,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from framework.exceptions import HTTPError
-from osf.models.node import Node
+from osf.models.node import Node, AbstractNode
 from website import settings as website_settings
 
 import addons.onedrivebusiness.settings as settings
@@ -21,6 +21,7 @@ from addons.onedrivebusiness.client import OneDriveBusinessClient
 from addons.onedrive.models import OneDriveProvider
 from framework.auth.core import Auth
 from osf.models.files import File, Folder, BaseFileNode
+from addons.osfstorage.models import Region, NodeSettings as OsfStorageNodeSettings
 
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,9 @@ class NodeSettings(BaseOAuthNodeSettings, BaseStorageAddon):
     folder_name = models.TextField(blank=True, null=True)
     folder_location = models.TextField(blank=True, null=True)
     user_settings = models.ForeignKey(UserSettings, null=True, blank=True, on_delete=models.CASCADE)
+    region = models.ForeignKey(Region, blank=True, null=True, related_name='one_drive_business_region_id', on_delete=models.CASCADE)
+    root_node = models.ForeignKey(BaseFileNode, related_name='one_drive_business_root_node_id', blank=True, null=True, default=None, on_delete=models.CASCADE)
+    owner = models.ForeignKey(AbstractNode, related_name='one_drive_business_node_settings', null=True, blank=True, on_delete=models.CASCADE)
 
     @property
     def api(self):
@@ -151,7 +155,7 @@ class NodeSettings(BaseOAuthNodeSettings, BaseStorageAddon):
         super(NodeSettings, self).delete(save=save)
 
     def fetch_access_token(self):
-        region_external_account = get_region_external_account(self.owner)
+        region_external_account = get_region_external_account(self)
         if region_external_account is None:
             raise exceptions.AddonError('Cannot retrieve credentials for {} addon'.format(FULL_NAME))
         region_provider = self.oauth_provider(region_external_account.external_account)
@@ -257,6 +261,9 @@ class NodeSettings(BaseOAuthNodeSettings, BaseStorageAddon):
             region_client.remove_permission(self.folder_id, permission['id'])
         return False
 
+    def set_root_node(self, root_node):
+        self.root_node = root_node
+
 
 @receiver(post_save, sender=Node)
 def node_post_save(sender, instance, created, **kwargs):
@@ -264,10 +271,25 @@ def node_post_save(sender, instance, created, **kwargs):
         return
     if SHORT_NAME not in website_settings.ADDONS_AVAILABLE_DICT:
         return
-    region_external_account = get_region_external_account(instance)
-    if region_external_account is None:
-        return  # disabled
-    addon = instance.get_addon(SHORT_NAME)
-    if addon is None:
-        addon = instance.add_addon(SHORT_NAME, auth=Auth(instance.creator), log=True)
-    addon.ensure_team_folder(region_external_account)
+    institution = None
+    if instance.creator:
+        institution = instance.creator.affiliated_institutions.first()
+    institution_id = None
+    if institution:
+        institution_id = institution._id
+    regions = Region.objects.filter(_id=institution_id, waterbutler_settings__storage__provider=SHORT_NAME).order_by('id')
+    for index, region in enumerate(regions):
+        addon = instance.get_addon(SHORT_NAME, region_id=region.id)
+        if addon is None:
+            addon = instance.add_addon(SHORT_NAME, auth=Auth(instance.creator), log=True, region_id=region.id)
+        region_external_account = get_region_external_account(addon)
+        if region_external_account is None:
+            continue  # disabled
+        if created:
+            osfstorage_nodesettings = OsfStorageNodeSettings.objects.filter(owner_id=instance.get_root().id, is_deleted=False, region_id=region.id).first()
+            if osfstorage_nodesettings:
+                base_file_node = osfstorage_nodesettings.root_node
+                if base_file_node:
+                    addon.set_root_node(base_file_node)
+                    addon.save()
+        addon.ensure_team_folder(region_external_account)

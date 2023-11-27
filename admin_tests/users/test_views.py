@@ -286,6 +286,7 @@ class TestHamUserRestore(AdminTestCase):
 class TestDisableSpamUser(AdminTestCase):
     def setUp(self):
         self.user = UserFactory()
+        self.user.affiliated_institutions.add(InstitutionFactory())
         self.public_node = ProjectFactory(creator=self.user, is_public=True)
         self.private_node = ProjectFactory(creator=self.user, is_public=False)
         self.request = RequestFactory().post('/fake_path')
@@ -476,6 +477,7 @@ class TestUserWorkshopFormView(AdminTestCase):
 
     def setUp(self):
         self.user = AuthUserFactory()
+        self.user.affiliated_institutions.add(InstitutionFactory())
         self.auth = Auth(self.user)
         self.view = views.UserWorkshopFormView()
         self.node = ProjectFactory(creator=self.user)
@@ -776,7 +778,9 @@ class TestGetLinkView(AdminTestCase):
         nt.assert_equal(link_path, ideal_link_path)
 
     def test_get_unclaimed_node_links(self):
-        project = ProjectFactory()
+        user = UnconfirmedUserFactory()
+        user.affiliated_institutions.add(InstitutionFactory())
+        project = ProjectFactory(creator=user)
         unregistered_contributor = project.add_unregistered_contributor(fullname='Brother Nero', email='matt@hardyboyz.biz', auth=Auth(project.creator))
         project.save()
 

@@ -17,7 +17,7 @@ from osf.models import (
 )
 from osf.models.user_storage_quota import UserStorageQuota
 from osf_tests.factories import (
-    AuthUserFactory, ProjectFactory, UserFactory, InstitutionFactory, RegionFactory,
+    AuthUserFactory, ProjectFactory, UserFactory, InstitutionFactory, RegionFactory, BaseFileNodeFactory
 )
 from tests.base import OsfTestCase
 from tests.test_websitefiles import TestFolder, TestFile
@@ -1670,7 +1670,6 @@ class TestSaveUsedQuota(OsfTestCase):
     def test_add_file_with_addon_method_provider(self):
         institution = InstitutionFactory()
         self.project_creator.affiliated_institutions.add(institution)
-        self.user.affiliated_institutions.add(institution)
         self.region = RegionFactory(
             _id=institution._id,
             waterbutler_settings={
@@ -1682,7 +1681,7 @@ class TestSaveUsedQuota(OsfTestCase):
                 }
             }
         )
-        addon_st = self.node.add_addon('osfstorage', auth=None, log=False, region_id=self.region.id)
+        addon_st = self.node.add_addon('nextcloudinstitutions', auth=None, log=False, region_id=self.region.id)
         addon_st.root_node_id = self.node_root.id
         addon_st.save()
 
@@ -1696,26 +1695,27 @@ class TestSaveUsedQuota(OsfTestCase):
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5000
         )
-
+        self.base_file_node._path='/' + self.node_root._id + self.base_file_node.materialized_path
+        self.base_file_node.parent_id=self.node_root.id
         self.base_file_node.save()
-
         quota.update_used_quota(
             self=None,
             target=self.node,
-            user=self.user,
+            user=self.project_creator,
             event_type=FileLog.FILE_ADDED,
             payload={
                 'provider': self.addon_provider,
+                'root_path':self.node_root._id,
                 'metadata': {
                     'provider': self.addon_provider,
                     'name': self.base_file_node.name,
                     'materialized': self.base_file_node.materialized_path,
-                    'path': self.base_file_node.materialized_path,
+                    'path': '/' + self.node_root._id + self.base_file_node.materialized_path,
                     'kind': 'file',
                     'size': 1000,
                     'created_utc': '',
                     'modified_utc': '',
-                    'extra': {'version': '1'}
+                    'extra': {'version': '1'},
                 }
             }
         )
@@ -1804,7 +1804,7 @@ class TestSaveUsedQuota(OsfTestCase):
                 }
             }
         )
-        addon_st = self.node.add_addon('osfstorage', auth=None, log=False, region_id=self.region.id)
+        addon_st = self.node.add_addon('nextcloudinstitutions', auth=None, log=False, region_id=self.region.id)
         addon_st.root_node_id = self.node_root.id
         addon_st.save()
 
@@ -1812,6 +1812,8 @@ class TestSaveUsedQuota(OsfTestCase):
             storage_type=ProjectStorageType.CUSTOM_STORAGE
         )
 
+        self.base_file_node._path='/' + self.node_root._id + self.base_file_node.materialized_path
+        self.base_file_node.parent_id=self.node_root.id
         self.base_file_node.save()
         FileInfo.objects.create(file=self.base_file_node, file_size=1000)
 
@@ -1834,12 +1836,13 @@ class TestSaveUsedQuota(OsfTestCase):
             event_type=FileLog.FILE_REMOVED,
             payload={
                 'provider': self.addon_provider,
+                'root_path':self.node_root._id,
                 'metadata': {
                     'provider': self.addon_provider,
                     'name': self.base_file_node.name,
                     'materialized': self.base_file_node.materialized_path,
                     'path': self.base_file_node.materialized_path,
-                    'kind': 'file'
+                    'kind': 'file',
                 }
             }
         )
@@ -1937,14 +1940,15 @@ class TestSaveUsedQuota(OsfTestCase):
             user=self.user,
             event_type=FileLog.FILE_REMOVED,
             payload={
-                'provider': self.addon_provider,
+                'provider': 'osfstorage',
+                'root_path':folder1._id,
                 'metadata': {
-                    'provider': self.addon_provider,
+                    'provider': 'osfstorage',
                     'name': folder1.name,
                     'materialized': folder1.materialized_path,
-                    'path': folder1.materialized_path,
+                    'path': folder1._id + '/',
                     'kind': 'folder',
-                    'extra': {}
+                    'extra': {},
                 }
             }
         )
@@ -2179,53 +2183,67 @@ class TestGetRegionIdOfInstitutionalStorageByPath(OsfTestCase):
 
     def test_get_region_id_of_institutional_storage_by_path_with_custom_storage(self):
         region_mock = mock.Mock()
+        root_node_mock = mock.Mock()
+        root_node_mock.id=123
         region_mock.id = 456
         institution_mock = mock.Mock()
         institution_mock.affiliated_institutions.first.return_value = institution_mock
         region_filter_mock = mock.Mock()
         region_filter_mock.first.return_value = region_mock
+        root_node_filter_mock = mock.Mock()
+        root_node_filter_mock.first.return_value = root_node_mock
+        addon_st = self.target.add_addon('nextcloudinstitutions', auth=None, log=False, region_id=region_mock.id)
+        addon_st.root_node_id = root_node_mock.id
+        addon_st.save()
 
         with mock.patch('website.util.quota.Region.objects.filter') as mock_filter, \
+                mock.patch('website.util.quota.BaseFileNode.objects.filter') as mock_base_filter, \
                 mock.patch('website.util.quota.get_addon_osfstorage_by_path'):
             mock_filter.return_value = region_filter_mock
+            mock_base_filter.return_value = root_node_filter_mock
             self.target.creator.affiliated_institutions.first.return_value = institution_mock
-
             result = get_region_id_of_institutional_storage_by_path(
                 self.target,
                 self.provider,
                 self.path,
-                self.storage_type
+                self.storage_type,
+                root_path='123'
             )
 
         assert_equal(result, 456)
         mock_filter.assert_called_once_with(
             _id=institution_mock._id,
+            id=self.target.get_addon().region.id,
             waterbutler_settings__storage__provider=self.provider
         )
 
     def test_get_region_id_of_institutional_storage_by_path_with_custom_storage_no_region(self):
+        root_node_mock = mock.Mock()
+        root_node_mock.id=123
+        root_node_filter_mock = mock.Mock()
+        root_node_filter_mock.first.return_value = root_node_mock
         institution_mock = mock.Mock()
         institution_mock.affiliated_institutions.first.return_value = institution_mock
         region_filter_mock = mock.Mock()
         region_filter_mock.first.return_value = None
 
         with mock.patch('website.util.quota.Region.objects.filter') as mock_filter, \
+                mock.patch('website.util.quota.BaseFileNode.objects.filter') as mock_base_filter, \
                 mock.patch('website.util.quota.get_addon_osfstorage_by_path'):
             mock_filter.return_value = region_filter_mock
+            mock_base_filter.return_value = root_node_filter_mock
             self.target.creator.affiliated_institutions.first.return_value = institution_mock
 
             result = get_region_id_of_institutional_storage_by_path(
                 self.target,
                 self.provider,
                 self.path,
-                self.storage_type
+                self.storage_type,
+                root_path='123'
             )
 
         assert_is_none(result)
-        mock_filter.assert_called_once_with(
-            _id=institution_mock._id,
-            waterbutler_settings__storage__provider=self.provider
-        )
+        mock_base_filter.assert_called_once_with(_id='123')
 
     def test_get_region_id_of_institutional_storage_by_path_with_custom_storage_no_affiliated_institutions(self):
         with mock.patch('website.util.quota.get_addon_osfstorage_by_path'), \

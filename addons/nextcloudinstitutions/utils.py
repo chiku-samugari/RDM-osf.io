@@ -78,7 +78,9 @@ class MetadataClient(object):
     def set_metadata(self, path, attributes):
         array = []
         for k, v in attributes.items():
-            array.append('<nc:' + k + '>' + v + '</nc:' + k + '>')
+            if hasattr(v, 'decode'):
+                v = v.decode('utf-8')
+            array.append(f'<nc:{k}>{v}</nc:{k}>')
         str_attributes = '    '.join(array)
         xml = self.PROPPATCH_XML_BASE.format(str_attributes)
         try:

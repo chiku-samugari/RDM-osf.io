@@ -1,8 +1,10 @@
 import datetime
+import inspect  # noqa
 from rest_framework import status as http_status
 import os
 import uuid
 import markupsafe
+import pytz
 from future.moves.urllib.parse import quote
 from django.utils import timezone
 
@@ -24,6 +26,7 @@ from addons.base.models import BaseStorageAddon
 from addons.osfstorage.models import OsfStorageFile
 from addons.osfstorage.models import OsfStorageFileNode, Region
 from addons.osfstorage.utils import update_analytics
+from addons.metadata.apps import AddonAppConfig as MetadataAppConfig
 
 from framework import sentry
 from framework.auth import Auth
@@ -39,10 +42,20 @@ from website import settings
 from addons.base import signals as file_signals
 from addons.base.utils import format_last_known_metadata, get_mfr_url, get_root_institutional_storage
 from osf import features
-from osf.models import (BaseFileNode, TrashedFileNode, BaseFileVersionsThrough,
-                        OSFUser, AbstractNode, Preprint,
-                        NodeLog, DraftRegistration,
-                        Guid, FileVersionUserMetadata, FileVersion)
+from osf.models import (
+    BaseFileNode,
+    TrashedFileNode,
+    BaseFileVersionsThrough,
+    OSFUser,
+    AbstractNode,
+    Preprint,
+    NodeLog,
+    DraftRegistration,
+    Guid,
+    FileVersionUserMetadata,
+    FileVersion,
+    FileInfo
+)
 from osf.metrics import PreprintView, PreprintDownload
 from osf.utils import permissions
 from website.profile.utils import get_profile_image_url
@@ -50,8 +63,7 @@ from website.project import decorators
 from website.project.decorators import must_be_contributor_or_public, must_be_valid_project, check_contributor_auth
 from website.ember_osf_web.decorators import ember_flag_is_active
 from website.project.utils import serialize_node
-from website.util import rubeus, timestamp
-
+from website.util import rubeus, timestamp, inspect_info  # noqa
 
 from osf.features import (
     SLOAN_COI_DISPLAY,
@@ -60,6 +72,7 @@ from osf.features import (
 )
 from website.util.rubeus import check_authentication_attribute
 
+utc = pytz.UTC
 SLOAN_FLAGS = (
     SLOAN_COI_DISPLAY,
     SLOAN_DATA_DISPLAY,
@@ -263,6 +276,7 @@ def get_metric_class_for_action(action, from_mfr):
 
 @collect_auth
 def get_auth(auth, **kwargs):
+    logger.debug('----{}:{}::{} from {}:{}::{}'.format(*inspect_info(inspect.currentframe(), inspect.stack())))
     cas_resp = None
     if not auth.user:
         # Central Authentication Server OAuth Bearer Token
@@ -279,6 +293,7 @@ def get_auth(auth, **kwargs):
             if cas_resp.authenticated:
                 auth.user = OSFUser.load(cas_resp.user)
 
+    # get data payload
     try:
         data = jwt.decode(
             jwe.decrypt(request.args.get('payload', '').encode('utf-8'), WATERBUTLER_JWE_KEY),
@@ -290,8 +305,9 @@ def get_auth(auth, **kwargs):
         sentry.log_message(str(err))
         raise HTTPError(http_status.HTTP_403_FORBIDDEN)
 
+    cookie = data.get('cookie', '')
     if not auth.user:
-        auth.user = OSFUser.from_cookie(data.get('cookie', ''))
+        auth.user = OSFUser.from_cookie(cookie)
 
     try:
         action = data['action']
@@ -300,6 +316,19 @@ def get_auth(auth, **kwargs):
     except KeyError:
         raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
+    try:
+        metrics = data.get('metrics', {})
+        uri = metrics.get('uri', '')
+        from urllib.parse import urlparse
+        from urllib.parse import parse_qs
+
+        parsed_url = urlparse(uri)
+        callback_log = parse_qs(parsed_url.query)['callback_log'][0]
+    except KeyError:
+        callback_log = data.get('callback_log', 'True') == 'True'
+
+    # as default callback_log is True
+    callback_log = False if isinstance(callback_log, str) and callback_log.lower() == 'false' else True
     node = AbstractNode.load(node_id) or Preprint.load(node_id)
     if node and node.is_deleted:
         raise HTTPError(http_status.HTTP_410_GONE)
@@ -311,29 +340,54 @@ def get_auth(auth, **kwargs):
     path = None
     if provider_name == 'osfstorage':
         path = data['path']
+        logger.debug(f'path={path}')
         if provider_name == 'osfstorage' and path is None:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
         if path == '/':
-            # When the item's path is missing, using the first storage is allowed and not readonly.
+            logger.debug(f'When the item\'s path is missing, using the first storage is allowed and not readonly.')
             institution = auth.user.affiliated_institutions.first()
             if institution is not None:
                 region = Region.objects.filter(_id=institution._id, is_allowed=True, is_readonly=False).first()
                 if region is not None:
                     region_id = region.id
         else:
-            # From path of file or folder, get root folder by the path
-            # Using this root folder to get the corresponding addon
+            logger.debug(f'From path of file or folder, get root folder by the path')
+            logger.debug(f'Using this root folder to get the corresponding addon')
+            file_id = path.strip('/').split('/')[0]
+            logger.debug(f'file_id={file_id}')
+            file_node_root_id = get_root_institutional_storage(file_id)
+            if file_node_root_id is not None:
+                file_node_root_id = file_node_root_id.id
+
+    elif provider_name in ADDON_METHOD_PROVIDER:
+        path = data['path']
+        logger.debug(f'path={path}')
+        if path is None:
+            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+        if path == '/':
+            logger.debug(f'When the item\'s path is missing, using the first storage is allowed and not readonly.')
+            institution = auth.user.affiliated_institutions.first()
+            if institution is not None:
+                region = Region.objects.filter(_id=institution._id, is_allowed=True, is_readonly=False, waterbutler_settings__storage__provider=provider_name).first()
+                if region is not None:
+                    region_id = region.id
+        else:
             file_id = path.strip('/').split('/')[0]
             file_node_root_id = get_root_institutional_storage(file_id)
             if file_node_root_id is not None:
                 file_node_root_id = file_node_root_id.id
 
-    check_access(node, auth, action, cas_resp)
+    logger.debug(f'file_node_root_id={file_node_root_id}')
+    #check_access(node, auth, action, cas_resp)
     provider_settings = None
     if hasattr(node, 'get_addon'):
+        logger.debug(f'provider_name is {provider_name}')
+        logger.debug(f'region_id is {region_id}')
         provider_settings = node.get_addon(provider_name, region_id=region_id, root_id=file_node_root_id)
+        logger.debug(f'provider_settings is {provider_settings}')
         if not provider_settings:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+
         if provider_name == 'osfstorage':
             region = provider_settings.region
             check_permission_by_attribute(auth.user, action, region)
@@ -341,7 +395,8 @@ def get_auth(auth, **kwargs):
             institution = auth.user.affiliated_institutions.first()
             region = Region.objects.filter(
                 _id=institution._id,
-                waterbutler_settings__storage__provider=provider_name
+                waterbutler_settings__storage__provider=provider_name,
+                id=provider_settings.region.id
             ).first()
             if region is not None:
                 check_permission_by_attribute(auth.user, action, region)
@@ -350,6 +405,7 @@ def get_auth(auth, **kwargs):
     waterbutler_settings = None
     fileversion = None
     if provider_name == 'osfstorage':
+        path = data.get('path')
         if path:
             file_id = path.strip('/')
             # check to see if this is a file or a folder
@@ -418,19 +474,35 @@ def get_auth(auth, **kwargs):
     if isinstance(credentials.get('token'), bytes):
         credentials['token'] = credentials.get('token').decode()
 
-    return {'payload': jwe.encrypt(jwt.encode({
-        'exp': timezone.now() + datetime.timedelta(seconds=settings.WATERBUTLER_JWT_EXPIRATION),
-        'data': {
-            'auth': make_auth(auth.user),  # A waterbutler auth dict not an Auth object
-            'credentials': credentials,
-            'settings': waterbutler_settings,
-            'callback_url': node.api_url_for(
-                ('create_waterbutler_log' if not getattr(node, 'is_registration', False) else 'registration_callbacks'),
-                _absolute=True,
-                _internal=True
-            )
-        }
-    }, settings.WATERBUTLER_JWT_SECRET, algorithm=settings.WATERBUTLER_JWT_ALGORITHM), WATERBUTLER_JWE_KEY).decode()}
+    payload_data = {
+        'auth': make_auth(auth.user),  # A waterbutler auth dict not an Auth object
+        'credentials': credentials,
+        'settings': waterbutler_settings,
+        'callback_url': '',
+    }
+
+    if callback_log:
+        payload_data['callback_url'] = node.api_url_for(
+            ('create_waterbutler_log' if not getattr(node, 'is_registration', False) else 'registration_callbacks'),
+            _absolute=True,
+            _internal=True
+        )
+
+    logger.debug(f'payload_data for auth is {payload_data}')
+    ret = {
+        'payload': jwe.encrypt(
+            jwt.encode(
+                {
+                    'exp': timezone.now() + datetime.timedelta(seconds=settings.WATERBUTLER_JWT_EXPIRATION),
+                    'data': payload_data
+                },
+                settings.WATERBUTLER_JWT_SECRET,
+                algorithm=settings.WATERBUTLER_JWT_ALGORITHM),
+            WATERBUTLER_JWE_KEY
+        ).decode()
+    }
+
+    return ret
 
 
 LOG_ACTION_MAP = {
@@ -452,8 +524,10 @@ DOWNLOAD_ACTIONS = set([
 @no_auto_transaction
 @must_be_valid_project(quickfiles_valid=True, preprints_valid=True)
 def create_waterbutler_log(payload, **kwargs):
+    logger.debug(f'payloaddata when create_waterbutler_log is {payload}')
     file_created_or_updated = False
     file_node_moved = False
+    file_node_copied = False
     with transaction.atomic():
         try:
             auth = payload['auth']
@@ -466,10 +540,12 @@ def create_waterbutler_log(payload, **kwargs):
 
             user = OSFUser.load(auth['id'])
             if user is None:
+                logger.debug('user is none')
                 raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
             action = LOG_ACTION_MAP[payload['action']]
         except KeyError:
+            logger.debug('key error')
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
         auth = Auth(user=user)
@@ -479,10 +555,12 @@ def create_waterbutler_log(payload, **kwargs):
             for bundle in ('source', 'destination'):
                 for key in ('provider', 'materialized', 'name', 'nid'):
                     if key not in payload[bundle]:
+                        logger.debug(f'key missing {key}')
                         raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-
             dest = payload['destination']
             src = payload['source']
+            logger.debug(f'destination is {dest}')
+            logger.debug(f'source is {src}')
             dest_root_id = None
             src_root_id = None
             try:
@@ -490,8 +568,16 @@ def create_waterbutler_log(payload, **kwargs):
                     dest_root_id = get_root_institutional_storage(dest['path'].strip('/').split('/')[0])
                     if dest_root_id is not None:
                         dest_root_id = dest_root_id.id
+                if dest['provider'] in ADDON_METHOD_PROVIDER:
+                    dest_root_id = get_root_institutional_storage(dest['root_path'])
+                    if dest_root_id is not None:
+                        dest_root_id = dest_root_id.id
                 if src['provider'] == 'osfstorage':
                     src_root_id = get_root_institutional_storage(src['old_root_id'].strip('/').split('/')[0])
+                    if src_root_id is not None:
+                        src_root_id = src_root_id.id
+                if src['provider'] in ADDON_METHOD_PROVIDER:
+                    src_root_id = get_root_institutional_storage(src['root_path'])
                     if src_root_id is not None:
                         src_root_id = src_root_id.id
             except KeyError:
@@ -519,13 +605,13 @@ def create_waterbutler_log(payload, **kwargs):
             destination = None
             if hasattr(node, 'get_addon'):
                 destination = node.get_addon(payload['destination']['provider'], root_id=dest_root_id)
-
+            payload['root_path'] = src['root_path']
             payload['source'].update({
                 'materialized': payload['source']['materialized'].lstrip('/'),
                 'addon': source.config.full_name if source else 'osfstorage',
                 'url': source_node.web_url_for(
                     'addon_view_or_download_file',
-                    path=payload['source']['path'].lstrip('/'),
+                    path=src['root_path'] + '/' + payload['source']['path'].lstrip('/') if src['provider'] in ADDON_METHOD_PROVIDER else payload['source']['path'].lstrip('/'),
                     provider=payload['source']['provider']
                 ),
                 'node': {
@@ -535,14 +621,14 @@ def create_waterbutler_log(payload, **kwargs):
                 },
                 # Add source region to payload when adding log
                 # Using the region to get institutional storage name in recent activity
-                'region': source.region.id if source.config.short_name == 'osfstorage' else None
+                'region': source.region.id if hasattr(source, 'config') and source.config.short_name == 'osfstorage' else None
             })
             payload['destination'].update({
                 'materialized': payload['destination']['materialized'].lstrip('/'),
                 'addon': destination.config.full_name if destination else 'osfstorage',
                 'url': destination_node.web_url_for(
                     'addon_view_or_download_file',
-                    path=payload['destination']['path'].lstrip('/'),
+                    path=dest['root_path'] + '/' + payload['destination']['path'].lstrip('/') if dest['provider'] in ADDON_METHOD_PROVIDER else payload['destination']['path'].lstrip('/'),
                     provider=payload['destination']['provider']
                 ),
                 'node': {
@@ -552,10 +638,10 @@ def create_waterbutler_log(payload, **kwargs):
                 },
                 # Add destination region to payload when adding log
                 # Using the region to get institutional storage name in recent activity
-                'region': destination.region.id if destination.config.short_name == 'osfstorage' else None
+                'region': destination.region.id if hasattr(destination, 'config') and destination.config.short_name == 'osfstorage' else None
             })
 
-            if destination.config.short_name == 'osfstorage':
+            if hasattr(destination, 'config') and destination.config.short_name == 'osfstorage':
                 payload['region'] = destination.region.id
 
             if not payload.get('errors'):
@@ -583,7 +669,17 @@ def create_waterbutler_log(payload, **kwargs):
                 return {'status': 'success'}
 
         else:
+            logger.debug('node create waterbutler log')
             node.create_waterbutler_log(auth, action, payload)
+        root_node_id = payload.get('root_path')
+        root_folder_id = None
+        if root_node_id:
+            root_folder = get_root_institutional_storage(root_node_id)
+            root_folder_id = root_folder.id if root_folder else None
+        if hasattr(node, 'get_addon'):
+            metadata_addon = node.get_addon(MetadataAppConfig.short_name, root_id=root_folder_id)
+            if metadata_addon:
+                metadata_addon.update_file_metadata_for(action, payload, auth)
 
         if not isinstance(node, Preprint):
             # Create/update timestamp record
@@ -601,48 +697,317 @@ def create_waterbutler_log(payload, **kwargs):
                 dest_provider = payload['destination']['provider']
                 src_metadata = payload.get('source', None)
                 file_node_moved = True
+                metadata['src_materialized'] = src_path
+                metadata['dest_materialized'] = dest_path
+                if metadata.get('kind') == 'file':
+                    metadata['dest_size'] = payload['destination']['size']
+                if src_provider in ADDON_METHOD_PROVIDER and dest_provider in ADDON_METHOD_PROVIDER:
+                    metadata['dest_path'] = payload['destination']['root_path'] + '/' + metadata.get('path').lstrip('/')
+                    metadata['src_path'] = metadata['path']
+                    metadata['path'] = payload['root_path'] + '/' + payload['source']['path'].lstrip('/')
+                elif src_provider in ADDON_METHOD_PROVIDER:
+                    metadata['dest_path'] = '/' + metadata.get('path').lstrip('/')
+                    metadata['src_path'] = metadata['path']
+                    metadata['path'] = payload['root_path'] + '/' + payload['source']['path'].lstrip('/')
+                elif dest_provider in ADDON_METHOD_PROVIDER:
+                    metadata['dest_path'] = payload['destination']['root_path'] + '/' + metadata.get('path').lstrip('/')
+                    metadata['src_path'] = metadata['path']
+                    metadata['path'] = metadata['dest_path']
+                else:
+                    metadata['src_path'] = metadata['path']
+
+            elif action in (NodeLog.FILE_COPIED):
+                file_node_copied = True
+                dest_provider = payload['destination']['provider']
+                metadata = payload.get('metadata') or payload.get('destination')
+                metadata['root_path'] = payload['destination']['root_path']
+
             # Update status of deleted timestamp records
             elif action in (NodeLog.FILE_REMOVED):
                 src_path = payload['metadata']['materialized']
                 provider = payload['metadata']['provider']
                 timestamp.file_node_deleted(node._id, provider, src_path)
 
-    def prepare_file_node(provider):
+    # Create child file_node when create, copy or move folder
+    def create_child_file_node(children, dest_root_folder_id):
+        children = children.get('children', None)
+        if children is not None:
+            for child in children:
+                if child['kind'] == 'file':
+                    file_node = BaseFileNode.resolve_class(
+                        dest_provider, BaseFileNode.FILE
+                    ).get_or_create(node, '/' + metadata.get('root_path').lstrip('/') + child.get('path'), parent_id=dest_root_folder_id)
+                    file_node.name = child.get('name')
+                    file_node.materialized_path = child.get('materialized')
+                    file_node.parent_id = dest_root_folder_id
+                    file_node.save()
+                    fileinfo = FileInfo.objects.filter(file_id=file_node.id).last()
+                    if fileinfo is None:
+                        FileInfo.objects.create(file=file_node, file_size=child.get('size'))
+                elif child.get('children'):
+                    create_child_file_node(child, dest_root_folder_id)
+
+    # Create child file_info when create, copy or move folder
+    def create_child_fileinfo(children):
+        children = children.get('children', [])
+        for child in children:
+            if child['kind'] == 'file':
+                file_node = BaseFileNode.objects.filter(_id=child['path'].lstrip('/')).last()
+                fileinfo = FileInfo.objects.filter(file_id=file_node.id).last()
+                if fileinfo is None:
+                    FileInfo.objects.create(file=file_node, file_size=int(child.get('size')))
+            else:
+                create_child_fileinfo(child)
+
+    # Get child file_metada of folder
+    def get_child_file_metadata(metadata, metadata_children, root_path):
+        children = metadata.get('children', [])
+        if children:
+            for child in children:
+                logger.debug(f'child is {child}')
+                if child['kind'] == 'file':
+                    if metadata.get('provider') in ADDON_METHOD_PROVIDER:
+                        child['path'] = root_path + '/' + child.get('path').lstrip('/')
+                    metadata_children.append(child)
+                elif child.get('children'):
+                    get_child_file_metadata(child, metadata_children, root_path)
+
+    def prepare_file_node(provider, root_folder_id=None, dest_root_folder_id=None, dest_provider=None):
         with transaction.atomic():
             # to reduce possibility of MultipleObjectsReturned.
             # [GRDM-13530, 15698, 17045, 17065]
             # (MultipleObjectsReturned may occur when creation of
             #  BaseFileNode is called in long transaction.)
-            file_node = BaseFileNode.resolve_class(
-                provider, BaseFileNode.FILE
-            ).get_or_create(node, '/' + metadata.get('path').lstrip('/'))
-            if file_node and metadata.get('kind') == 'file':
-                func_hash = getattr(file_node, 'get_hash_for_timestamp', None)
-                if func_hash:
-                    extras = {}
-                    # collect new metadata from waterbutler
-                    # and update external hashes of the file_node
-                    # to update timestamp by file hash
-                    file_node.touch(
-                        request.headers.get('Authorization'),
-                        **dict(
-                            extras,
-                            cookie=user.get_or_create_cookie().decode()
-                        )
-                    )
+            logger.debug(f'prepare_file_node metadata is {metadata}')
+            logger.debug(f'prepare_file_node action is {action}')
+            logger.debug(f'prepare_file_node root_folder_id is {root_folder_id}')
+            logger.debug(f'prepare_file_node dest_root_folder_id is {dest_root_folder_id}')
+            logger.debug(f'prepare_file_node dest_provider is {dest_provider}')
+            file_node = None
+            if metadata.get('kind') == 'file':
+                # Move or create from addon
+                if provider in ADDON_METHOD_PROVIDER:
+                    if provider == 'onedrivebusiness' and dest_provider is not None and dest_provider not in ADDON_METHOD_PROVIDER:
+                        file_node = BaseFileNode.objects.filter(target_object_id=node.id, provider=provider, deleted_on__isnull=True, _materialized_path='/' + src_path.lstrip('/'), parent_id=root_folder_id).last()
+                    else:
+                        file_node = BaseFileNode.resolve_class(
+                            provider, BaseFileNode.FILE
+                        ).get_or_create(node, '/' + metadata.get('path').lstrip('/'), parent_id=root_folder_id)
+                else:
+                    # Move to addon or bulkmount
+                    if dest_provider in ADDON_METHOD_PROVIDER:
+                        file_node = BaseFileNode.resolve_class(
+                            dest_provider, BaseFileNode.FILE
+                        ).get_or_create(node, '/' + metadata['dest_path'].lstrip('/'), parent_id=dest_root_folder_id)
+                    else:
+                        file_node = BaseFileNode.resolve_class(
+                            provider, BaseFileNode.FILE
+                        ).get_or_create(node, '/' + metadata.get('path').lstrip('/'))
+                if file_node:
+                    logger.debug(f'file node is {file_node.id}')
+                    # Update parent_id by destination root node id
+                    if dest_root_folder_id and provider in ADDON_METHOD_PROVIDER:
+                        file_node.parent_id = dest_root_folder_id
+                        file_node.save()
+                    if dest_provider:
+                        # Update dest_materialized of base file node
+                        if metadata['dest_materialized']:
+                            file_node._materialized_path = '/' + metadata['dest_materialized'].lstrip('/')
+                        # If move to bulkmount reset path
+                        if dest_provider not in ADDON_METHOD_PROVIDER:
+                            osf_file_node = BaseFileNode.objects.filter(name=file_node.name, parent_id=dest_root_folder_id).last()
+                            if osf_file_node:
+                                fileinfo = FileInfo.objects.filter(file_id=osf_file_node.id).last()
+                                if fileinfo is None:
+                                    FileInfo.objects.create(file=osf_file_node, file_size=metadata.get('dest_size'))
+                            metadata['path'] = metadata['src_path']
+                        if dest_provider in ADDON_METHOD_PROVIDER:
+                            # Update base file node type
+                            cls = BaseFileNode.resolve_class(dest_provider, BaseFileNode.FILE)
+                            file_node.recast(cls._typedmodels_type)
+                            file_node._path = '/' + metadata.get('dest_path').lstrip('/')
+                            file_node.provider = dest_provider
+                            file_node._meta.model._provider = dest_provider
+                            file_node.save()
+                            fileinfo = FileInfo.objects.filter(file_id=file_node.id).last()
+                            if fileinfo is None:
+                                FileInfo.objects.create(file=file_node, file_size=metadata.get('dest_size'))
+                        if provider == 'onedrivebusiness' and metadata['src_materialized']:
+                            # If source provider is onedrivebusiness will remove old base filenode
+                            logger.debug('materialized_path is ' + str(metadata['src_materialized']))
+                            old_file_nodes = BaseFileNode.objects.filter(target_object_id=node.id,
+                                                                 provider=provider,
+                                                                 deleted_on__isnull=True,
+                                                                 _materialized_path='/' + metadata['src_materialized'].lstrip('/'),
+                                                                 parent_id=root_folder_id).all()
+                            if old_file_nodes:
+                                for old_file_node in old_file_nodes:
+                                    logger.debug(f'old_file_node id is {old_file_node.id}')
+                                    old_file_node.delete()
+
+                    func_hash = getattr(file_node, 'get_hash_for_timestamp', None)
+                    #if provider != 'osfstorage' and action in (NodeLog.FILE_MOVED, NodeLog.FILE_RENAMED):
+                    #    file_node.path ='/' + metadata.get('dest_path')
+                    if func_hash:
+                        logger.warning('func hash here')
+                        extras = {}
+                        # collect new metadata from waterbutler
+                        # and update external hashes of the file_node
+                        # to update timestamp by file hash
+                        if dest_provider in ADDON_METHOD_PROVIDER and action in (NodeLog.FILE_MOVED, NodeLog.FILE_RENAMED):
+                            metadata['path'] = metadata.get('dest_path')
+                            file_node.touch(
+                                request.headers.get('Authorization'),
+                                **dict(
+                                    extras,
+                                    cookie=user.get_or_create_cookie().decode()
+                                ),
+                                parent_id=dest_root_folder_id,
+                                dest_path='/' + metadata.get('dest_path')
+                            )
+                        else:
+                            file_node.touch(
+                                request.headers.get('Authorization'),
+                                **dict(
+                                    extras,
+                                    cookie=user.get_or_create_cookie().decode()
+                                ),
+                                parent_id=root_folder_id
+                            )
+
+            elif metadata.get('kind') == 'folder' and dest_provider in ADDON_METHOD_PROVIDER:
+                if provider in ADDON_METHOD_PROVIDER:
+                    old_file_nodes = BaseFileNode.objects.filter(target_object_id=node.id,
+                                                             provider=provider,
+                                                             deleted_on__isnull=True,
+                                                             _materialized_path__startswith='/' + src_path.lstrip('/'),
+                                                             parent_id=root_folder_id).all()
+                    if old_file_nodes:
+                        for old_file_node in old_file_nodes:
+                            logger.debug(f'old_file_node id is {old_file_node.id}')
+                            old_file_node.delete()
+
+                children = metadata.get('children', None)
+                if children is not None:
+                    for child in metadata['children']:
+                        if child['kind'] == 'file':
+                            file_node = BaseFileNode.resolve_class(
+                                dest_provider, BaseFileNode.FILE
+                            ).get_or_create(node, '/' + metadata.get('root_path').lstrip('/') + child.get('path'), parent_id=dest_root_folder_id)
+                            file_node.name = child.get('name')
+                            file_node.materialized_path = child.get('materialized')
+                            file_node.parent_id = dest_root_folder_id
+                            file_node.save()
+                            fileinfo = FileInfo.objects.filter(file_id=file_node.id).last()
+                            if fileinfo is None:
+                                FileInfo.objects.create(file=file_node, file_size=child.get('size'))
+                        elif child.get('children'):
+                            create_child_file_node(child, dest_root_folder_id)
+            else:
+                create_child_fileinfo(metadata)
+
+    def prepare_copy(dest_provider, dest_root_folder_id):
+        with transaction.atomic():
+            # to reduce possibility of MultipleObjectsReturned.
+            # [GRDM-13530, 15698, 17045, 17065]
+            # (MultipleObjectsReturned may occur when creation of
+            #  BaseFileNode is called in long transaction.)
+            logger.debug(f'prepare_copy metadata is {metadata}')
+            logger.debug(f'prepare_copy action is {action}')
+            logger.debug(f'prepare_copy dest_root_folder_id is {dest_root_folder_id}')
+            file_node = None
+            if metadata.get('kind') == 'file':
+                # Copy to addon
+                if dest_provider in ADDON_METHOD_PROVIDER:
+                    file_node = BaseFileNode.resolve_class(
+                        dest_provider, BaseFileNode.FILE
+                    ).get_or_create(node, '/' + metadata.get('root_path') + '/' + metadata.get('path').lstrip('/'), parent_id=dest_root_folder_id)
+                else:
+                    file_node = BaseFileNode.objects.filter(name=metadata.get('name'), parent_id=dest_root_folder_id).last()
+                if file_node:
+                    logger.debug(f'file node is {file_node.id}')
+                    # Update dest_materialized of base file node
+                    if metadata['materialized']:
+                        file_node._materialized_path = '/' + metadata['materialized'].lstrip('/')
+                    # Create file info
+                    FileInfo.objects.create(file=file_node, file_size=metadata.get('size'))
+
+                    func_hash = getattr(file_node, 'get_hash_for_timestamp', None)
+                    #if provider != 'osfstorage' and action in (NodeLog.FILE_MOVED, NodeLog.FILE_RENAMED):
+                    #    file_node.path ='/' + metadata.get('dest_path')
+                    if func_hash:
+                        extras = {}
+                        # collect new metadata from waterbutler
+                        # and update external hashes of the file_node
+                        # to update timestamp by file hash
+                        if dest_provider in ADDON_METHOD_PROVIDER and action in (NodeLog.FILE_MOVED, NodeLog.FILE_RENAMED):
+                            file_node.touch(
+                                request.headers.get('Authorization'),
+                                **dict(
+                                    extras,
+                                    cookie=user.get_or_create_cookie().decode()
+                                ),
+                                parent_id=dest_root_folder_id,
+                                dest_path='/' + metadata.get('dest_path')
+                            )
+                        else:
+                            file_node.touch(
+                                request.headers.get('Authorization'),
+                                **dict(
+                                    extras,
+                                    cookie=user.get_or_create_cookie().decode()
+                                ),
+                                parent_id=dest_root_folder_id
+                            )
+
+            elif metadata.get('kind') == 'folder' and dest_provider in ADDON_METHOD_PROVIDER:
+                children = metadata.get('children', None)
+                if children is not None:
+                    for child in metadata['children']:
+                        if child['kind'] == 'file':
+                            file_node = BaseFileNode.resolve_class(
+                                dest_provider, BaseFileNode.FILE
+                            ).get_or_create(node, '/' + metadata.get('root_path').lstrip('/') + child.get('path'), parent_id=dest_root_folder_id)
+                            file_node.name = child.get('name')
+                            file_node.materialized_path = child.get('materialized')
+                            file_node.parent_id = dest_root_folder_id
+                            file_node.save()
+                            FileInfo.objects.create(file=file_node, file_size=child.get('size'))
+                        elif child.get('children'):
+                            create_child_file_node(child, dest_root_folder_id)
+            else:
+                create_child_fileinfo(metadata)
 
     if file_created_or_updated:
-        prepare_file_node(metadata['provider'])
+        prepare_file_node(metadata['provider'], root_folder_id=root_folder_id)
         with transaction.atomic():  # long transaction
             timestamp.file_created_or_updated(node, metadata, user.id,
                                               created_flag)
+
     elif file_node_moved:
-        prepare_file_node(dest_provider)
+        prepare_file_node(src_provider, root_folder_id=root_folder_id, dest_root_folder_id=dest_root_id, dest_provider=dest_provider)
         with transaction.atomic():  # long transaction
             timestamp.file_node_moved(auth.user.id, node._id,
                                       src_provider, dest_provider,
                                       src_path, dest_path,
                                       metadata, src_metadata)
+
+    elif file_node_copied:
+        prepare_copy(dest_provider, dest_root_id)
+        if dest_provider in ADDON_METHOD_PROVIDER:
+            metadata['path'] = metadata.get('root_path') + '/' + metadata.get('path').lstrip('/')
+        elif dest_provider == 'osfstorage':
+            metadata['path'] = metadata.get('path').lstrip('/')
+        if metadata.get('kind') == 'file':
+            with transaction.atomic():  # long transaction
+                timestamp.file_created_or_updated(node, metadata, user.id, True)
+        else:
+            metadata_list = []
+            get_child_file_metadata(metadata, metadata_list, metadata.get('root_path'))
+            logger.debug(f'metadata_list is {metadata_list}')
+            for metadata_child in metadata_list:
+                with transaction.atomic():  # long transaction
+                    timestamp.file_created_or_updated(node, metadata_child, user.id, True)
 
     with transaction.atomic():
         file_signals.file_updated.send(target=node, user=user, event_type=action, payload=payload)
@@ -841,13 +1206,20 @@ def addon_deleted_file(auth, target, error_type='BLAME_PROVIDER', **kwargs):
 
 @must_be_contributor_or_public
 def verify_timestamp(auth, path, provider, **kwargs):
+    logger.debug(f'verify timestamp here {path}')
     extras = request.args.to_dict()
     extras.pop('_', None)  # Clean up our url params a bit
     guid = kwargs.get('guid')
     guid_target = getattr(Guid.load(guid), 'referent', None)
     target = guid_target or kwargs.get('node') or kwargs['project']
-    file_node = BaseFileNode.resolve_class(provider, BaseFileNode.FILE).get_or_create(target, path)
-
+    file_node_root_id = None
+    if provider in ADDON_METHOD_PROVIDER:
+        file_id = path.strip('/').split('/')[0]
+        file_node_root_id = get_root_institutional_storage(file_id)
+    if file_node_root_id:
+        file_node = BaseFileNode.resolve_class(provider, BaseFileNode.FILE).get_or_create(target, path, parent_id=file_node_root_id.id)
+    else:
+        file_node = BaseFileNode.resolve_class(provider, BaseFileNode.FILE).get_or_create(target, path)
     version = file_node.touch(
         request.headers.get('Authorization'),
         **dict(
@@ -893,7 +1265,6 @@ def addon_view_or_download_file(auth, path, provider, **kwargs):
 
     if not path:
         raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-
     file_node_root_id = None
     if hasattr(target, 'get_addon'):
         if provider == 'osfstorage':
@@ -901,9 +1272,13 @@ def addon_view_or_download_file(auth, path, provider, **kwargs):
             file_node_root_id = get_root_institutional_storage(file_id)
             if file_node_root_id is not None:
                 file_node_root_id = file_node_root_id.id
+        if provider in ADDON_METHOD_PROVIDER:
+            file_id = path.strip('/').split('/')[0]
+            file_node_root_id = get_root_institutional_storage(file_id)
+            if file_node_root_id is not None:
+                file_node_root_id = file_node_root_id.id
 
         node_addon = target.get_addon(provider, root_id=file_node_root_id)
-
         if hasattr(node_addon, 'region'):
             region = node_addon.region
             is_allowed = check_authentication_attribute(auth.user,
@@ -932,18 +1307,22 @@ def addon_view_or_download_file(auth, path, provider, **kwargs):
             })
 
     savepoint_id = transaction.savepoint()
-    file_node = BaseFileNode.resolve_class(provider, BaseFileNode.FILE).get_or_create(target, path)
-
+    if provider == 'osfstorage':
+        file_node = BaseFileNode.resolve_class(provider, BaseFileNode.FILE).get_or_create(target, path)
+    else:
+        file_node = BaseFileNode.resolve_class(provider, BaseFileNode.FILE).get_or_create(target, path, parent_id=file_node_root_id)
+        file_node.path = '/' + path
+    logger.debug(f'file_node id is {file_node.id}')
     # Note: Cookie is provided for authentication to waterbutler
     # it is overriden to force authentication as the current user
     # the auth header is also pass to support basic auth
-
     version = file_node.touch(
         request.headers.get('Authorization'),
         **dict(
             extras,
             cookie=request.cookies.get(settings.COOKIE_NAME)
-        )
+        ),
+        parent_id=file_node_root_id
     )
     if version is None:
         # File is either deleted or unable to be found in the provider location
@@ -951,7 +1330,7 @@ def addon_view_or_download_file(auth, path, provider, **kwargs):
         transaction.savepoint_rollback(savepoint_id)
         if not file_node.pk:
             file_node = BaseFileNode.load(path)
-
+            logger.debug(f'file_node is {file_node}')
             if not file_node:
                 raise HTTPError(http_status.HTTP_404_NOT_FOUND, data={
                     'message_short': 'File Not Found',
@@ -974,6 +1353,7 @@ def addon_view_or_download_file(auth, path, provider, **kwargs):
         transaction.savepoint_commit(savepoint_id)
 
     # TODO clean up these urls and unify what is used as a version identifier
+
     if request.method == 'HEAD':
         return make_response(('', http_status.HTTP_302_FOUND, {
             'Location': file_node.generate_waterbutler_url(**dict(extras, direct=None, version=version.identifier, _internal=extras.get('mode') == 'render'))
@@ -988,7 +1368,7 @@ def addon_view_or_download_file(auth, path, provider, **kwargs):
                 **dict(extras, direct=None, version=version.identifier, _internal=extras.get('mode') == 'render')
             ))))
         return redirect(file_node.generate_waterbutler_url(**dict(extras, direct=None, version=version.identifier, _internal=extras.get('mode') == 'render')))
-
+    #file_node.path=file_path
     if action == 'get_guid':
         draft_id = extras.get('draft')
         draft = DraftRegistration.load(draft_id)
