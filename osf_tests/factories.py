@@ -1225,11 +1225,3 @@ class BaseFileVersionsThroughFactory(DjangoModelFactory):
 class RdmFileTimestamptokenVerifyResultFactory(DjangoModelFactory):
     class Meta:
         model = models.RdmFileTimestamptokenVerifyResult
-
-
-class ResponseFactory:
-    def __init__(self, raw):
-        self.raw = raw
-
-    def close(self):
-        return None
