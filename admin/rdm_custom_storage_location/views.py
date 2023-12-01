@@ -15,6 +15,7 @@ import logging
 from addons.osfstorage.models import Region
 from admin.rdm.utils import RdmPermissionMixin
 from admin.rdm_custom_storage_location import utils
+from .export_data.views.location import ExportStorageLocationViewBaseView
 from osf.models import Institution, OSFUser
 from osf.models.external import ExternalAccountTemporary
 from scripts import refresh_addon_tokens
@@ -60,7 +61,7 @@ class InstitutionalStorageView(InstitutionalStorageBaseView, TemplateView):
         return kwargs
 
 
-class IconView(InstitutionalStorageBaseView, View):
+class IconView(ExportStorageLocationViewBaseView, View):
     """ View for each addon's icon """
     raise_exception = True
 
@@ -78,7 +79,7 @@ class IconView(InstitutionalStorageBaseView, View):
         raise Http404
 
 
-class TestConnectionView(InstitutionalStorageBaseView, View):
+class TestConnectionView(ExportStorageLocationViewBaseView, View):
     """ View for testing the credentials to connect to a provider.
     Called when clicking the 'Connect' Button.
     """
@@ -204,6 +205,7 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
                 data.get('s3_access_key'),
                 data.get('s3_secret_key'),
                 data.get('s3_bucket'),
+                bool(strtobool(data.get('s3_server_side_encryption'))),
             )
         elif provider_short_name == 's3compat':
             result = utils.save_s3compat_credentials(
@@ -232,6 +234,7 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
                 data.get('s3compatinstitutions_access_key'),
                 data.get('s3compatinstitutions_secret_key'),
                 data.get('s3compatinstitutions_bucket'),
+                bool(strtobool(data.get('s3compatinstitutions_server_side_encryption'))),
                 provider_short_name,
             )
         elif provider_short_name == 'ociinstitutions':
