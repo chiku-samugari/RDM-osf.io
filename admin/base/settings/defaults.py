@@ -259,7 +259,7 @@ ROOT_URLCONF = 'admin.base.urls'
 WSGI_APPLICATION = 'admin.base.wsgi.application'
 ADMIN_BASE = ''
 STATIC_URL = '/static/'
-LOGIN_URL = 'account/login/'
+LOGIN_URL = '/account/login/'
 LOGIN_REDIRECT_URL = ADMIN_BASE
 
 STATIC_ROOT = os.path.join(os.path.dirname(BASE_DIR), 'static_root')
@@ -347,3 +347,9 @@ BASE_PATH = parent_dir(parent_dir(HERE))  # admin/ directory
 LOCALE_PATHS = (
     os.path.join(BASE_PATH, 'translations'),
 )
+
+# The directory to store data temporarily.
+TEMPORARY_PATH = '/tmp/'
+
+# Time out for calling copy API
+EACH_FILE_EXPORT_TIME_OUT = 1800

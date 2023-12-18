@@ -29,10 +29,10 @@ from osf.models.sanctions import Sanction
 from osf.models.storage import PROVIDER_ASSET_NAME_CHOICES
 from osf.utils.names import impute_names_model
 from osf.utils.workflows import DefaultStates, DefaultTriggers
+from addons.base.institutions_utils import KEYNAME_BASE_FOLDER
 from addons.osfstorage.models import OsfStorageFile, Region
-from api.base import settings as api_settings
 
-
+settings = apps.get_app_config('addons_osfstorage')
 fake = Factory.create()
 
 # If tests are run on really old processors without high precision this might fail. Unlikely to occur.
@@ -253,14 +253,12 @@ class NodeFactory(BaseNodeFactory):
 
 
 class InstitutionFactory(DjangoModelFactory):
-    _id = factory.Sequence(lambda n: 'us_east_{0}'.format(n))
     name = factory.Faker('company')
     login_url = factory.Faker('url')
     logout_url = factory.Faker('url')
     domains = FakeList('url', n=3)
     email_domains = FakeList('domain_name', n=1)
     logo_name = factory.Faker('file_name')
-    is_authentication_attribute = True
 
     class Meta:
         model = models.Institution
@@ -280,24 +278,6 @@ class InstitutionEntitlementFactory(DjangoModelFactory):
 
         return super(InstitutionEntitlementFactory, cls)._create(target_class, institution=institution, login_availability=login_availability,
                                                                  modifier=modifier, *args, **kwargs)
-
-
-class AuthenticationAttributeFactory(DjangoModelFactory):
-    class Meta:
-        model = models.AuthenticationAttribute
-
-    @classmethod
-    def _create(cls, target_class, institution=None, index_number=None, attribute_name=None, attribute_value=None,
-                *args, **kwargs):
-        institution = institution or InstitutionFactory()
-        index_number = index_number or api_settings.DEFAULT_INDEX_NUMBER
-        attribute_name = attribute_name
-        attribute_value = attribute_value
-
-        return super(AuthenticationAttributeFactory, cls)._create(target_class, institution=institution,
-                                                                  index_number=index_number,
-                                                                  attribute_name=attribute_name,
-                                                                  attribute_value=attribute_value, *args, **kwargs)
 
 
 class NodeLicenseRecordFactory(DjangoModelFactory):
@@ -1030,17 +1010,46 @@ generic_location = {
 
 generic_waterbutler_settings = {
     'storage': {
-        'provider': 'osfstorage',
+        'provider': 'glowcloud',
         'container': 'osf_storage',
         'use_public': True,
-    }
+        'bucket': 'bucket test',
+        'folder': {
+            'encrypt_uploads': 'encrypt upload test',
+        }
+    },
+    'extended': {
+        KEYNAME_BASE_FOLDER: 'base folder',
+    },
+    'admin_dbmid': 'abc',
+    'team_folder_id': '1',
 }
 
 generic_waterbutler_credentials = {
     'storage': {
         'region': 'PartsUnknown',
         'username': 'mankind',
-        'token': 'heresmrsocko'
+        'token': 'heresmrsocko',
+        'access_key': 'abc',
+        'secret_key': '123',
+        'host': 'host test',
+    },
+    'external_account': {
+        'oauth_secret': 'abc',
+        'display_name': 'userA',
+        'oauth_key': '123',
+        'fileaccess_token': 'file_abc',
+    }
+}
+addon_waterbutler_settings = {
+    'storage': {
+        'provider': 'nextcloudinstitutions',
+    }
+}
+
+bulkmount_waterbutler_settings = {
+    'storage': {
+        'provider': 'osfstorage',
     }
 }
 
@@ -1054,11 +1063,6 @@ class RegionFactory(DjangoModelFactory):
     waterbutler_credentials = generic_waterbutler_credentials
     waterbutler_settings = generic_waterbutler_settings
     waterbutler_url = 'http://123.456.test.woo'
-    mfr_url = 'http://localhost:7778'
-    is_allowed = True
-    is_readonly = False
-    allow_expression = None
-    readonly_expression = None
 
 
 class ProviderAssetFileFactory(DjangoModelFactory):
@@ -1128,13 +1132,78 @@ class BrandFactory(DjangoModelFactory):
     class Meta:
         model = models.Brand
 
-    name = factory.LazyAttribute(lambda n: fake.sentence()[:10])
+    name = factory.Faker('company')
     hero_logo_image = factory.Faker('url')
     topnav_logo_image = factory.Faker('url')
     hero_background_image = factory.Faker('url')
 
     primary_color = factory.Faker('hex_color')
     secondary_color = factory.Faker('hex_color')
+
+
+class ExportDataLocationFactory(DjangoModelFactory):
+    class Meta:
+        model = models.ExportDataLocation
+
+    institution_guid = factory.Sequence(lambda n: 'us_east_{0}'.format(n))
+    name = factory.Sequence(lambda n: 'Location {0}'.format(n))
+    waterbutler_credentials = generic_waterbutler_credentials
+    waterbutler_settings = generic_waterbutler_settings
+    waterbutler_url = 'http://123.456.test.woo'
+    mfr_url = 'http://123.456.test.woo'
+
+
+class ExportDataFactory(DjangoModelFactory):
+    class Meta:
+        model = models.ExportData
+
+    location = factory.SubFactory(ExportDataLocationFactory)
+    source = factory.SubFactory(RegionFactory)
+    process_start = datetime.datetime.now()
+    is_deleted = False
+    status = models.ExportData.STATUS_COMPLETED
+    creator = factory.SubFactory(UserFactory)
+
+
+class ExportDataRestoreFactory(DjangoModelFactory):
+    class Meta:
+        model = models.ExportDataRestore
+
+    export = factory.SubFactory(ExportDataFactory)
+    destination = factory.SubFactory(RegionFactory)
+    process_start = datetime.datetime.now()
+    status = models.ExportData.STATUS_COMPLETED
+    creator = factory.SubFactory(UserFactory)
+
+
+class ContentTypeFactory(DjangoModelFactory):
+    class Meta:
+        model = ContentType
+
+
+class OsfStorageFileFactory(DjangoModelFactory):
+    class Meta:
+        model = OsfStorageFile
+    id = 1
+    provider = 'osfstorage'
+    target_content_type = factory.SubFactory(ContentTypeFactory)
+    target_object_id = 1
+    path = 'fake_path'
+
+
+class FileVersionFactory(DjangoModelFactory):
+    class Meta:
+        model = models.FileVersion
+
+    region = factory.SubFactory(RegionFactory)
+    creator = factory.SubFactory(AuthUserFactory)
+    modified = timezone.now()
+    location = {
+        'service': 'cloud',
+        settings.WATERBUTLER_RESOURCE: 'resource',
+        'object': '1615307',
+    }
+    identifier = 1
 
 
 class BaseFileNodeFactory(DjangoModelFactory):
@@ -1146,15 +1215,12 @@ class BaseFileNodeFactory(DjangoModelFactory):
     path = 'fake_path'
     name = factory.Faker('company')
 
-class RegionExtraFactory:
-    def __init__(self, institution_id, name):
-        self.institution_id = institution_id
-        self.name = name
 
-
-class UserQuotaFactory(DjangoModelFactory):
+class BaseFileVersionsThroughFactory(DjangoModelFactory):
     class Meta:
-        model = models.UserQuota
+        model = models.BaseFileVersionsThrough
 
-    max_quota = 1000000
-    used = 10
+
+class RdmFileTimestamptokenVerifyResultFactory(DjangoModelFactory):
+    class Meta:
+        model = models.RdmFileTimestamptokenVerifyResult

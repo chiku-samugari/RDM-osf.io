@@ -52,7 +52,8 @@ function ERad() {
       self.candidates = ((data.data || {}).attributes || {}).records;
       callback();
     }).fail(function(xhr, status, error) {
-      Raven.captureMessage('Error while retrieving addon info', {
+      $osf.growl('Error', 'Error while retrieving erad candidates: ' + xhr.status);
+      Raven.captureMessage('Error while retrieving erad candidates', {
           extra: {
               url: url,
               status: status,
@@ -64,6 +65,34 @@ function ERad() {
   };
 }
 
+function FileMetadataSuggestion(baseUrl) {
+  var self = this;
+
+  self.suggest = function(filepath, format) {
+    var url = baseUrl + 'file_metadata/suggestions/' + encodeURI(filepath);
+    return $.ajax({
+      url: url,
+      type: 'GET',
+      dataType: 'json',
+      data: {
+        format: format
+      }
+    }).catch(function(xhr, status, error) {
+      $osf.growl('Error', 'Error while retrieving file metadata suggestions: ' + xhr.status);
+      Raven.captureMessage('Error while retrieving file metadata suggestions', {
+        extra: {
+          url: url,
+          status: status,
+          error: error
+        }
+      });
+      return Promise.reject({xhr: xhr, status: status, error: error});
+    }).then(function (data) {
+      console.log(logPrefix, 'suggestion: ', data);
+      return ((data.data || {}).attributes || {}).suggestions || [];
+    });
+  };
+}
 
 function MetadataButtons() {
   var self = this;
@@ -72,6 +101,7 @@ function MetadataButtons() {
   self.contexts = null;
   self.loadingMetadatas = {};
   self.erad = new ERad();
+  self.fileMetadataSuggestion = new FileMetadataSuggestion(self.baseUrl);
   self.currentItem = null;
   self.registrationSchemas = new RegistrationSchemas();
   self.draftRegistrations = new DraftRegistrations();
@@ -170,7 +200,7 @@ function MetadataButtons() {
       callback((data.data || {}).attributes);
     }).fail(function(xhr, status, error) {
       self.loadingMetadatas[nodeId] = false;
-      if (error === 'BAD REQUEST') {
+      if (xhr.status === 400) {
         if (!self.contexts) {
           self.contexts = {};
         }
@@ -186,6 +216,7 @@ function MetadataButtons() {
           addonAttached: false
         };
       } else {
+        $osf.growl('Error', 'Error while retrieving addon info for "' + nodeId + '": ' + xhr.status);
         Raven.captureMessage('Error while retrieving addon info', {
           extra: {
               url: url,
@@ -216,6 +247,7 @@ function MetadataButtons() {
         const value = itemData[question.qid];
         const field = metadataFields.createField(
           self.erad,
+          self.fileMetadataSuggestion,
           question,
           value,
           options,
@@ -584,6 +616,7 @@ function MetadataButtons() {
     console.log(logPrefix, 'copy to clipboard');
     copyStatus.text('');
     if (!navigator.clipboard) {
+      $osf.growl('Error', _('Could not copy text'));
       Raven.captureMessage(_('Could not copy text'), {
         extra: {
           error: 'navigator.clipboard API is not supported.',
@@ -598,6 +631,7 @@ function MetadataButtons() {
     navigator.clipboard.writeText(text).then(function() {
       copyStatus.text(_('Copied!'));
     }, function(err) {
+      $osf.growl('Error', _('Could not copy text'));
       Raven.captureMessage(_('Could not copy text'), {
         extra: {
           error: err.toString(),
@@ -622,6 +656,7 @@ function MetadataButtons() {
     navigator.clipboard.readText().then(function(text) {
       self.setMetadataFromJson(text);
     }, function(err) {
+      $osf.growl('Error', _('Could not paste text'));
       Raven.captureMessage(_('Could not paste text'), {
         extra: {
           error: err.toString(),
@@ -637,6 +672,7 @@ function MetadataButtons() {
         fieldSet.field.setValue(fieldSet.input, jsonObject[fieldSet.question.qid] || '');
       });
     } catch(err) {
+      $osf.growl('Error', _('Could not paste text'));
       Raven.captureMessage(_('Could not paste text'), {
         extra: {
           error: err.toString(),
@@ -720,7 +756,7 @@ function MetadataButtons() {
           const item = file.item;
           return context.wbcache.computeHash({
             data: Object.assign({}, item.attributes, {
-              links: item.linsks,
+              links: item.links,
             }),
             kind: item.attributes.kind
           });
@@ -763,6 +799,7 @@ function MetadataButtons() {
                 .text(_('Delete metadata'))));
           })
           .catch(function(err) {
+            $osf.growl('Error', _('Could not list hashes') + ': ' + err.toString());
             Raven.captureMessage(_('Could not list hashes'), {
               extra: {
                 error: err.toString()
@@ -771,6 +808,7 @@ function MetadataButtons() {
           });
       })
       .catch(function(err) {
+        $osf.growl('Error', _('Could not list files') + ': ' + err.toString());
         Raven.captureMessage(_('Could not list files'), {
           extra: {
             error: err.toString()
@@ -803,6 +841,8 @@ function MetadataButtons() {
           window.location.reload();
         }).fail(function(xhr, status, error) {
           reject(error)
+          $osf.growl('Error',
+            'Error while retrieving addon info for ' + self.currentMetadata.path + ': ' + xhr.status);
           Raven.captureMessage('Error while retrieving addon info', {
             extra: {
               url: url,
@@ -813,6 +853,8 @@ function MetadataButtons() {
         });
       }).fail(function(xhr, status, error) {
         reject(error);
+        $osf.growl('Error',
+          'Error while retrieving addon info for ' + self.currentMetadata.path + ': ' + xhr.status);
         Raven.captureMessage('Error while retrieving addon info', {
           extra: {
             url: url,
@@ -847,6 +889,8 @@ function MetadataButtons() {
         });
       }).fail(function(xhr, status, error) {
         reject(error);
+        $osf.growl('Error',
+          'Error while retrieving addon info for ' + filepath + ': ' + xhr.status);
         Raven.captureMessage('Error while retrieving addon info', {
           extra: {
             url: url,
@@ -1135,6 +1179,7 @@ function MetadataButtons() {
         self.draftRegistrations.load();
       })
       .catch(function(url, xhr, status, error) {
+        $osf.growl('Error', 'Error while retrieving addon info for ' + filepath + ': ' + xhr.status);
         Raven.captureMessage('Error while retrieving addon info', {
             extra: {
                 url: url,
@@ -1311,6 +1356,7 @@ function MetadataButtons() {
             })
           };
         }).fail(function(xhr, status, error) {
+          $osf.growl('Error', 'Error while saving addon info for ' + filepath + ': ' + xhr.status);
           Raven.captureMessage('Error while saving addon info', {
               extra: {
                   url: url,
@@ -1579,6 +1625,60 @@ function MetadataButtons() {
                 }
                 return base;
               };
+            } else if (propname == 'onMoveComplete') {
+              return function (item, from) {
+                const context = self.findContextByNodeId(from.data.nodeId);
+                if (!context) {
+                  return;
+                }
+                const fromFilepath = from.data.provider + (from.data.materialized || '/');
+                const projectMetadata = context.projectMetadata;
+                const fromFilepaths = projectMetadata.files
+                  .map(function(f) { return f.path; })
+                  .filter(function(p) {
+                    return p.substring(0, fromFilepath.length) === fromFilepath;
+                  });
+                if (!fromFilepaths.length) {
+                  return;
+                }
+                const toFilepath = item.data.provider + (item.data.materialized || '/');
+                const toFilepaths = fromFilepaths
+                  .map(function(p) {
+                    return toFilepath + p.replace(fromFilepath, '');
+                  });
+                // try reload project metadata
+                const interval = 250;
+                const maxRetry = 10;
+                var retry = 0;
+                function tryLoadMetadata() {
+                  self.loadMetadata(context.nodeId, context.baseUrl, function() {
+                    const context2 = self.findContextByNodeId(context.nodeId);
+                    const matches = toFilepaths
+                      .map(function(p) {
+                        return context2.projectMetadata.files.find(function(f) { return f.path === p; });
+                      });
+                    const unmatchCount = matches.filter(function(m) { return !m; }).length;
+                    console.log(logPrefix, 'reloaded metadata: ', {
+                      context: context2,
+                      unmatchCount: unmatchCount,
+                      expectedFilepaths: toFilepaths
+                    });
+                    if (!unmatchCount) {
+                      context2.wbcache.clearCache();
+                      m.redraw();
+                      return;
+                    }
+                    retry += 1;
+                    if (retry >= maxRetry) {
+                      console.log(logPrefix, 'failed retry reloading metadata');
+                      return;
+                    }
+                    console.log(logPrefix, retry + 'th retry reload metadata after ' + interval + 'ms: ');
+                    setTimeout(tryLoadMetadata, interval);
+                  });
+                }
+                setTimeout(tryLoadMetadata, interval);
+              }
             } else {
               return target[propname];
             }
@@ -1642,6 +1742,7 @@ function MetadataButtons() {
             });
           }).fail(function(xhr, status, error) {
             reject(error);
+            $osf.growl('Error', 'Error while retrieving addon info for ' + metadata.path + ': ' + xhr.status);
             Raven.captureMessage('Error while retrieving addon info', {
               extra: {
                 url: url,
@@ -1739,6 +1840,7 @@ function MetadataButtons() {
                 resolve();
               }
             }).fail(function(xhr, status, error) {
+              $osf.growl('Error', 'Error while retrieving addon info for ' + metadata.path + ': ' + xhr.status);
               Raven.captureMessage('Error while retrieving addon info', {
                 extra: {
                   url: url,

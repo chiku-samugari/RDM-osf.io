@@ -2,9 +2,8 @@
 
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.http import HttpResponse, Http404, JsonResponse
-from django.views.generic import TemplateView, View
-from django.db.models import Max
-from django.db import IntegrityError
+from django.views.generic import TemplateView, View, ListView
+import codecs
 import json
 import hashlib
 from rest_framework import status as http_status
@@ -17,25 +16,26 @@ import logging
 from addons.osfstorage.models import Region
 from admin.rdm.utils import RdmPermissionMixin
 from admin.rdm_custom_storage_location import utils
-from osf.models import Institution, OSFUser, AuthenticationAttribute
+from osf.models import Institution, OSFUser
 from osf.models.external import ExternalAccountTemporary
 from scripts import refresh_addon_tokens
 from website import settings as osf_settings
 from distutils.util import strtobool
-from framework.exceptions import HTTPError
-from api.base import settings as api_settings
-
+from admin.base import settings
 
 logger = logging.getLogger(__name__)
 
 SITE_KEY = 'rdm_custom_storage_location'
+INSTITUTION_NOT_FOUND_MESSAGE = 'Institution does not exist'
 
 class InstitutionalStorageBaseView(RdmPermissionMixin, UserPassesTestMixin):
     """ Base class for all the Institutional Storage Views """
+    raise_exception = True
+
     def test_func(self):
         """ Check user permissions """
-        return not self.is_super_admin and self.is_admin and \
-            self.request.user.affiliated_institutions.exists()
+        institution_id = int(self.kwargs.get('institution_id'))
+        return self.has_auth(institution_id)
 
 
 class InstitutionalStorageView(InstitutionalStorageBaseView, TemplateView):
@@ -43,47 +43,89 @@ class InstitutionalStorageView(InstitutionalStorageBaseView, TemplateView):
     model = Institution
     template_name = 'rdm_custom_storage_location/institutional_storage.html'
 
+    def test_func(self):
+        """ Check user permissions """
+        if not self.is_authenticated:
+            # If user is not authenticated then redirect to login page
+            self.raise_exception = False
+            return False
+        institution_id = self.kwargs.get('institution_id', None)
+        if not institution_id and self.is_super_admin:
+            # If user is super administrator but no institution_id provided, return False
+            return False
+        if self.is_admin and institution_id:
+            # If user is administrator but currently accessing super administrator's URL, return False
+            return False
+        return self.is_super_admin or (self.is_admin and self.request.user.affiliated_institutions.exists())
+
     def get_context_data(self, *args, **kwargs):
-        if not (self.is_admin and self.request.user.affiliated_institutions.exists()):
+        if self.is_super_admin:
+            # If user is a super administrator, get institution by institution_id value
+            institution_id = kwargs.get('institution_id', None)
+            institution = Institution.objects.filter(id=institution_id, is_deleted=False).first()
+        else:
+            # If user is an administrator, get institution by user's first affiliated institution
+            institution = self.request.user.affiliated_institutions.first()
+        if not institution:
+            # Navigate to 404 Not Found page
             raise Http404
-        institution = self.request.user.representative_affiliated_institution
 
-        list_region = Region.objects.filter(_id=institution._id).order_by('pk')
-        if not list_region:
-            region = utils.set_default_storage(institution._id)
+        region = None
+        if Region.objects.filter(_id=institution._id).exists():
+            region = Region.objects.get(_id=institution._id)
+        else:
+            region = Region.objects.first()
             region.name = ''
-            list_region = [region]
 
-        list_providers = utils.get_providers()
-        list_providers_configured = []
-        provider_name = None
-
-        for i in reversed(range(len(list_region))):
-            provider_name = list_region[i].waterbutler_settings['storage']['provider']
-            provider_name = provider_name if provider_name != 'filesystem' else 'osfstorage'
-            for provider in list_providers:
-                if (provider.__dict__['name'].split('.')[-1]) == provider_name:
-                    list_providers_configured.append({'region': list_region[i], 'provider': provider})
-
-        attributes = AuthenticationAttribute.objects.filter(
-            institution=institution,
-            is_deleted=False
-        ).order_by('index_number')
+        provider_name = region.waterbutler_settings['storage']['provider']
+        provider_name = provider_name if provider_name != 'filesystem' else 'osfstorage'
 
         kwargs['institution'] = institution
-        kwargs['attributes'] = attributes
-        kwargs['region'] = list_region
-        kwargs['providers'] = list_providers
-        kwargs['providers_configured'] = list_providers_configured
+        kwargs['region'] = region
+        kwargs['providers'] = utils.get_providers()
         kwargs['selected_provider_short_name'] = provider_name
         kwargs['have_storage_name'] = utils.have_storage_name(provider_name)
         kwargs['osf_domain'] = osf_settings.DOMAIN
         return kwargs
 
 
+class InstitutionalStorageListView(InstitutionalStorageBaseView, ListView):
+    template_name = 'rdm_custom_storage_location/institutional_storage_list.html'
+    paginate_by = 25
+    ordering = 'name'
+    permission_required = 'osf.view_institution'
+    model = Institution
+
+    def test_func(self):
+        """ Check user permissions """
+        if not self.is_authenticated:
+            # If user is not authenticated then redirect to login page
+            self.raise_exception = False
+            return False
+        # Only allow super administrators to access this view
+        return self.is_super_admin
+
+    def get_queryset(self):
+        """ GET: set to self.object_list """
+        return Institution.objects.filter(is_deleted=False).order_by(self.ordering)
+
+    def get_context_data(self, **kwargs):
+        query_set = kwargs.pop('object_list', self.object_list)
+        page_size = self.get_paginate_by(query_set)
+        paginator, page, query_set, is_paginated = self.paginate_queryset(query_set, page_size)
+        kwargs.setdefault('institutions', query_set)
+        kwargs.setdefault('page', page)
+        kwargs.setdefault('logohost', settings.OSF_URL)
+        return super(InstitutionalStorageListView, self).get_context_data(**kwargs)
+
+
 class IconView(InstitutionalStorageBaseView, View):
     """ View for each addon's icon """
     raise_exception = True
+
+    def test_func(self):
+        """ Check user permission """
+        return self.is_super_admin or (self.is_admin and self.request.user.affiliated_institutions.exists())
 
     def get(self, request, *args, **kwargs):
         addon_name = kwargs['addon_name']
@@ -103,7 +145,7 @@ class TestConnectionView(InstitutionalStorageBaseView, View):
     """ View for testing the credentials to connect to a provider.
     Called when clicking the 'Connect' Button.
     """
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         data = json.loads(request.body)
 
         provider_short_name = data.get('provider_short_name')
@@ -112,6 +154,12 @@ class TestConnectionView(InstitutionalStorageBaseView, View):
                 'message': 'Provider is missing.'
             }
             return JsonResponse(response, status=http_status.HTTP_400_BAD_REQUEST)
+        # Get institution by institution_id value
+        institution_id = kwargs.get('institution_id', None)
+        institution = Institution.objects.filter(id=institution_id, is_deleted=False).first()
+        if not institution:
+            # Return 404 Not Found
+            return JsonResponse({'message': INSTITUTION_NOT_FOUND_MESSAGE}, status=http_status.HTTP_404_NOT_FOUND)
 
         result = None
 
@@ -185,7 +233,6 @@ class TestConnectionView(InstitutionalStorageBaseView, View):
                 data.get('swift_container'),
             )
         elif provider_short_name == 'dropboxbusiness':
-            institution = request.user.affiliated_institutions.first()
             result = utils.test_dropboxbusiness_connection(institution)
 
         else:
@@ -198,9 +245,7 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
     """ View for saving the credentials to the provider into the database.
     Called when clicking the 'Save' Button.
     """
-    def post(self, request):
-        institution = request.user.affiliated_institutions.first()
-        institution_id = institution._id
+    def post(self, request, *args, **kwargs):
         data = json.loads(request.body)
 
         provider_short_name = data.get('provider_short_name')
@@ -209,172 +254,169 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
                 'message': 'Provider is missing.'
             }
             return JsonResponse(response, status=http_status.HTTP_400_BAD_REQUEST)
+        # Get institution by institution_id value
+        institution_id = kwargs.get('institution_id', None)
+        institution = Institution.objects.filter(id=institution_id, is_deleted=False).first()
+        if not institution:
+            # Return 404 Not Found
+            return JsonResponse({'message': INSTITUTION_NOT_FOUND_MESSAGE}, status=http_status.HTTP_404_NOT_FOUND)
+        institution_id = institution._id
 
         storage_name = data.get('storage_name')
-        if storage_name is not None:
-            storage_name = storage_name.strip()
-        new_storage_name = data.get('new_storage_name')
-        if new_storage_name is not None:
-            new_storage_name = new_storage_name.strip()
         if not storage_name and utils.have_storage_name(provider_short_name):
             return JsonResponse({
                 'message': 'Storage name is missing.'
             }, status=http_status.HTTP_400_BAD_REQUEST)
 
         result = None
-        try:
-            if provider_short_name == 's3':
-                result = utils.save_s3_credentials(
-                    institution_id,
-                    storage_name,
-                    data.get('s3_access_key'),
-                    data.get('s3_secret_key'),
-                    data.get('s3_bucket'),
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 's3compat':
-                result = utils.save_s3compat_credentials(
-                    institution_id,
-                    storage_name,
-                    data.get('s3compat_endpoint_url'),
-                    data.get('s3compat_access_key'),
-                    data.get('s3compat_secret_key'),
-                    data.get('s3compat_bucket'),
-                    bool(strtobool(data.get('s3compat_server_side_encryption'))),
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 's3compatb3':
-                result = utils.save_s3compatb3_credentials(
-                    institution_id,
-                    storage_name,
-                    data.get('s3compatb3_endpoint_url'),
-                    data.get('s3compatb3_access_key'),
-                    data.get('s3compatb3_secret_key'),
-                    data.get('s3compatb3_bucket'),
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 's3compatinstitutions':
-                result = utils.save_s3compatinstitutions_credentials(
-                    institution,
-                    storage_name,
-                    data.get('s3compatinstitutions_endpoint_url'),
-                    data.get('s3compatinstitutions_access_key'),
-                    data.get('s3compatinstitutions_secret_key'),
-                    data.get('s3compatinstitutions_bucket'),
-                    provider_short_name,
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 'ociinstitutions':
-                result = utils.save_ociinstitutions_credentials(
-                    institution,
-                    storage_name,
-                    data.get('ociinstitutions_endpoint_url'),
-                    data.get('ociinstitutions_access_key'),
-                    data.get('ociinstitutions_secret_key'),
-                    data.get('ociinstitutions_bucket'),
-                    provider_short_name,
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 'swift':
-                result = utils.save_swift_credentials(
-                    institution_id,
-                    storage_name,
-                    data.get('swift_auth_version'),
-                    data.get('swift_access_key'),
-                    data.get('swift_secret_key'),
-                    data.get('swift_tenant_name'),
-                    data.get('swift_user_domain_name'),
-                    data.get('swift_project_domain_name'),
-                    data.get('swift_auth_url'),
-                    data.get('swift_container'),
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 'osfstorage':
-                result = utils.save_osfstorage_credentials(
-                    institution_id,
-                )
-            elif provider_short_name == 'googledrive':
-                result = utils.save_googledrive_credentials(
-                    request.user,
-                    storage_name,
-                    data.get('googledrive_folder'),
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 'owncloud':
-                result = utils.save_owncloud_credentials(
-                    institution_id,
-                    storage_name,
-                    data.get('owncloud_host'),
-                    data.get('owncloud_username'),
-                    data.get('owncloud_password'),
-                    data.get('owncloud_folder'),
-                    'owncloud',
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 'nextcloud':
-                result = utils.save_nextcloud_credentials(
-                    institution_id,
-                    storage_name,
-                    data.get('nextcloud_host'),
-                    data.get('nextcloud_username'),
-                    data.get('nextcloud_password'),
-                    data.get('nextcloud_folder'),
-                    'nextcloud',
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 'nextcloudinstitutions':
-                result = utils.save_nextcloudinstitutions_credentials(
-                    institution,
-                    storage_name,
-                    data.get('nextcloudinstitutions_host'),
-                    data.get('nextcloudinstitutions_username'),
-                    data.get('nextcloudinstitutions_password'),
-                    data.get('nextcloudinstitutions_folder'),  # base folder
-                    data.get('nextcloudinstitutions_notification_secret'),
-                    provider_short_name,
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 'box':
-                result = utils.save_box_credentials(
-                    request.user,
-                    storage_name,
-                    data.get('box_folder'),
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 'dropboxbusiness':
-                result = utils.save_dropboxbusiness_credentials(
-                    institution,
-                    storage_name,
-                    provider_short_name,
-                    new_storage_name=new_storage_name,
-                )
-            elif provider_short_name == 'onedrivebusiness':
-                result = utils.save_onedrivebusiness_credentials(
-                    request.user,
-                    storage_name,
-                    provider_short_name,
-                    data.get('onedrivebusiness_folder'),
-                    new_storage_name=new_storage_name,
-                )
-            else:
-                result = ({'message': 'Invalid provider.'}, http_status.HTTP_400_BAD_REQUEST)
-        except IntegrityError:
-            result = ({'message': 'The name of institutional storage already exists.'},
-                      http_status.HTTP_400_BAD_REQUEST)
+
+        if provider_short_name == 's3':
+            result = utils.save_s3_credentials(
+                institution_id,
+                storage_name,
+                data.get('s3_access_key'),
+                data.get('s3_secret_key'),
+                data.get('s3_bucket'),
+                bool(strtobool(data.get('s3_server_side_encryption'))),
+            )
+        elif provider_short_name == 's3compat':
+            result = utils.save_s3compat_credentials(
+                institution_id,
+                storage_name,
+                data.get('s3compat_endpoint_url'),
+                data.get('s3compat_access_key'),
+                data.get('s3compat_secret_key'),
+                data.get('s3compat_bucket'),
+                bool(strtobool(data.get('s3compat_server_side_encryption'))),
+            )
+        elif provider_short_name == 's3compatb3':
+            result = utils.save_s3compatb3_credentials(
+                institution_id,
+                storage_name,
+                data.get('s3compatb3_endpoint_url'),
+                data.get('s3compatb3_access_key'),
+                data.get('s3compatb3_secret_key'),
+                data.get('s3compatb3_bucket'),
+            )
+        elif provider_short_name == 's3compatinstitutions':
+            result = utils.save_s3compatinstitutions_credentials(
+                institution,
+                storage_name,
+                data.get('s3compatinstitutions_endpoint_url'),
+                data.get('s3compatinstitutions_access_key'),
+                data.get('s3compatinstitutions_secret_key'),
+                data.get('s3compatinstitutions_bucket'),
+                provider_short_name,
+                bool(strtobool(data.get('s3compatinstitutions_server_side_encryption'))),
+            )
+        elif provider_short_name == 'ociinstitutions':
+            result = utils.save_ociinstitutions_credentials(
+                institution,
+                storage_name,
+                data.get('ociinstitutions_endpoint_url'),
+                data.get('ociinstitutions_access_key'),
+                data.get('ociinstitutions_secret_key'),
+                data.get('ociinstitutions_bucket'),
+                provider_short_name,
+            )
+        elif provider_short_name == 'swift':
+            result = utils.save_swift_credentials(
+                institution_id,
+                storage_name,
+                data.get('swift_auth_version'),
+                data.get('swift_access_key'),
+                data.get('swift_secret_key'),
+                data.get('swift_tenant_name'),
+                data.get('swift_user_domain_name'),
+                data.get('swift_project_domain_name'),
+                data.get('swift_auth_url'),
+                data.get('swift_container'),
+            )
+        elif provider_short_name == 'osfstorage':
+            result = utils.save_osfstorage_credentials(
+                institution_id,
+            )
+        elif provider_short_name == 'googledrive':
+            result = utils.save_googledrive_credentials(
+                institution_id,
+                request.user,
+                storage_name,
+                data.get('googledrive_folder'),
+            )
+        elif provider_short_name == 'owncloud':
+            result = utils.save_owncloud_credentials(
+                institution_id,
+                storage_name,
+                data.get('owncloud_host'),
+                data.get('owncloud_username'),
+                data.get('owncloud_password'),
+                data.get('owncloud_folder'),
+                'owncloud'
+            )
+        elif provider_short_name == 'nextcloud':
+            result = utils.save_nextcloud_credentials(
+                institution_id,
+                storage_name,
+                data.get('nextcloud_host'),
+                data.get('nextcloud_username'),
+                data.get('nextcloud_password'),
+                data.get('nextcloud_folder'),
+                'nextcloud',
+            )
+        elif provider_short_name == 'nextcloudinstitutions':
+            result = utils.save_nextcloudinstitutions_credentials(
+                institution,
+                storage_name,
+                data.get('nextcloudinstitutions_host'),
+                data.get('nextcloudinstitutions_username'),
+                data.get('nextcloudinstitutions_password'),
+                data.get('nextcloudinstitutions_folder'),  # base folder
+                data.get('nextcloudinstitutions_notification_secret'),
+                provider_short_name,
+            )
+        elif provider_short_name == 'box':
+            result = utils.save_box_credentials(
+                institution_id,
+                request.user,
+                storage_name,
+                data.get('box_folder'),
+            )
+        elif provider_short_name == 'dropboxbusiness':
+            result = utils.save_dropboxbusiness_credentials(
+                institution,
+                storage_name,
+                provider_short_name)
+        elif provider_short_name == 'onedrivebusiness':
+            result = utils.save_onedrivebusiness_credentials(
+                institution_id,
+                request.user,
+                storage_name,
+                provider_short_name,
+                data.get('onedrivebusiness_folder'),
+            )
+        else:
+            result = ({'message': 'Invalid provider.'}, http_status.HTTP_400_BAD_REQUEST)
         status = result[1]
+        if status == http_status.HTTP_200_OK:
+            utils.change_allowed_for_institutions(
+                institution, provider_short_name)
         return JsonResponse(result[0], status=status)
 
 
 class FetchCredentialsView(InstitutionalStorageBaseView, View):
     def _common(self, request, data):
-        institution = request.user.affiliated_institutions.first()
         provider_short_name = data.get('provider_short_name')
         if not provider_short_name:
             response = {
                 'message': 'Provider is missing.'
             }
             return JsonResponse(response, status=http_status.HTTP_400_BAD_REQUEST)
-
+        # Get institution by institution_id value
+        institution_id = self.kwargs.get('institution_id', None)
+        institution = Institution.objects.filter(id=institution_id, is_deleted=False).first()
+        if not institution:
+            # Return 404 Not Found
+            return JsonResponse({'message': INSTITUTION_NOT_FOUND_MESSAGE}, status=http_status.HTTP_404_NOT_FOUND)
         result = None
         data = None
         if provider_short_name == 'nextcloudinstitutions':
@@ -393,16 +435,16 @@ class FetchCredentialsView(InstitutionalStorageBaseView, View):
 
         return JsonResponse(result[0], status=result[1])
 
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         data = json.loads(request.body)
         return self._common(request, data)
 
-    def get(self, request):
+    def get(self, request, *args, **kwargs):
         return self._common(request, request.GET)
 
 
 class FetchTemporaryTokenView(InstitutionalStorageBaseView, View):
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         data = json.loads(request.body)
         provider_short_name = data.get('provider_short_name')
 
@@ -411,7 +453,13 @@ class FetchTemporaryTokenView(InstitutionalStorageBaseView, View):
                 'message': 'Provider is missing.'
             }, status=http_status.HTTP_400_BAD_REQUEST)
 
-        institution_id = request.user.affiliated_institutions.first()._id
+        # Get institution by institution_id value
+        institution_id = self.kwargs.get('institution_id', None)
+        institution = Institution.objects.filter(id=institution_id, is_deleted=False).first()
+        if not institution:
+            # Return 404 Not Found
+            return JsonResponse({'message': INSTITUTION_NOT_FOUND_MESSAGE}, status=http_status.HTTP_404_NOT_FOUND)
+        institution_id = institution._id
         data = utils.get_oauth_info_notification(institution_id, provider_short_name)
         if data:
             data['fullname'] = request.user.fullname
@@ -425,8 +473,14 @@ class FetchTemporaryTokenView(InstitutionalStorageBaseView, View):
 
 
 class RemoveTemporaryAuthData(InstitutionalStorageBaseView, View):
-    def post(self, request):
-        institution_id = request.user.affiliated_institutions.first()._id
+    def post(self, request, *args, **kwargs):
+        # Get institution by institution_id value
+        institution_id = self.kwargs.get('institution_id', None)
+        institution = Institution.objects.filter(id=institution_id, is_deleted=False).first()
+        if not institution:
+            # Return 404 Not Found
+            return JsonResponse({'message': INSTITUTION_NOT_FOUND_MESSAGE}, status=http_status.HTTP_404_NOT_FOUND)
+        institution_id = institution._id
         ExternalAccountTemporary.objects.filter(_id=institution_id).delete()
         return JsonResponse({
             'message': 'Garbage data removed!!'
@@ -452,7 +506,16 @@ def to_bool(val):
 class UserMapView(InstitutionalStorageBaseView, View):
     def post(self, request, *args, **kwargs):
         provider_name = request.POST.get('provider', None)
-        institution = request.user.affiliated_institutions.first()
+        if not provider_name:
+            return JsonResponse({
+                'message': 'Provider is missing.'
+            }, status=http_status.HTTP_400_BAD_REQUEST)
+        # Get institution by institution_id value
+        institution_id = kwargs.get('institution_id', None)
+        institution = Institution.objects.filter(id=institution_id, is_deleted=False).first()
+        if not institution:
+            # Return 404 Not Found
+            return JsonResponse({'message': INSTITUTION_NOT_FOUND_MESSAGE}, status=http_status.HTTP_404_NOT_FOUND)
 
         OK = 'OK'
         NG = 'NG'
@@ -469,7 +532,7 @@ class UserMapView(InstitutionalStorageBaseView, View):
 
         check_extuser = to_bool(request.POST.get('check_extuser', 'false'))
         usermap = request.FILES['usermap']
-        csv_reader = csv.reader(usermap, delimiter=',', quotechar='"')
+        csv_reader = csv.reader(codecs.iterdecode(usermap, 'utf-8'), delimiter=',', quotechar='"')
 
         result = {OK: 0, NG: 0}
         user_to_extuser = dict()  # This is UserMap.  (guid -> extuser)
@@ -570,12 +633,21 @@ class UserMapView(InstitutionalStorageBaseView, View):
 
     def get(self, request, *args, **kwargs):
         # download CSV (or Templates when User mapping file is not set)
-        provider_name = request.GET['provider']
-        institution = request.user.affiliated_institutions.first()
+        provider_name = request.GET.get('provider', None)
+        if not provider_name:
+            return JsonResponse({
+                'message': 'Provider is missing.'
+            }, status=http_status.HTTP_400_BAD_REQUEST)
+        # Get institution by institution_id value
+        institution_id = kwargs.get('institution_id', None)
+        institution = Institution.objects.filter(id=institution_id, is_deleted=False).first()
+        if not institution:
+            # Return 404 Not Found
+            return JsonResponse({'message': INSTITUTION_NOT_FOUND_MESSAGE}, status=http_status.HTTP_404_NOT_FOUND)
         ext = 'csv'
         name = 'usermap-' + provider_name
 
-        s = StringIO.StringIO()
+        s = StringIO()
         csv_writer = csv.writer(s, delimiter=',')
 
         def fullname(osfuser):
@@ -612,250 +684,3 @@ class UserMapView(InstitutionalStorageBaseView, View):
         resp = HttpResponse(s.getvalue(), content_type='text/%s' % ext)
         resp['Content-Disposition'] = 'attachment; filename=%s.%s' % (name, ext)
         return resp
-
-
-class ChangeAllowedViews(InstitutionalStorageBaseView, View):
-
-    def post(self, request):
-        data = json.loads(request.body)
-        region_id = data.get('id')
-        is_allowed = data.get('is_allowed')
-        if not region_id:
-            response = {
-                'message': 'Failed to change Allow settings.'
-            }
-            return JsonResponse(response, status=http_status.HTTP_400_BAD_REQUEST)
-        region = Region.objects.filter(id=region_id)
-        if region is None:
-            raise HTTPError(http_status.HTTP_404_NOT_FOUND)
-
-        allowed_regions = Region.objects.filter(_id=region[0]._id, is_allowed=True)
-        # At least 1 region is allowed
-        if allowed_regions.count() > 1 \
-                or (allowed_regions.count() == 1 and is_allowed is True):
-            region.update(is_allowed=is_allowed)
-
-        return JsonResponse({}, status=http_status.HTTP_200_OK)
-
-
-class CheckExistingStorage(InstitutionalStorageBaseView, View):
-
-    def post(self, request):
-        institution = request.user.affiliated_institutions.first()
-        data = json.loads(request.body)
-        provider_name = data.get('provider')
-        region = Region.objects.filter(
-            _id=institution._id,
-            waterbutler_settings__storage__provider=provider_name
-        ).first()
-
-        if region is None:
-            return JsonResponse({}, status=http_status.HTTP_200_OK)
-        else:
-            response = {
-                'message': 'The name of institutional storage already exists.'
-            }
-            return JsonResponse(response, status=http_status.HTTP_409_CONFLICT)
-
-
-class ChangeReadonlyViews(InstitutionalStorageBaseView, View):
-
-    def post(self, request):
-        data = json.loads(request.body)
-        region_id = data.get('id')
-        is_readonly = data.get('is_readonly')
-        if not region_id:
-            response = {
-                'message': 'Failed to change Read-only settings.'
-            }
-            return JsonResponse(response, status=http_status.HTTP_400_BAD_REQUEST)
-
-        regions = Region.objects.filter(id=region_id)
-
-        if regions is None:
-            return JsonResponse(
-                {'message': 'Failed to change Read-only settings.'},
-                status=http_status.HTTP_400_BAD_REQUEST
-            )
-        regions.update(is_readonly=is_readonly)
-        return JsonResponse({}, status=http_status.HTTP_200_OK)
-
-
-class ChangeAuthenticationAttributeView(InstitutionalStorageBaseView, View):
-
-    def post(self, request):
-        data = json.loads(request.body)
-        institution = request.user.affiliated_institutions.first()
-        is_authentication_attribute = data.get('is_active', None)
-
-        if is_authentication_attribute is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-
-        institution.is_authentication_attribute = is_authentication_attribute
-        institution.save()
-
-        return JsonResponse({}, status=http_status.HTTP_200_OK)
-
-
-class AddAttributeFormView(RdmPermissionMixin, View):
-
-    def post(self, request, **kwargs):
-
-        institution = request.user.affiliated_institutions.first()
-
-        max_current_index_number = AuthenticationAttribute.objects.filter(
-            institution=institution
-        ).aggregate(Max('index_number'))
-
-        index_number = max_current_index_number['index_number__max']
-        is_deleted = False
-        deleted_first_attribute = None
-
-        if index_number is None:
-            index_number = api_settings.DEFAULT_INDEX_NUMBER
-        else:
-            if index_number < api_settings.MAX_INDEX_NUMBER:
-                index_number = index_number + 1
-            else:
-                deleted_first_attribute = AuthenticationAttribute.objects.filter(
-                    institution=institution, is_deleted=True
-                ).order_by('index_number').first()
-                if deleted_first_attribute is not None and \
-                        deleted_first_attribute.index_number <= api_settings.MAX_INDEX_NUMBER:
-                    index_number = deleted_first_attribute.index_number
-                    is_deleted = True
-                else:
-                    return JsonResponse({
-                        'message': 'The maximum number of registrations has been reached.'
-                    }, status=http_status.HTTP_404_NOT_FOUND)
-
-        if is_deleted:
-            deleted_first_attribute.restore()
-        else:
-            AuthenticationAttribute.objects.create(
-                institution=institution,
-                index_number=index_number
-            )
-        return JsonResponse({}, status=http_status.HTTP_200_OK)
-
-
-class DeleteAttributeFormView(InstitutionalStorageBaseView, View):
-
-    def post(self, request):
-        data = json.loads(request.body)
-        institution = request.user.affiliated_institutions.first()
-        attribute_id = data.get('id', None)
-        if attribute_id is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-        regions = Region.objects.filter(_id=institution._id)
-        try:
-            attribute = AuthenticationAttribute.objects.get(id=attribute_id)
-        except AuthenticationAttribute.DoesNotExist:
-            raise HTTPError(http_status.HTTP_404_NOT_FOUND)
-        is_used = False
-        for region in regions:
-            if region.allow_expression is not None:
-                is_used = utils.check_index_number_exists(region.allow_expression, attribute.index_number)
-                if is_used:
-                    break
-            if region.readonly_expression is not None:
-                is_used = utils.check_index_number_exists(region.readonly_expression, attribute.index_number)
-                if is_used:
-                    break
-
-        if is_used:
-            return JsonResponse({
-                'message': 'Cannot be deleted because it is in use.'
-            }, status=http_status.HTTP_400_BAD_REQUEST)
-        else:
-            try:
-                attribute.delete()
-            except AuthenticationAttribute.DoesNotExist:
-                raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-
-        return JsonResponse({}, status=http_status.HTTP_200_OK)
-
-
-class SaveAttributeFormView(InstitutionalStorageBaseView, View):
-
-    def post(self, request):
-        data = json.loads(request.body)
-        attribute_id = data.get('id', None)
-        attribute_name = data.get('attribute', None)
-        attribute_value = data.get('attribute_value', None)
-        if attribute_id is None or attribute_name is None or attribute_value is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-
-        if attribute_name not in api_settings.ATTRIBUTE_LIST:
-            return JsonResponse({
-                'message': 'Please specify a valid attribute name.'
-            }, status=http_status.HTTP_400_BAD_REQUEST)
-
-        try:
-            attribute = AuthenticationAttribute.objects.get(id=attribute_id)
-        except AuthenticationAttribute.DoesNotExist:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-
-        if not attribute.is_deleted:
-            attribute.attribute_name = attribute_name
-            attribute.attribute_value = attribute_value
-            attribute.save()
-
-        return JsonResponse({}, status=http_status.HTTP_200_OK)
-
-
-class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
-
-    def post(self, request):
-        data = json.loads(request.body)
-        region_id = data.get('region_id', None)
-        allow = data.get('allow', None)
-        readonly = data.get('readonly', None)
-        allow_expression = data.get('allow_expression', None)
-        readonly_expression = data.get('readonly_expression', None)
-        storage_name = data.get('storage_name', None)
-        if region_id is None or allow is None or readonly is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-
-        is_valid_allow = utils.validate_logic_expression(allow_expression)
-        is_valid_readonly = utils.validate_logic_expression(readonly_expression)
-
-        if not is_valid_allow or not is_valid_readonly:
-            return JsonResponse({
-                'message': 'Invalid condition.'
-            }, status=http_status.HTTP_400_BAD_REQUEST)
-
-        institution = request.user.affiliated_institutions.first()
-        index_numbers = list(AuthenticationAttribute.objects.filter(
-            institution=institution,
-            is_deleted=False,
-            attribute_name__isnull=False,
-            attribute_value__isnull=False).values_list('index_number', flat=True))
-        is_valid_allow = utils.validate_index_number_not_found(allow_expression, index_numbers)
-        is_valid_readonly = utils.validate_index_number_not_found(readonly_expression, index_numbers)
-
-        if not is_valid_allow or not is_valid_readonly:
-            return JsonResponse({
-                'message': 'Invalid condition.'
-            }, status=http_status.HTTP_400_BAD_REQUEST)
-
-        try:
-            region = Region.objects.get(id=region_id)
-            if storage_name:
-                regions = Region.objects.filter(
-                    _id=institution._id, name=storage_name
-                ).exclude(id=region.id)
-                if regions.exists():
-                    return JsonResponse({
-                        'message': 'The name of institutional storage already exists.'
-                    }, status=http_status.HTTP_400_BAD_REQUEST)
-                region.name = storage_name
-            region.is_allowed = allow
-            region.is_readonly = readonly
-            region.allow_expression = allow_expression
-            region.readonly_expression = readonly_expression
-            region.save()
-        except Region.DoesNotExist:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-
-        return JsonResponse({}, status=http_status.HTTP_200_OK)

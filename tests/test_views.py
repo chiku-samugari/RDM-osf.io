@@ -12,9 +12,9 @@ import shutil
 import tempfile
 import time
 import unittest
-from future.moves.urllib.parse import quote,unquote
+from future.moves.urllib.parse import quote
 import uuid
-from website.project.views.file import update_custom_storage_icon_url
+
 from flask import request
 import mock
 import pytest
@@ -109,8 +109,6 @@ from osf_tests.factories import (
 )
 from osf.models.node import set_project_storage_type
 from addons.osfstorage.models import NodeSettings
-from osf.models.project_storage_type import ProjectStorageType
-
 
 @mock_app.route('/errorexc')
 def error_exc():
@@ -988,24 +986,24 @@ class TestProjectViews(OsfTestCase):
         assert_equal(res.status_code, 200)
         assert_in('This project is a withdrawn registration of', res.body.decode())
 
-    @mock.patch('website.project.views.node.recalculate_used_quota_by_user')
-    def test_component_remove_with_node_is_project(self, mock_recalculate_used_quota_by_user_method):
+    @mock.patch('website.util.quota.update_user_used_quota')
+    def test_component_remove_with_node_is_project(self, mock_update_user_used_quota_method):
         url = self.project.api_url_for('component_remove')
         res = self.app.delete_json(url, {'node_id': self.project._id}, auth=self.auth)
         res_data = res.json
         assert_equal(res.status_code, 200)
         assert_equal(res_data.get('url'), '/dashboard/')
-        mock_recalculate_used_quota_by_user_method.assert_called()
+        mock_update_user_used_quota_method.assert_called()
 
-    @mock.patch('website.project.views.node.recalculate_used_quota_by_user')
-    def test_component_remove_with_node_is_component(self, mock_recalculate_used_quota_by_user_method):
+    @mock.patch('website.util.quota.update_user_used_quota')
+    def test_component_remove_with_node_is_component(self, mock_update_user_used_quota_method):
         child_node = NodeFactory(parent=self.project, creator=self.user1)
         url = child_node.api_url_for('component_remove')
         res = self.app.delete_json(url, {'node_id': child_node._id}, auth=self.auth)
         res_data = res.json
         assert_equal(res.status_code, 200)
         assert_equal(res_data.get('url'), child_node.parent_node.url)
-        mock_recalculate_used_quota_by_user_method.assert_not_called()
+        mock_update_user_used_quota_method.assert_not_called()
 
 
 class TestEditableChildrenViews(OsfTestCase):
@@ -1570,7 +1568,7 @@ class TestUserProfile(OsfTestCase):
         url = '/api/v1/profile/region/'
         auth = self.user.auth
         region = RegionFactory(name='Frankfort', _id='eu-central-1')
-        payload = {'region_id': region.id}
+        payload = {'region_id': 'eu-central-1'}
 
         res = self.app.put_json(url, payload, auth=auth)
         user_settings.reload()
@@ -4036,7 +4034,7 @@ class TestAuthViews(OsfTestCase):
         assert_equal(self.user.email_verifications[token]['confirmed'], True)
         assert_equal(res.status_code, 302)
         login_url = 'login?service'
-        assert_in(login_url, unquote(res.body.decode()))
+        assert_in(login_url, res.body.decode())
 
     def test_get_email_to_add_no_email(self):
         email_verifications = self.user.unconfirmed_email_info
@@ -4576,8 +4574,8 @@ class TestExternalAuthViews(OsfTestCase):
         url = self.user.get_confirmation_url(self.user.username, external_id_provider='orcid', destination='dashboard')
         res = self.app.get(url, auth=another_user.auth)
         assert_equal(res.status_code, 302, 'redirects to cas logout')
-        assert_in('/logout?service=', unquote(res.location))
-        assert_in(url, unquote(res.location))
+        assert_in('/logout?service=', res.location)
+        assert_in(url, res.location)
 
     def test_external_login_confirm_email_get_without_destination(self):
         url = self.user.get_confirmation_url(self.user.username, external_id_provider='orcid')
@@ -4590,8 +4588,8 @@ class TestExternalAuthViews(OsfTestCase):
         url = self.user.get_confirmation_url(self.user.username, external_id_provider='orcid', destination='dashboard')
         res = self.app.get(url, auth=self.auth)
         assert_equal(res.status_code, 302, 'redirects to cas login')
-        assert_in('/login?service=', unquote(res.location))
-        assert_in('new=true', unquote(res.location))
+        assert_in('/login?service=', res.location)
+        assert_in('new=true', res.location)
 
         assert_equal(mock_welcome.call_count, 1)
 
@@ -4936,46 +4934,13 @@ class TestFileViews(OsfTestCase):
         data = res.json['data']
         assert_equal(len(data), len(expected))
 
-    def test_grid_data_have_component(self):
-        url = self.project.api_url_for('grid_data')
-        NodeFactory(parent=self.project)
-        res = self.app.get(url, auth=self.user.auth).maybe_follow()
-        assert_equal(res.status_code, http_status.HTTP_200_OK)
-        expected = rubeus.to_hgrid(self.project, auth=Auth(self.user))
-        data = res.json['data']
-        assert_equal(len(data), len(expected))
-
-    def test_update_custom_storage_icon_url_noderegion_is_united_tates(self):
-        fake_child = {'provider': 'osfstorage', 'addonFullname': 'NII Storage', 'name': 'NII Storage', 'iconUrl': '/static/addons/osfstorage/comicon.png',
-         'kind': 'folder', 'extra': None, 'buttons': None, 'isAddonRoot': True, 'permissions': {'view': True, 'edit': True},
-         'accept': {'maxSize': 5120, 'acceptedFiles': True},
-         'urls': {'fetch': '/api/v1/project/tkqvs/osfstorage/hgrid/', 'upload': '/api/v1/project/tkqvs/osfstorage/'}, 'isPointer': False,
-         'nodeId': 'tkqvs', 'nodeUrl': '/tkqvs/', 'nodeApiUrl': '/api/v1/project/tkqvs/', 'path': '642400ffe3ff270298cfa6df/',
-         'nodeRegion': 'United States', 'waterbutlerURL': 'http://localhost:7777'}
-
-        res = update_custom_storage_icon_url(fake_child)
-        assert_is_none(res)
-
-    def testupdate_custom_storage_icon_url(self):
-        fake_child = {'provider': 'osfstorage', 'addonFullname': 'NII Storage', 'name': 'NII Storage', 'iconUrl': '/static/addons/osfstorage/comicon.png',
-         'kind': 'folder', 'extra': None, 'buttons': None, 'isAddonRoot': True, 'permissions': {'view': True, 'edit': True},
-         'accept': {'maxSize': 5120, 'acceptedFiles': True},
-         'urls': {'fetch': '/api/v1/project/tkqvs/osfstorage/hgrid/', 'upload': '/api/v1/project/tkqvs/osfstorage/'}, 'isPointer': False,
-         'nodeId': 'tkqvs', 'nodeUrl': '/tkqvs/', 'nodeApiUrl': '/api/v1/project/tkqvs/', 'path': '642400ffe3ff270298cfa6df/',
-         'nodeRegion': 'not United States', 'waterbutlerURL': 'http://localhost:7777'}
-
-        res = update_custom_storage_icon_url(fake_child)
-        assert_is_none(res)
-
     def test_grid_data_for_icon(self):
         new_region = RegionFactory()
         new_region.save()
         nodeSettings = NodeSettings.objects.get(owner_id=self.project.id)
         nodeSettings.region = new_region
         nodeSettings.save()
-        ProjectStorageType.objects.update_or_create(
-            node_id=self.project.id, defaults={'node_id': self.project.id, 'storage_type': ProjectStorageType.NII_STORAGE}
-        )
+        set_project_storage_type(self.project)
         url = self.project.api_url_for('grid_data')
         res = self.app.get(url, auth=self.user.auth).maybe_follow()
         assert_equal(res.status_code, http_status.HTTP_200_OK)
@@ -5537,7 +5502,7 @@ class TestResetPassword(OsfTestCase):
         assert_equal(res.status_code, 302)
         location = res.headers.get('Location')
         assert_true('login?service=' in location)
-        assert_true('username={}'.format(self.user.username, safe='@') in unquote(location))
+        assert_true('username={}'.format(quote(self.user.username, safe='@')) in location)
         assert_true('verification_key={}'.format(self.user.verification_key) in location)
 
         # check if password was updated
@@ -5619,7 +5584,7 @@ class TestResolveGuid(OsfTestCase):
 
 
     def test_preprint_provider_with_osf_domain(self):
-        provider = PreprintProviderFactory(_id='osftest', domain='https://rdm.nii.ac.jp/')
+        provider = PreprintProviderFactory(_id='osf', domain='https://rdm.nii.ac.jp/')
         preprint = PreprintFactory(provider=provider)
         url = web_url_for('resolve_guid', _guid=True, guid=preprint._id)
         res = self.app.get(url)

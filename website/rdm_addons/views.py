@@ -34,9 +34,7 @@ def import_admin_account(auth, addon_name=None):
     user = auth.user
 
     institution_id = rdm_utils.get_institution_id(user)
-    # Note: May be impact when multiple
-    rdm_addon_options = rdm_addons_utils.get_rdm_addon_option(institution_id, addon_name)
-    rdm_addon_option = rdm_addon_options.order_by('-id').first()
+    rdm_addon_option = rdm_addons_utils.get_rdm_addon_option(institution_id, addon_name)
 
     if not rdm_addon_option.external_accounts.exists():
         raise HTTPError(http_status.HTTP_400_BAD_REQUEST)

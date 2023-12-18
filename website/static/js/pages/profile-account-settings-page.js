@@ -15,9 +15,7 @@ $(function() {
     $osf.applyBindings(viewModel, '#connectedEmails');
     viewModel.init();
 
-    if($('#changePassword').length){
-        new passwordForms.ChangePassword('#changePassword');
-    }
+    new passwordForms.ChangePassword('#changePassword');
 
     $osf.applyBindings(
         new accountSettings.DeactivateAccountViewModel(),
@@ -29,12 +27,10 @@ $(function() {
         '#exportAccount'
     );
 
-    if($('#externalIdentity').length){
-        $osf.applyBindings(
-            new accountSettings.ExternalIdentityViewModel(),
-            '#externalIdentity'
-        );
-    }
+    $osf.applyBindings(
+        new accountSettings.ExternalIdentityViewModel(),
+        '#externalIdentity'
+    );
 
     $osf.applyBindings( new accountSettings.UpdateDefaultStorageLocation(),
         '#updateDefaultStorageLocation');

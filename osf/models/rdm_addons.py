@@ -30,6 +30,9 @@ class RdmAddonOption(BaseModel, CommonMixin):
 
     extended = DateTimeAwareJSONField(default=dict, blank=True)
 
+    class Meta:
+        unique_together = (('provider', 'institution'),)
+
 
 class RdmAddonNoInstitutionOption(BaseModel, CommonMixin):
     provider = models.CharField(max_length=50, blank=False, null=False, unique=True, db_index=True)

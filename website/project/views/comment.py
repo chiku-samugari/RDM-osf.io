@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import logging
+
 import markdown
 from django.utils import timezone
 from flask import request
@@ -16,9 +16,6 @@ from website.notifications.emails import notify, notify_mentions
 from website.project.decorators import must_be_contributor_or_public
 from osf.models import Node
 from website.project.signals import comment_added, mention_added
-from api.base.settings.defaults import ADDON_METHOD_PROVIDER
-
-logger = logging.getLogger(__name__)
 
 
 @file_updated.connect
@@ -36,19 +33,12 @@ def update_file_guid_referent(self, target, event_type, payload, user=None):
         # Must be a move
         if source['provider'] == destination['provider'] and source_node == destination_node:
             return  # Node has not changed and provider has not changed
-    if destination['provider'] in ADDON_METHOD_PROVIDER:
-        file_guids = BaseFileNode.resolve_class(destination['provider'], BaseFileNode.ANY).get_file_guids(
-            materialized_path=source['materialized'] if source['provider'] != 'osfstorage' else source['path'],
-            provider=destination['provider'],
-            target=source_node,
-            root_path=destination['root_path']
-        )
-    else:
-        file_guids = BaseFileNode.resolve_class(source['provider'], BaseFileNode.ANY).get_file_guids(
-            materialized_path=source['materialized'] if source['provider'] != 'osfstorage' else source['path'],
-            provider=source['provider'],
-            target=source_node
-        )
+
+    file_guids = BaseFileNode.resolve_class(source['provider'], BaseFileNode.ANY).get_file_guids(
+        materialized_path=source['materialized'] if source['provider'] != 'osfstorage' else source['path'],
+        provider=source['provider'],
+        target=source_node
+    )
 
     for guid in file_guids:
         obj = Guid.load(guid)
@@ -56,13 +46,11 @@ def update_file_guid_referent(self, target, event_type, payload, user=None):
             update_comment_node(guid, source_node, destination_node)
 
         if source['provider'] != destination['provider'] or source['provider'] != 'osfstorage':
-            logger.warning(f'change file node here {obj}')
             old_file = BaseFileNode.load(obj.referent._id)
             obj.referent = create_new_file(obj, source, destination, destination_node)
             obj.save()
             if old_file and not TrashedFileNode.load(old_file._id):
-                if destination['provider'] not in ADDON_METHOD_PROVIDER:
-                    old_file.delete()
+                old_file.delete()
 
 
 def create_new_file(obj, source, destination, destination_node):

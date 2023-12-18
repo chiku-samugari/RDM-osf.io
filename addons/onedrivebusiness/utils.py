@@ -4,6 +4,7 @@ from django.core.cache import cache
 from framework.exceptions import HTTPError
 from osf.models import RdmAddonOption
 from osf.models.region_external_account import RegionExternalAccount
+from addons.osfstorage.models import Region
 from addons.onedrivebusiness import SHORT_NAME
 
 from addons.onedrivebusiness.client import UserListClient
@@ -18,9 +19,7 @@ def parse_root_folder_id(root_folder_id):
         return None, root_folder_id
     return tuple(root_folder_id.split('\t', maxsplit=1))
 
-
-def get_region_external_account(node_settings):
-    node = node_settings.owner
+def get_region_external_account(node):
     user = node.creator
     if user is None:
         return None
@@ -34,10 +33,10 @@ def get_region_external_account(node_settings):
     ).first()
     if addon_option is None:
         return None
-    external_account = RegionExternalAccount.objects.filter(region=node_settings.region)
-    if external_account.exists():
-        return external_account.first()
-    else:
+    try:
+        region = Region.objects.get(_id=institution._id)
+        return RegionExternalAccount.objects.get(region=region)
+    except Region.DoesNotExist:
         return None
 
 def get_column_id(sheet, text):

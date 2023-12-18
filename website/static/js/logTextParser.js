@@ -451,8 +451,8 @@ var LogPieces = {
     source: {
         view: function (ctrl, logObject) {
             var source = logObject.attributes.params.source;
-            if (source.addon === 'NII Storage' && source.storage_name) {
-                source.addon = source.storage_name;
+            if (source.addon === 'NII Storage' && logObject.attributes.params.storage_name) {
+                source.addon = logObject.attributes.params.storage_name;
             }
             if(paramIsReturned(source, logObject)){
                 var sourceMaterialized = stripBackslash(source.materialized);
@@ -465,8 +465,8 @@ var LogPieces = {
     destination: {
         view: function (ctrl, logObject) {
             var destination = logObject.attributes.params.destination;
-            if (destination.addon === 'NII Storage' && destination.storage_name) {
-                destination.addon = destination.storage_name;
+            if (destination.addon === 'NII Storage' && logObject.attributes.params.storage_name) {
+                destination.addon = logObject.attributes.params.storage_name;
             }
             if(paramIsReturned(destination, logObject)){
                 var destinationMaterialized = destination.materialized;
@@ -498,9 +498,7 @@ var LogPieces = {
                     'nextcloud_file_added', 'nextcloud_file_updated',
                     'nextcloudinstitutions_file_added', 'nextcloudinstitutions_file_updated',
                     'dropboxbusiness_file_added', 'dropboxbusiness_file_updated',
-                    's3compatinstitutions_file_added', 'ociinstitutions_file_updated',
-                    'ociinstitutions_file_added', 'dropboxbusiness_file_updated',
-                    'onedrivebusiness_file_added', 'onedrive_file_updated',
+                    's3compatinstitutions_file_added', 's3compatinstitutions_file_updated',
                     'timestamp_added'];
                     if (acceptableLinkedItems.indexOf(action) !== -1 && logObject.attributes.params.urls) {
                        return logObject.attributes.params.urls.view;

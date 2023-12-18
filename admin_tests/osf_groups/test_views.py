@@ -8,7 +8,7 @@ from nose import tools as nt
 from django.test import RequestFactory
 
 from tests.base import AdminTestCase
-from osf_tests.factories import UserFactory, ProjectFactory, OSFGroupFactory, InstitutionFactory
+from osf_tests.factories import UserFactory, ProjectFactory, OSFGroupFactory
 from osf.utils.permissions import WRITE
 from admin.osf_groups.serializers import serialize_node_for_groups
 
@@ -17,9 +17,8 @@ class TestOSFGroupsView(AdminTestCase):
     def setUp(self):
         super(TestOSFGroupsView, self).setUp()
         self.user = UserFactory()
-        self.user.affiliated_institutions.add(InstitutionFactory())
         self.user_two = UserFactory()
-        self.project = ProjectFactory(creator=self.user)
+        self.project = ProjectFactory()
         self.group = OSFGroupFactory(name='test', creator=self.user)
         self.group.make_member(self.user_two)
         self.group.add_group_to_node(self.project)

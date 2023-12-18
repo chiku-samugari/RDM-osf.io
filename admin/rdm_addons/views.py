@@ -105,14 +105,12 @@ class AddonListView(RdmPermissionMixin, UserPassesTestMixin, TemplateView):
                 'addons_css': []
             })
 
-            # Note: May be impact when multiple
             for addon in ctx['addon_settings']:
                 addon_name = addon['addon_short_name']
-                rdm_addon_options = utils.get_rdm_addon_option(institution.id, addon_name)
-                if rdm_addon_options.exists():
-                    addon['option'] = {}
-                    addon['option'] = model_to_dict(rdm_addon_options.first())
-                    addon['option']['external_accounts'] = rdm_addon_options.first().external_accounts.values()
+                rdm_addon_option = utils.get_rdm_addon_option(institution.id, addon_name)
+                addon['option'] = {}
+                addon['option'] = model_to_dict(rdm_addon_option)
+                addon['option']['external_accounts'] = rdm_addon_option.external_accounts.values()
 
             return ctx
 
@@ -151,31 +149,27 @@ class AddonAllowView(RdmPermissionMixin, UserPassesTestMixin, View):
         addon_name = kwargs['addon_name']
         institution_id = int(kwargs['institution_id'])
         is_allowed = bool(int(kwargs['allowed']))
-        # Note: May be impact when multiple
-        rdm_addon_options = utils.get_rdm_addon_option(institution_id, addon_name)
-        for rdm_addon_option in rdm_addon_options:
-            rdm_addon_option.is_allowed = is_allowed
-            rdm_addon_option.save()
-            if not is_allowed:
-                self.revoke_user_accounts(institution_id, addon_name)
+        rdm_addon_option = utils.get_rdm_addon_option(institution_id, addon_name)
+        rdm_addon_option.is_allowed = is_allowed
+        rdm_addon_option.save()
+        if not is_allowed:
+            self.revoke_user_accounts(institution_id, addon_name)
         return HttpResponse('')
 
     def revoke_user_accounts(self, institution_id, addon_name):
         """disconnect from administrator specified storage the project using it"""
-        # Note: May be impact when multiple
-        rdm_addon_options = utils.get_rdm_addon_option(institution_id, addon_name)
+        rdm_addon_option = utils.get_rdm_addon_option(institution_id, addon_name)
         if institution_id:
             users = OSFUser.objects.filter(affiliated_institutions__pk=institution_id)
         else:
             users = OSFUser.objects.filter(affiliated_institutions__isnull=True)
-        for rdm_addon_option in rdm_addon_options:
-            if not users.exists() or not rdm_addon_option.external_accounts.exists():
-                return
-            accounts = rdm_addon_option.external_accounts.all()
-            for user in users.all():
-                for account in accounts:
-                    user.external_accounts.remove(account)
-                user.save()
+        if not users.exists() or not rdm_addon_option.external_accounts.exists():
+            return
+        accounts = rdm_addon_option.external_accounts.all()
+        for user in users.all():
+            for account in accounts:
+                user.external_accounts.remove(account)
+            user.save()
 
 class AddonForceView(RdmPermissionMixin, UserPassesTestMixin, View):
     """View for saving whether to force use of each add-on"""
@@ -190,9 +184,7 @@ class AddonForceView(RdmPermissionMixin, UserPassesTestMixin, View):
         addon_name = kwargs['addon_name']
         institution_id = int(kwargs['institution_id'])
         is_forced = bool(int(kwargs['forced']))
-        # Note: May be impact when multiple
-        rdm_addon_options = utils.get_rdm_addon_option(institution_id, addon_name)
-        for rdm_addon_option in rdm_addon_options:
-            rdm_addon_option.is_forced = is_forced
-            rdm_addon_option.save()
+        rdm_addon_option = utils.get_rdm_addon_option(institution_id, addon_name)
+        rdm_addon_option.is_forced = is_forced
+        rdm_addon_option.save()
         return HttpResponse('')

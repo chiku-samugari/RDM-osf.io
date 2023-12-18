@@ -13,7 +13,6 @@ from django.forms.models import model_to_dict
 from django.urls import reverse_lazy, reverse
 from django.http import HttpResponse, JsonResponse
 from django.views.generic import ListView, DetailView, View, CreateView, UpdateView, DeleteView, TemplateView
-from django.views.generic.base import RedirectView
 from django.views.generic.edit import FormView
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin, UserPassesTestMixin
@@ -24,11 +23,9 @@ from admin.base.forms import ImportFileForm
 from admin.institutions.forms import InstitutionForm, InstitutionalMetricsAdminRegisterForm
 from django.contrib.auth.models import Group
 from osf.models import Institution, Node, OSFUser, UserQuota, Email
-from osf.models.user_storage_quota import UserStorageQuota
 from website.util import quota
 from addons.osfstorage.models import Region
 from api.base import settings as api_settings
-from api.base.settings import NII_STORAGE_REGION_ID
 import csv
 
 logger = logging.getLogger(__name__)
@@ -54,18 +51,31 @@ class InstitutionList(PermissionRequiredMixin, ListView):
         kwargs.setdefault('logohost', settings.OSF_URL)
         return super(InstitutionList, self).get_context_data(**kwargs)
 
-class InstitutionUserList(PermissionRequiredMixin, ListView):
+class InstitutionUserList(RdmPermissionMixin, UserPassesTestMixin, ListView):
+    """
+    List of institution that are using NII Storage page for integrated administrators.
+    """
     paginate_by = 25
     template_name = 'institutions/institution_list.html'
     ordering = 'name'
-    permission_required = 'osf.view_institution'
     raise_exception = True
     model = Institution
 
+    def test_func(self):
+        """ Check user permissions """
+        if not self.is_authenticated:
+            # If user is not authenticated then redirect to login page
+            self.raise_exception = False
+            return False
+        return self.is_super_admin
+
     def get_queryset(self):
-        return Institution.objects.all().order_by(self.ordering)
+        """ Get institutions that is using NII Storage """
+        institution_storage_region__ids = Region.objects.filter(waterbutler_settings__storage__type=Region.INSTITUTIONS).values('_id')
+        return Institution.objects.filter(is_deleted=False).exclude(_id__in=institution_storage_region__ids).order_by(self.ordering)
 
     def get_context_data(self, **kwargs):
+        """ Get context for this view """
         query_set = kwargs.pop('object_list', self.object_list)
         page_size = self.get_paginate_by(query_set)
         paginator, page, query_set, is_paginated = self.paginate_queryset(query_set, page_size)
@@ -269,33 +279,17 @@ class InstitutionalMetricsAdminRegister(PermissionRequiredMixin, FormView):
     def get_success_url(self):
         return reverse('institutions:register_metrics_admin', kwargs={'institution_id': self.kwargs['institution_id']})
 
-
 class QuotaUserList(ListView):
     """Base class for UserListByInstitutionID and StatisticalStatusDefaultStorage.
     """
-
-    def get_institution(self):
-        raise NotImplementedError("QuotaUserList subclasses must implement a \
-            'get_institution' method.")
-
-    def get_region(self):
-        raise NotImplementedError("QuotaUserList subclasses must implement a \
-            'get_region' method.")
-
-    def get_user_list(self):
-        raise NotImplementedError("QuotaUserList subclasses must implement a \
-            'get_user_list' method.")
 
     def custom_size_abbreviation(self, size, abbr):
         if abbr == 'B':
             return (size / api_settings.BASE_FOR_METRIC_PREFIX, 'KB')
         return size, abbr
 
-    def get_user_quota_info(self, user):
-        max_quota, used_quota = quota.get_storage_quota_info(
-            user,
-            self.get_region()
-        )
+    def get_user_quota_info(self, user, storage_type):
+        max_quota, used_quota = quota.get_quota_info(user, storage_type)
         max_quota_bytes = max_quota * api_settings.SIZE_UNIT_GB
         remaining_quota = max_quota_bytes - used_quota
         used_quota_abbr = self.custom_size_abbreviation(*quota.abbreviate_size(used_quota))
@@ -316,7 +310,7 @@ class QuotaUserList(ListView):
         }
 
     def get_queryset(self):
-        user_list = self.get_user_list()
+        user_list = self.get_userlist()
         order_by = self.get_order_by()
         reverse = self.get_direction() != 'asc'
         user_list.sort(key=itemgetter(order_by), reverse=reverse)
@@ -352,9 +346,6 @@ class QuotaUserList(ListView):
         kwargs['page'] = self.page
         kwargs['order_by'] = self.get_order_by()
         kwargs['direction'] = self.get_direction()
-        region = self.get_region()
-        if region is not None and institution._id == region._id:
-            kwargs['region_id'] = region.id
         return super(QuotaUserList, self).get_context_data(**kwargs)
 
 
@@ -385,20 +376,43 @@ class ExportFileTSV(PermissionRequiredMixin, QuotaUserList):
         return response
 
 
-class UserListByInstitutionID(PermissionRequiredMixin, QuotaUserList):
+class UserListByInstitutionID(RdmPermissionMixin, UserPassesTestMixin, QuotaUserList):
+    """
+    User list quota information page for integrated administrators.
+    """
     template_name = 'institutions/list_institute.html'
-    permission_required = 'osf.view_osfuser'
     raise_exception = True
     paginate_by = 10
 
-    def get_user_list(self):
+    def test_func(self):
+        """ Check user permissions """
+        if not self.is_authenticated:
+            # If user is not authenticated then redirect to login page
+            self.raise_exception = False
+            return False
+        return self.is_super_admin
+
+    def get_userlist(self):
+        """ Get list of users' quota info """
         guid = self.request.GET.get('guid')
         name = self.request.GET.get('info')
         email = self.request.GET.get('email')
         queryset = OSFUser.objects.filter(affiliated_institutions=self.kwargs['institution_id'])
 
+        # Get institution by institution_id
+        institution = self.get_institution()
+        if not institution:
+            # If institution is not found, redirect to HTTP 404 page
+            raise Http404
+
+        # Get user quota type for institution if using NII Storage
+        user_quota_type = institution.get_user_quota_type_for_nii_storage()
+        if not user_quota_type:
+            # Institution is not using NII storage, redirect to HTTP 404 page
+            raise Http404
+
         if not email and not guid and not name:
-            return [self.get_user_quota_info(user) for user in queryset]
+            return [self.get_user_quota_info(user, user_quota_type) for user in queryset]
 
         query_email = query_guid = query_name = None
 
@@ -409,199 +423,175 @@ class UserListByInstitutionID(PermissionRequiredMixin, QuotaUserList):
             query_guid = queryset.filter(guids___id=guid)
         if name:
             query_name = queryset.filter(Q(fullname__icontains=name) |
+                                         # Q(family_name_ja__icontains=name) |  # add in (1)4.1.4
+                                         # Q(given_name_ja__icontains=name) |  # add in (1)4.1.4
+                                         # Q(middle_names_ja__icontains=name) |  # add in (1)4.1.4
                                          Q(given_name__icontains=name) |
                                          Q(middle_names__icontains=name) |
                                          Q(family_name__icontains=name))
 
         if query_email is not None and query_email.exists():
-            return [self.get_user_quota_info(user) for user in query_email]
+            return [self.get_user_quota_info(user, user_quota_type) for user in query_email]
         elif query_guid is not None and query_guid.exists():
-            return [self.get_user_quota_info(user) for user in query_guid]
+            return [self.get_user_quota_info(user, user_quota_type) for user in query_guid]
         elif query_name is not None and query_name.exists():
-            return [self.get_user_quota_info(user) for user in query_name]
+            return [self.get_user_quota_info(user, user_quota_type) for user in query_name]
         else:
             return []
 
     def get_institution(self):
-        # be called in QuotaUserList.get_user_quota_info method
-        return Institution.objects.get(id=self.kwargs['institution_id'])
-
-    def get_region(self):
-        # be called in QuotaUserList.get_user_quota_info method
-        return Region.objects.first()
+        """ Get institution by institution_id """
+        # institution_id is already validated in Django URL resolver, no need to validate again
+        institution_id = self.kwargs['institution_id']
+        return Institution.objects.filter(id=institution_id, is_deleted=False).first()
 
 
-class UpdateQuotaUserListByInstitutionID(PermissionRequiredMixin, View):
-    permission_required = 'osf.change_osfuser'
+class UpdateQuotaUserListByInstitutionID(RdmPermissionMixin, UserPassesTestMixin, View):
+    """
+    Change users max quota for an institution if that institution is using NII Storage.
+    """
     raise_exception = True
 
+    def test_func(self):
+        """ Check user permissions """
+        if not self.is_authenticated:
+            # If user is not authenticated then redirect to login page
+            self.raise_exception = False
+            return False
+        return self.is_super_admin
+
     def post(self, request, *args, **kwargs):
+        """ Handle POST request """
+        # institution_id is already validated in Django URL resolver, no need to validate again
         institution_id = self.kwargs['institution_id']
-        min_value, max_value = connection.ops.integer_field_range('IntegerField')
+
+        # Validate maxQuota parameter
         try:
-            max_quota = min(int(self.request.POST.get('maxQuota')), max_value)
+            max_quota = self.request.POST.get('maxQuota')
+            # Try converting maxQuota param to integer
+            max_quota = int(max_quota)
         except (ValueError, TypeError):
-            return redirect('institutions:institution_user_list',
-                            institution_id=institution_id)
-        for user in OSFUser.objects.filter(
-                affiliated_institutions=institution_id):
-            UserStorageQuota.objects.update_or_create(
-                user=user,
-                region_id=NII_STORAGE_REGION_ID,
-                defaults={'max_quota': max_quota})
+            # Cannot convert maxQuota param to integer, redirect to the current page
+            return redirect('institutions:institution_user_list', institution_id=institution_id)
+
+        institution = Institution.objects.filter(id=institution_id).first()
+        if not institution:
+            # If institution is not found, redirect to HTTP 404 page
+            raise Http404
+        # Get user quota type for institution if using NII Storage
+        user_quota_type = institution.get_user_quota_type_for_nii_storage()
+        if not user_quota_type:
+            # If institution is not using NII Storage, redirect to HTTP 404 page
+            raise Http404
+        min_value, max_value = connection.ops.integer_field_range('PositiveIntegerField')
+        if min_value < max_quota <= max_value:
+            # Update or create used quota for each user in the institution
+            for user in OSFUser.objects.filter(
+                    affiliated_institutions=institution_id):
+                UserQuota.objects.update_or_create(
+                    user=user, storage_type=user_quota_type,
+                    defaults={'max_quota': max_quota})
         return redirect('institutions:institution_user_list',
                         institution_id=institution_id)
 
-
-class RecalculateQuota(RdmPermissionMixin, RedirectView):
-
-    def dispatch(self, request, *args, **kwargs):
-        if self.is_super_admin:
-            institutions_list = Institution.objects.all()
-
-            for institution in institutions_list:
-                user_list = OSFUser.objects.filter(affiliated_institutions=institution)
-                for user in user_list:
-                    quota.recalculate_used_of_user_by_region(user._id)
-
-        return redirect('institutions:institution_list')
-
-
-class RecalculateQuotaOfUsersInInstitution(RdmPermissionMixin, RedirectView):
-
-    def dispatch(self, request, *args, **kwargs):
-        region_id = kwargs['region_id']
-        if self.is_admin:
-            institution = self.request.user.affiliated_institutions.first()
-            if institution is not None and Region.objects.filter(_id=institution._id).exists():
-                for user in OSFUser.objects.filter(affiliated_institutions=institution.id):
-                    quota.recalculate_used_of_user_by_region(user._id, region_id)
-
-        return redirect('institutions:statistical_status_default_storage', region_id=region_id)
-
-
-class InstitutionalStorage(RdmPermissionMixin, ListView):
-    paginate_by = 25
-    template_name = 'institutions/institutional_storages.html'
-    ordering = 'name'
-    raise_exception = True
-    model = Institution
-
-    def get_order_by(self):
-        order_by = self.request.GET.get('order_by', 'provider')
-        if order_by not in ['provider', 'name']:
-            return 'provider'
-        return order_by
-
-    def get_direction(self):
-        direction = self.request.GET.get('status', 'desc')
-        if direction not in ['asc', 'desc']:
-            return 'desc'
-        return direction
-
-    def get(self, request, *args, **kwargs):
-        if not (self.is_admin and self.request.user.affiliated_institutions.exists()):
-            raise Http404
-        query_set = self.get_queryset()
-        self.object_list = query_set
-        ctx = self.get_context_data()
-
-        if len(query_set) == 1:
-            return redirect(
-                'institutions:statistical_status_default_storage', region_id=query_set[0]['region_id']
-            )
-
-        return self.render_to_response(ctx)
-
-    def get_queryset(self):
-        new_list = []
-        number_id = 0
-        institution = self.request.user.affiliated_institutions.first()
-        list_region = Region.objects.filter(_id=institution._id)
-
-        if list_region is not None:
-            for region in list_region:
-                new_list.append({
-                    'order_id': number_id,
-                    'region_id': region.id,
-                    'institution_id': institution.id,
-                    'name': region.name,
-                    'provider': region.provider_full_name,
-                    'icon_url': '/custom_storage_location/icon/{}/comicon.png'.format(region.provider_short_name)
-                })
-
-        order_by = self.get_order_by()
-        direction = self.get_direction() != 'asc'
-        new_list.sort(key=itemgetter(order_by), reverse=direction)
-        for region in new_list:
-            number_id = number_id + 1
-            region['order_id'] = number_id
-        return new_list
-
-    def get_context_data(self, **kwargs):
-        query_set = self.get_queryset()
-        page_size = self.get_paginate_by(query_set)
-        paginator, page, query_set, is_paginated = self.paginate_queryset(query_set, page_size)
-        kwargs.setdefault('page', page)
-
-        inst_obj = self.request.user.affiliated_institutions.first()
-        kwargs['institution'] = inst_obj
-        kwargs['list_storage'] = query_set
-
-        return super(InstitutionalStorage, self).get_context_data(**kwargs)
-
-
-class QuotaUserStorageList(QuotaUserList):
-
-    def get_user_storage_quota_info(self, user):
-        max_quota, used_quota = quota.get_storage_quota_info(
-            user, self.get_region()
-        )
-        max_quota_bytes = max_quota * api_settings.SIZE_UNIT_GB
-        remaining_quota = max_quota_bytes - used_quota
-        used_quota_abbr = self.custom_size_abbreviation(*quota.abbreviate_size(used_quota))
-        remaining_abbr = self.custom_size_abbreviation(*quota.abbreviate_size(remaining_quota))
-        return {
-            'id': user.guids.first()._id,
-            'fullname': user.fullname,
-            'eppn': user.eppn or '',
-            'username': user.username,
-            'ratio': float(used_quota) / max_quota_bytes * 100,
-            'usage': used_quota,
-            'usage_value': used_quota_abbr[0],
-            'usage_abbr': used_quota_abbr[1],
-            'remaining': remaining_quota,
-            'remaining_value': remaining_abbr[0],
-            'remaining_abbr': remaining_abbr[1],
-            'quota': max_quota
-        }
-
-    def get_context_data(self, **kwargs):
-        return super(QuotaUserStorageList, self).get_context_data(**kwargs)
-
-
-class StatisticalStatusDefaultInstitutionalStorage(QuotaUserStorageList, RdmPermissionMixin, UserPassesTestMixin):
+class StatisticalStatusDefaultStorage(RdmPermissionMixin, UserPassesTestMixin, QuotaUserList):
+    """
+    User list quota information page for institution administrators.
+    """
     template_name = 'institutions/statistical_status_default_storage.html'
     permission_required = 'osf.view_institution'
     raise_exception = True
     paginate_by = 10
 
     def test_func(self):
-        return not self.is_super_admin and self.is_admin and self.request.user.affiliated_institutions.exists()
+        """ Check user permissions """
+        if not self.is_authenticated:
+            # If user is not authenticated then redirect to login page
+            self.raise_exception = False
+            return False
+        return not self.is_super_admin and self.is_admin \
+            and self.request.user.affiliated_institutions.exists()
 
-    def get_user_list(self):
+    def get_userlist(self):
+        """ Get list of users' quota info """
         user_list = []
-        institution = self.request.user.affiliated_institutions.first()
-        if institution is not None and Region.objects.filter(_id=institution._id).exists():
-            for user in OSFUser.objects.filter(affiliated_institutions=institution.id):
-                user_list.append(self.get_user_storage_quota_info(user))
+        institution = self.get_institution()
+        if not institution:
+            # If institution is not found, redirect to HTTP 404 page
+            raise Http404
+
+        # Get user quota type for institution if using NII Storage
+        user_quota_type = institution.get_user_quota_type_for_nii_storage()
+        if not user_quota_type:
+            # Institution is not using NII storage, redirect to 404 page
+            raise Http404
+        # Get user quota for each user in the institution
+        for user in OSFUser.objects.filter(affiliated_institutions=institution.id):
+            user_list.append(self.get_user_quota_info(user, user_quota_type))
         return user_list
 
     def get_institution(self):
-        return self.request.user.affiliated_institutions.first()
+        """ Get logged in user's first affiliated institution """
+        return self.request.user.affiliated_institutions.filter(is_deleted=False).first()
 
-    def get_region(self):
-        region_id = self.kwargs['region_id']
-        if not region_id:
-            raise Http404
-        return Region.objects.filter(id=region_id).first()
+
+class RecalculateQuota(RdmPermissionMixin, UserPassesTestMixin, View):
+    """
+    Recalculate used quota for institutions that is using NII Storage for integrated administrators.
+    """
+    raise_exception = True
+
+    def test_func(self):
+        """ Check user permissions """
+        if not self.is_authenticated:
+            # If user is not authenticated then redirect to login page
+            self.raise_exception = False
+            return False
+        return self.is_super_admin
+
+    def post(self, request, *args, **kwargs):
+        """ Handle POST request """
+        # institution_id is already validated in Django URL resolver, no need to validate again
+        institution_id = kwargs.get('institution_id')
+        if not institution_id:
+            # Recalculate quota for all users each institution
+            institution_query = """
+                SELECT oi.*, aor.waterbutler_settings
+                FROM osf_institution AS oi
+                LEFT JOIN addons_osfstorage_region AS aor ON oi._id = aor._id
+                WHERE oi.is_deleted IS false AND (aor.waterbutler_settings is null OR aor.waterbutler_settings -> 'storage' ->> 'type' = 'NII_STORAGE')
+            """
+            institutions = Institution.objects.raw(institution_query)
+            for institution in institutions:
+                # Default quota type: 1 (NII_STORAGE)
+                user_quota_type = UserQuota.NII_STORAGE
+                if institution.waterbutler_settings:
+                    # If there is an institutional storage for this institution, set quota type: 2 (CUSTOM_STORAGE)
+                    user_quota_type = UserQuota.CUSTOM_STORAGE
+
+                user_list = OSFUser.objects.filter(affiliated_institutions=institution)
+                for user in user_list:
+                    # Update quota for each user in every institution
+                    quota.update_user_used_quota(user, user_quota_type, is_recalculating_quota=True)
+
+            return redirect('institutions:institution_list')
+        else:
+            # Recalculate quota for all users in a specified institution
+            institution = Institution.objects.filter(id=institution_id, is_deleted=False).first()
+            if not institution:
+                # If institution is not found, redirect to HTTP 404 page
+                raise Http404
+
+            # Get user quota type for institution if using NII Storage
+            user_quota_type = institution.get_user_quota_type_for_nii_storage()
+            if not user_quota_type:
+                # If institution is not using NII Storage, redirect to HTTP 404 page
+                raise Http404
+
+            # Get institution's user list and update quota
+            user_list = OSFUser.objects.filter(affiliated_institutions=institution)
+            for user in user_list:
+                # Update quota for each user in the institution
+                quota.update_user_used_quota(user, user_quota_type, is_recalculating_quota=True)
+
+            return redirect('institutions:institution_user_list', institution_id=institution_id)

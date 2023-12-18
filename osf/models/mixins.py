@@ -4,7 +4,7 @@ import logging
 
 from django.apps import apps
 from django.contrib.auth.models import Group, AnonymousUser
-from django.core.exceptions import ObjectDoesNotExist, ValidationError, MultipleObjectsReturned
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -46,7 +46,7 @@ from website.project import signals as project_signals
 from website import settings, mails, language
 from website.project.licenses import set_license
 from api.base.rdmlogger import RdmLogger, rdmlog
-from api.base.settings.defaults import ADDON_METHOD_PROVIDER
+
 
 logger = logging.getLogger(__name__)
 
@@ -513,23 +513,10 @@ class AddonModelMixin(models.Model):
         return self.get_addons()
 
     def get_addons(self):
-        addons = []
-        for config in self.ADDONS_AVAILABLE:
-            if config.short_name == 'osfstorage':
-                osf_addons = self.get_osfstorage_addons()
-                for osf_addon in osf_addons:
-                    addons.append(osf_addon)
-            else:
-                if config.short_name in ADDON_METHOD_PROVIDER:
-                    multi_addon = self.get_multi_addon(config.short_name)
-                    if multi_addon and len(multi_addon) > 0:
-                        addons.extend(multi_addon)
-                else:
-                    addon = self.get_addon(config.short_name)
-                    if addon:
-                        addons.append(addon)
-        logger.debug(f'addons is {addons}')
-        return addons
+        return [_f for _f in [
+            self.get_addon(config.short_name)
+            for config in self.ADDONS_AVAILABLE
+        ] if _f]
 
     def get_oauth_addons(self):
         # TODO: Using hasattr is a dirty hack - we should be using issubclass().
@@ -541,15 +528,7 @@ class AddonModelMixin(models.Model):
         ]
 
     def has_addon(self, addon_name, is_deleted=False):
-        try:
-            settings_model = self._settings_model(addon_name)
-        except LookupError:
-            return False
-        if not settings_model:
-            return False
-        if is_deleted:
-            return bool(settings_model.objects.filter(owner=self))
-        return bool(settings_model.objects.filter(owner=self, is_deleted=is_deleted))
+        return bool(self.get_addon(addon_name, is_deleted=is_deleted))
 
     def get_addon_names(self):
         return [each.short_name for each in self.get_addons()]
@@ -560,11 +539,7 @@ class AddonModelMixin(models.Model):
             return addon
         return self.add_addon(name, *args, **kwargs)
 
-    def get_addon(self, name, is_deleted=False, region_id=None, root_id=None):
-        logger.debug(f'addon name is {name}')
-        logger.debug(f'addon region_id is {region_id}')
-        logger.debug(f'addon root_id is {root_id}')
-
+    def get_addon(self, name, is_deleted=False):
         try:
             settings_model = self._settings_model(name)
         except LookupError:
@@ -572,81 +547,14 @@ class AddonModelMixin(models.Model):
         if not settings_model:
             return None
         try:
-            settings_obj = None
             settings_obj = settings_model.objects.get(owner=self)
+            if not settings_obj.is_deleted or is_deleted:
+                return settings_obj
         except ObjectDoesNotExist:
             pass
-        except MultipleObjectsReturned:
-            if root_id:
-                settings_obj = settings_model.objects.filter(owner=self,
-                                                             root_node_id=root_id).first()
-            elif region_id:
-                settings_obj = settings_model.objects.filter(owner=self,
-                                                             region_id=region_id).first()
-            else:
-                logger.debug('get the first addon')
-                settings_obj = settings_model.objects.filter(owner=self).first()
-        if settings_obj and (not settings_obj.is_deleted or is_deleted):
-            return settings_obj
-        else:
-            return None
+        return None
 
-    def get_multi_addon(self, name, is_deleted=False):
-        logger.debug(f'addon name is {name}')
-        addon_settings = []
-        try:
-            settings_model = self._settings_model(name)
-        except LookupError:
-            return None
-        if not settings_model:
-            return None
-        try:
-            settings_objs = None
-            settings_objs = settings_model.objects.filter(owner=self)
-        except ObjectDoesNotExist:
-            pass
-
-        if settings_objs.exists():
-            for settings_obj in settings_objs:
-                if not settings_obj.is_deleted or is_deleted:
-                    addon_settings.append(settings_obj)
-        return addon_settings
-
-    def get_osfstorage_addons(self):
-        """Get all osfstorage addons were owned
-
-        :return QuerySet: Osfstorage add-ons was owned
-
-        """
-        try:
-            settings_model = self._settings_model('osfstorage')
-        except LookupError:
-            return []
-        if not settings_model:
-            return []
-        settings_obj = settings_model.objects.filter(owner=self, is_deleted=False)
-        return settings_obj
-
-    def get_first_addon(self, addon_name, *args, **kwargs):
-        """Get first addon was owned by addon name
-
-        :param str addon_name: Name of add-on
-        :return NodeSettings: Add-on was found
-
-        """
-        try:
-            settings_model = self._settings_model(addon_name)
-        except LookupError:
-            return None
-        if not settings_model:
-            return None
-        try:
-            is_deleted = kwargs['is_deleted']
-        except KeyError:
-            is_deleted = False
-        return settings_model.objects.filter(owner=self, is_deleted=is_deleted).first()
-
-    def add_addon(self, addon_name, auth=None, override=False, _force=False, region_id=None):
+    def add_addon(self, addon_name, auth=None, override=False, _force=False):
         """Add an add-on to the node.
 
         :param str addon_name: Name of add-on
@@ -662,17 +570,7 @@ class AddonModelMixin(models.Model):
             return False
 
         # Reactivate deleted add-on if present
-        if region_id:
-            try:
-                settings_model = self._settings_model(addon_name)
-            except LookupError:
-                return None
-            if not settings_model:
-                return None
-            addon = settings_model.objects.filter(owner=self, region_id=region_id).first()
-        else:
-            addon = self.get_addon(addon_name, is_deleted=True)
-        logger.debug(f'addon is {addon}')
+        addon = self.get_addon(addon_name, is_deleted=True)
         if addon:
             if addon.deleted:
                 addon.undelete(save=True)
@@ -684,8 +582,6 @@ class AddonModelMixin(models.Model):
         model = self._settings_model(addon_name, config=config)
         ret = model(owner=self)
         ret.on_add()
-        if region_id:
-            ret.region_id = region_id
         ret.save(clean=False)  # TODO This doesn't feel right
         return ret
 
@@ -703,7 +599,7 @@ class AddonModelMixin(models.Model):
         if save:
             self.save()
 
-    def delete_addon(self, addon_name, auth=None, _force=False, region_id=None):
+    def delete_addon(self, addon_name, auth=None, _force=False):
         """Delete an add-on from the node.
 
         :param str addon_name: Name of add-on
@@ -714,8 +610,7 @@ class AddonModelMixin(models.Model):
         :return bool: Add-on was deleted
         """
         from website.util import timestamp
-        addon = self.get_addon(addon_name, region_id=region_id)
-        logger.debug(f'addon is {addon}')
+        addon = self.get_addon(addon_name)
         if not addon:
             return False
         if self.settings_type in addon.config.added_mandatory and not _force:
