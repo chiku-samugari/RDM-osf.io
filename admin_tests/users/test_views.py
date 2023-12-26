@@ -1062,7 +1062,7 @@ class TestGetUserInstitutionQuota(AdminTestCase):
             guid=self.user._id
         )
         context = response.get_object()
-        nt.assert_equal(context['quota'], 200)
+        nt.assert_equal(context['quota'], api_settings.DEFAULT_MAX_QUOTA)
 
     def test_get_nii_default_storage_quota(self):
         UserQuota.objects.create(
@@ -1079,7 +1079,7 @@ class TestGetUserInstitutionQuota(AdminTestCase):
             guid=self.user._id
         )
         context = response.get_object()
-        nt.assert_equal(context['quota'], 200)
+        nt.assert_equal(context['quota'], api_settings.DEFAULT_MAX_QUOTA)
         nt.assert_equal(context['disable_update_max_quota'], True)
 
     def test_get_nii_custom_storage_quota(self):
