@@ -32,7 +32,6 @@ from website.mailchimp_utils import subscribe_on_confirm
 from website import search
 from website.util import quota
 
-from api.base import settings as api_settings
 from admin.base.views import GuidView
 from osf.models.admin_log_entry import (
     update_admin_log,
@@ -808,10 +807,7 @@ class UserDetailsView(RdmPermissionMixin, UserPassesTestMixin, GuidView):
             institution_storage_type = region.waterbutler_settings.get('storage', {}).get('type')
         else:
             institution_storage_type = Region.NII_STORAGE
-        max_quota = api_settings.DEFAULT_MAX_QUOTA
-        if institution_storage_type == Region.INSTITUTIONS:
-            # Get quota value of user with storage_type = 2
-            max_quota, _ = quota.get_quota_info(user, UserQuota.CUSTOM_STORAGE)
+        max_quota, _ = quota.get_quota_info(user, UserQuota.CUSTOM_STORAGE)
         return {
             'username': user.username,
             'name': user.fullname,
