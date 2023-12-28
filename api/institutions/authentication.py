@@ -59,6 +59,7 @@ class InstitutionAuthentication(BaseAuthentication):
     media_type = 'text/plain'
 
     def authenticate(self, request):
+        logger.info(f'*******request: {request}')
         """
         Handle CAS institution authentication request.
 
@@ -108,6 +109,7 @@ class InstitutionAuthentication(BaseAuthentication):
 
         # Load institution and user data
         data = json.loads(payload['data'])
+        logger.info(f'*******data: {data}')
         provider = data['provider']
         institution = Institution.load(provider['id'])
         if not institution:
