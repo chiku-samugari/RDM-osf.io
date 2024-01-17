@@ -612,11 +612,11 @@
                 <input type="hidden" id="LogSearchUserKeys">
                 <div class="container-fluid" style="padding: 0px">
                     <div>
-                        <div class="pull-left" style="margin-left: 1px; margin-bottom: 5px">
-                            <input type="text" id="LogSearchS" placeholder='${_("Start time")}' size="14" autocomplete="off" class="search-datetime-input">
+                        <div class="pull-left" style="margin-bottom: 5px">
+                            <input type="text" id="LogSearchS" placeholder='${_("Start time")}' size="14" autocomplete="off">
                         </div>
                         <div class="pull-left" style="margin-left: 10px; margin-bottom: 5px">
-                            <input type="text" id="LogSearchE" placeholder='${_("End time")}' size="14" autocomplete="off" class="search-datetime-input">
+                            <input type="text" id="LogSearchE" placeholder='${_("End time")}' size="14" autocomplete="off">
                         </div>
                         <div class="pull-left form-check" style="margin-left: 10px; padding-top: 2px;" id="useDropdown">
                             <input class="form-check-input" type="checkbox" id="useDropdownCheckbox">

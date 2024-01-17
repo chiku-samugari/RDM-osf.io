@@ -96,6 +96,7 @@ var LogFeed = {
                 function(result) {
                     _processResults(result);
                     self.logRequestPending(false);
+                    m.redraw();
                     return promise;
                 }, function(xhr, textStatus, error) {
                     self.failed = true;
@@ -104,6 +105,7 @@ var LogFeed = {
                     $('#DownloadLog').addClass('disabled');
                     $('#downloadHeader').text(sprintf(_('Download as file for %1$s logs'), 0));
                     $('#totalLogs').val(0);
+                    m.redraw();
                 }
             );
         };
