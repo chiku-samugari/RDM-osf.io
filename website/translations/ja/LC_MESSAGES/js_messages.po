@@ -8735,3 +8735,6 @@ msgstr "%1$s件のファイルをダウンロード"
 
 msgid "Downloading"
 msgstr "ダウンロード中"
+
+msgid "Download failed."
+msgstr "ダウンロードが失敗されました。"

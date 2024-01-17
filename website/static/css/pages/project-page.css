@@ -263,3 +263,17 @@ li.addon-categories a{
 #shareButtonsPopover a {
     display: block;
 }
+
+.search-datetime-input {
+    border-color: transparent;
+    box-shadow: 0 0 0px 1px #767676;
+}
+
+.search-datetime-input-chromium:focus {
+    border-color: inherit;
+    box-shadow: none;
+    margin-top: -1px;
+    margin-bottom: -1px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+}

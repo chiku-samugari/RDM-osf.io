@@ -101,6 +101,9 @@ var LogFeed = {
                     self.failed = true;
                     self.logRequestPending(false);
                     Raven.captureMessage('Error retrieving logs', {extra: {url: url, textStatus: textStatus, error: error}});
+                    $('#DownloadLog').addClass('disabled');
+                    $('#downloadHeader').text(sprintf(_('Download as file for %1$s logs'), 0));
+                    $('#totalLogs').val(0);
                 }
             );
         };
@@ -267,5 +270,7 @@ var LogFeed = {
 };
 
 module.exports = {
-    LogFeed: LogFeed
+    LogFeed: LogFeed,
+    DATETIME_FORMAT: DATETIME_FORMAT,
+    DATETIME_T_FORMAT: DATETIME_T_FORMAT
 };
