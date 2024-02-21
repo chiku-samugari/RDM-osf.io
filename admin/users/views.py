@@ -745,7 +745,7 @@ class BaseUserQuotaView(View):
             return
 
         if max_quota <= 0:
-            max_quota = 1
+            max_quota = 0
 
         UserQuota.objects.update_or_create(
             user=OSFUser.load(self.kwargs.get('guid')),
