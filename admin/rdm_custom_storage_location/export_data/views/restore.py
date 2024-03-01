@@ -826,11 +826,10 @@ def copy_files_from_export_data_to_destination(task, current_process_step,
                                 else:
                                     if user.exists():
                                         file_version.creator = user.first()
-                                    file_version.created = file_version_created_at
-                                    file_version.modified = file_version_modified
-                                    file_version.save()
-                                    FileVersion.objects.filter(id=file_version.id).update(created=file_version_created_at,
-                                                                                          modified=file_version_created_at)
+                                    FileVersion.objects.filter(id=file_version.id).update(
+                                        created=file_version_created_at,
+                                        modified=file_version_modified
+                                    )
 
                             if file_checkout_id:
                                 node.checkout_id = file_checkout_id
@@ -838,7 +837,6 @@ def copy_files_from_export_data_to_destination(task, current_process_step,
                             # update created/modified date to basefilenode
                             node.created = file_created
                             node.modified = file_modified
-                            node.save()
                             BaseFileNode.objects.filter(id=node.id).update(created=file_created,
                                                                            modified=file_modified)
 
