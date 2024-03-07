@@ -122,3 +122,11 @@ input.apple-switch.checked:after {
     flex:1;
     word-break: break-all;
 }
+
+.fixed-table-cell {
+    min-width: 100px;
+}
+
+.table-header-cell {
+    background-color: #f9f9f9;
+}

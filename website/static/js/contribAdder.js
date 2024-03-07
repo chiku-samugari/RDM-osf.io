@@ -455,6 +455,13 @@ AddContributorViewModel = oop.extend(Paginator, {
             }
         }).fail(function (xhr, status, error) {
             var errorMessage = lodashGet(xhr, 'responseJSON.message') || (sprintf(_('There was a problem trying to add contributors%1$s.') , osfLanguage.REFRESH_OR_SUPPORT));
+            if (xhr.status === 403) {
+                var continueHandle = $osf.handleErrorResponse(xhr);
+                if (continueHandle === false) {
+                    return;
+                }
+                errorMessage = _('You do not have permission to operate a project.');
+            }
             $osf.growl(_('Could not add contributors'), errorMessage);
             Raven.captureMessage(_('Error adding contributors'), {
                 extra: {
@@ -502,6 +509,13 @@ AddContributorViewModel = oop.extend(Paginator, {
     },
     onInviteError: function (xhr) {
         var self = this;
+        if (xhr.status === 403) {
+            var continueHandle = $osf.handleErrorResponse(xhr);
+            if (continueHandle === false) {
+                return;
+            }
+            self.inviteError(_('You do not have permission to operate a project.'));
+        }
         var response = JSON.parse(xhr.responseText);
         // Update error message
         self.inviteError(response.message);
