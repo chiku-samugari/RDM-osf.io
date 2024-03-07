@@ -669,6 +669,14 @@ $(document).ready(function () {
 
             request.fail(function(xhr, textStatus, error) {
                 window.contextVars.node.tags.splice(window.contextVars.node.tags.indexOf(tag),1);
+                if (xhr.status === 403) {
+                    var continueHandle = $osf.handleErrorResponse(xhr);
+                    if (continueHandle === false) {
+                        return;
+                    }
+                    $osf.growl('Error', _('You do not have permission to operate a project.'));
+                }
+                $('#node-tags').importTags(window.contextVars.node.tags.join(','));
                 Raven.captureMessage(_('Failed to add tag'), {
                     extra: {
                         tag: tag, url: tagsApiUrl, textStatus: textStatus, error: error
@@ -704,7 +712,15 @@ $(document).ready(function () {
                 window.contextVars.node.tags.push(tag);
                 // Suppress "tag not found" errors, as the end result is what the user wanted (tag is gone)- eg could be because two people were working at same time
                 if (xhr.status !== 409) {
-                    $osf.growl('Error', _('Could not remove tag'));
+                    if (xhr.status === 403) {
+                        var continueHandle = $osf.handleErrorResponse(xhr);
+                        if (continueHandle === false) {
+                            return;
+                        }
+                        $osf.growl('Error', _('You do not have permission to operate a project.'));
+                    } else {
+                        $osf.growl('Error', _('Could not remove tag'));
+                    }
                     Raven.captureMessage(_('Failed to remove tag'), {
                         extra: {
                             tag: tag, url: tagsApiUrl, textStatus: textStatus, error: error

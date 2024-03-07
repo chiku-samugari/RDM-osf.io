@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "patternProperties": {
+    "^[^\\n]+$": {
+      "type": "object",
+      "properties": {
+        "function_name": {
+          "type": "string"
+        },
+        "api_group": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "api": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string"
+              }
+            },
+            "required": ["api", "method"]
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

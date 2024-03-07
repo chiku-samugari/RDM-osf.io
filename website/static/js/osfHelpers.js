@@ -1061,6 +1061,30 @@ function linkifyText(content) {
     return linkify(content);
 }
 
+/**
+ * Utility function handle error response
+ * @param xhr {Object} XHR response
+ * @returns {boolean} a boolean that indicates if redirect to 403 page or show error message
+ */
+function handleErrorResponse(xhr) {
+    if (xhr && xhr.status === 403) {
+        var data = xhr.responseJSON;
+        if (data && data.errors && data.errors.length > 0) {
+            var error_message = data.errors[0];
+            if (error_message.type && error_message.type === 1) {
+                // Continue handle on client
+                return true;
+            }
+        }
+
+        // Redirect to HTTP 403
+        window.location.href = '/403';
+        return false;
+    }
+    // Continue handle on client
+    return true;
+}
+
 // Also export these to the global namespace so that these can be used in inline
 // JS. This is used on the /goodbye page at the moment.
 module.exports = window.$.osf = {
@@ -1113,4 +1137,5 @@ module.exports = window.$.osf = {
     osfSupportEmail: osfSupportEmail,
     osfSupportLink: osfSupportLink,
     refreshOrSupport: refreshOrSupport,
+    handleErrorResponse: handleErrorResponse,
 };
