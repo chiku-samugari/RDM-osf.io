@@ -36,6 +36,8 @@ from admin_tests.utilities import setup_view, setup_log_view, setup_form_view
 from admin.users import views
 from admin.users.forms import WorkshopForm, UserSearchForm, MergeUserForm
 from osf.models.admin_log_entry import AdminLogEntry
+from django.contrib.auth.models import AnonymousUser
+from django.http import HttpResponseBadRequest
 
 pytestmark = pytest.mark.django_db
 
@@ -968,6 +970,35 @@ class TestGetUserInstitutionQuota(AdminTestCase):
         self.user.save()
         self.view = views.UserDetailsView()
 
+        self.institution_1 = InstitutionFactory()
+        self.institution_2 = InstitutionFactory()
+
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
+
+        self.institution1_admin = AuthUserFactory(fullname='admin001_inst01')
+        self.institution1_admin.is_staff = True
+        self.institution1_admin.affiliated_institutions.add(self.institution_1)
+        self.institution1_admin.save()
+
+        self.institution2_admin = AuthUserFactory(fullname='admin001_inst02')
+        self.institution2_admin.is_staff = True
+        self.institution2_admin.affiliated_institutions.add(self.institution_2)
+        self.institution2_admin.save()
+
     def test_admin_login(self):
         request = RequestFactory().get(reverse('users:user_details', kwargs={'guid': self.user._id}))
         request.user = self.user
@@ -984,6 +1015,7 @@ class TestGetUserInstitutionQuota(AdminTestCase):
             RequestFactory().get(reverse('users:user_details', kwargs={'guid': self.user._id})),
             guid=self.user._id
         )
+        response.user = self.user
         context = response.get_object()
         nt.assert_equal(context['quota'], api_settings.DEFAULT_MAX_QUOTA)
 
@@ -997,6 +1029,7 @@ class TestGetUserInstitutionQuota(AdminTestCase):
             ),
             guid=self.user._id
         )
+        response.user = self.user
         context = response.get_object()
         nt.assert_equal(context['quota'], 200)
 
@@ -1018,8 +1051,88 @@ class TestGetUserInstitutionQuota(AdminTestCase):
             request,
             guid=self.user._id
         )
+        response.user = self.user
         context = response.get_object()
         nt.assert_equal(context['quota'], 150)
+
+    def test_permission_anonymous(self):
+        request = RequestFactory().get(reverse('users:user_details', kwargs={'guid': self.user._id}))
+        request.user = self.anon
+        view = setup_view(self.view, request, guid=self.user._id)
+        nt.assert_false(view.test_func())
+
+    def test_permission_normal_user(self):
+        request = RequestFactory().get(reverse('users:user_details', kwargs={'guid': self.user._id}))
+        request.user = self.normal_user
+        view = setup_view(self.view, request, guid=self.user._id)
+        nt.assert_false(view.test_func())
+
+    def test_permission_super(self):
+        request = RequestFactory().get(reverse('users:user_details', kwargs={'guid': self.user._id}))
+        request.user = self.superuser
+        view = setup_view(self.view, request, guid=self.user._id)
+        nt.assert_false(view.test_func())
+
+    def test_permission_admin_without_institution(self):
+        request = RequestFactory().get(reverse('users:user_details', kwargs={'guid': self.user._id}))
+        request.user = self.admin_not_inst
+        view = setup_view(self.view, request, guid=self.user._id)
+        nt.assert_false(view.test_func())
+
+    def test_permission_admin_without_permission(self):
+        request = RequestFactory().get(reverse('users:user_details', kwargs={'guid': self.institution1_admin._id}))
+        request.user = self.institution2_admin
+        view = setup_view(self.view, request, guid=self.institution1_admin._id)
+        nt.assert_false(view.test_func())
+
+    @mock.patch('admin.users.views.render_bad_request_response')
+    def test__get_region_invalid(self, mock_render):
+        mock_render.return_value = HttpResponseBadRequest(content='fake')
+        request = RequestFactory().get(
+            reverse('users:user_details', kwargs={'guid': self.user._id}),
+            {'region_id': 'abc'}
+        )
+        request.user = self.user
+        view = setup_view(
+            self.view,
+            request,
+            guid=self.user._id
+        )
+        view.user = self.user
+        response = view.get_object()
+        nt.assert_equal(response.status_code, 400)
+
+    def test__get_region_not_exist(self):
+        request = RequestFactory().get(
+            reverse('users:user_details', kwargs={'guid': self.user._id}),
+            {'region_id': 0}
+        )
+        request.user = self.user
+        view = setup_view(
+                self.view,
+                request,
+                guid=self.user._id
+            )
+        view.user = self.user
+        with nt.assert_raises(Http404):
+            view.get_object()
+
+    @mock.patch('admin.users.views.render_bad_request_response')
+    def test__get_region_not_same_institution(self, mock_render):
+        mock_render.return_value = HttpResponseBadRequest(content='fake')
+        request = RequestFactory().get(
+            reverse('users:user_details', kwargs={'guid': self.institution1_admin._id}),
+            {'region_id': self.region.id}
+        )
+        request.user = self.institution1_admin
+        view = setup_view(
+            self.view,
+            request,
+            guid=self.institution1_admin._id
+        )
+        view.user = self.institution1_admin
+        response = view.get_object()
+        nt.assert_equal(response.status_code, 400)
 
 
 class TestSetUserInstitutionQuota(AdminTestCase):
@@ -1030,6 +1143,35 @@ class TestSetUserInstitutionQuota(AdminTestCase):
         self.user.affiliated_institutions.add(self.institution)
         self.user.save()
         self.view = views.UserInstitutionQuotaView()
+
+        self.institution_1 = InstitutionFactory()
+        self.institution_2 = InstitutionFactory()
+
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
+
+        self.institution1_admin = AuthUserFactory(fullname='admin001_inst01')
+        self.institution1_admin.is_staff = True
+        self.institution1_admin.affiliated_institutions.add(self.institution_1)
+        self.institution1_admin.save()
+
+        self.institution2_admin = AuthUserFactory(fullname='admin001_inst02')
+        self.institution2_admin.is_staff = True
+        self.institution2_admin.affiliated_institutions.add(self.institution_2)
+        self.institution2_admin.save()
 
     def test_permissions_staff(self):
         request = RequestFactory().post(
@@ -1046,22 +1188,22 @@ class TestSetUserInstitutionQuota(AdminTestCase):
 
     def test_permissions_superuser(self):
         request = RequestFactory().post(
-            reverse('users:quota', kwargs={'guid': self.user._id}),
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
             {'maxQuota': 200, 'region_id': self.region.id})
         request.user = self.user
         request.user.is_superuser = True
         request.user.is_staff = False
-        response = views.UserInstitutionQuotaView.as_view()(
-            request, guid=self.user._id
-        )
-        nt.assert_equal(response.status_code, 302)
-        nt.assert_in('login', str(response))
+        with nt.assert_raises(PermissionDenied):
+            views.UserInstitutionQuotaView.as_view()(
+                request, guid=self.user._id
+            )
 
     def test_new_quota(self):
         request = RequestFactory().post(
-            reverse('users:quota', kwargs={'guid': self.user._id}),
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
             {'maxQuota': 150, 'region_id': self.region.id})
         self.view = setup_view(self.view, request, guid=self.user._id)
+        self.view.user = self.user
         response = self.view.post(request)
         nt.assert_equal(response.status_code, 302)
 
@@ -1075,9 +1217,10 @@ class TestSetUserInstitutionQuota(AdminTestCase):
         UserStorageQuota.objects.create(user=self.user, region=self.region, max_quota=100)
 
         request = RequestFactory().post(
-            reverse('users:quota', kwargs={'guid': self.user._id}),
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
             {'maxQuota': 200, 'region_id': self.region.id})
         self.view = setup_view(self.view, request, guid=self.user._id)
+        self.view.user = self.user
         response = self.view.post(request)
         nt.assert_equal(response.status_code, 302)
 
@@ -1091,9 +1234,10 @@ class TestSetUserInstitutionQuota(AdminTestCase):
         UserStorageQuota.objects.create(user=self.user, region=self.region, max_quota=100)
 
         request = RequestFactory().post(
-            reverse('users:quota', kwargs={'guid': self.user._id}),
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
             {'maxQuota': -200, 'region_id': self.region.id})
         self.view = setup_view(self.view, request, guid=self.user._id)
+        self.view.user = self.user
         response = self.view.post(request)
         nt.assert_equal(response.status_code, 302)
 
@@ -1103,15 +1247,130 @@ class TestSetUserInstitutionQuota(AdminTestCase):
         nt.assert_is_not_none(user_quota)
         nt.assert_equal(user_quota.max_quota, 1)
 
-    @mock.patch('admin.users.views.Region.objects.get')
-    def test_update_quota_not_match_region(self, region):
-        region.return_value = None
+    def test_update_quota_not_match_region(self):
         UserStorageQuota.objects.create(user=self.user, region=self.region, max_quota=100)
-        with nt.assert_raises(HTTPError) as exc_info:
+        with nt.assert_raises(Http404):
             request = RequestFactory().post(
-                reverse('users:quota', kwargs={'guid': self.user._id}),
-                {'maxQuota': 150, 'region_id': 1}, )
+                reverse('users:institution_quota', kwargs={'guid': self.user._id}),
+                {'maxQuota': 150, 'region_id': 0}, )
             self.view = setup_view(self.view, request, guid=self.user._id)
+            self.view.user = self.user
             self.view.post(request)
 
-        nt.assert_equal(exc_info.exception.code, 400)
+    def test_permission_anonymous(self):
+        request = RequestFactory().post(
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
+            {'maxQuota': 200, 'region_id': self.region.id})
+        request.user = self.anon
+        view = setup_view(self.view, request, guid=self.user._id)
+        nt.assert_false(view.test_func())
+
+    def test_permission_normal_user(self):
+        request = RequestFactory().post(
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
+            {'maxQuota': 200, 'region_id': self.region.id})
+        request.user = self.normal_user
+        view = setup_view(self.view, request, guid=self.user._id)
+        nt.assert_false(view.test_func())
+
+    def test_permission_super(self):
+        request = RequestFactory().post(
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
+            {'maxQuota': 200, 'region_id': self.region.id})
+        request.user = self.superuser
+        view = setup_view(self.view, request, guid=self.user._id)
+        nt.assert_false(view.test_func())
+
+    def test_permission_admin_without_institution(self):
+        request = RequestFactory().post(
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
+            {'maxQuota': 200, 'region_id': self.region.id})
+        request.user = self.admin_not_inst
+        view = setup_view(self.view, request, guid=self.user._id)
+        nt.assert_false(view.test_func())
+
+    def test_permission_admin_without_permission(self):
+        request = RequestFactory().post(
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
+            {'maxQuota': 200, 'region_id': self.region.id})
+        request.user = self.institution2_admin
+        view = setup_view(self.view, request, guid=self.institution1_admin._id)
+        nt.assert_false(view.test_func())
+
+    @mock.patch('admin.users.views.render_bad_request_response')
+    def test__update_quota_missing_required(self, mock_render):
+        mock_render.return_value = HttpResponseBadRequest(content='fake')
+        request = RequestFactory().post(
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
+            {}, )
+        request.user = self.user
+        view = setup_view(
+            self.view,
+            request,
+            guid=self.user._id
+        )
+        view.user = self.user
+        response = view.post(request)
+        nt.assert_equal(response.status_code, 400)
+
+    @mock.patch('admin.users.views.render_bad_request_response')
+    def test__update_quota_region_invalid(self, mock_render):
+        mock_render.return_value = HttpResponseBadRequest(content='fake')
+        request = RequestFactory().post(
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
+            {'maxQuota': 150, 'region_id': 'abc'}, )
+        request.user = self.user
+        view = setup_view(
+            self.view,
+            request,
+            guid=self.user._id
+        )
+        view.user = self.user
+        response = view.post(request)
+        nt.assert_equal(response.status_code, 400)
+
+    @mock.patch('admin.users.views.render_bad_request_response')
+    def test__update_quota_max_quota_invalid(self, mock_render):
+        mock_render.return_value = HttpResponseBadRequest(content='fake')
+        request = RequestFactory().post(
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
+            {'maxQuota': 'abc', 'region_id': self.region.id}, )
+        request.user = self.user
+        view = setup_view(
+            self.view,
+            request,
+            guid=self.user._id
+        )
+        view.user = self.user
+        response = view.post(request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test__update_quota_region_not_exist(self):
+        request = RequestFactory().post(
+            reverse('users:institution_quota', kwargs={'guid': self.user._id}),
+            {'maxQuota': 150, 'region_id': 0}, )
+        request.user = self.user
+        view = setup_view(
+            self.view,
+            request,
+            guid=self.user._id
+        )
+        view.user = self.user
+        with nt.assert_raises(Http404):
+            view.post(request)
+
+    @mock.patch('admin.users.views.render_bad_request_response')
+    def test__update_quota_region_not_same_institution(self, mock_render):
+        mock_render.return_value = HttpResponseBadRequest(content='fake')
+        request = RequestFactory().post(
+            reverse('users:institution_quota', kwargs={'guid': self.institution1_admin._id}),
+            {'maxQuota': 150, 'region_id': self.region.id}, )
+        request.user = self.institution1_admin
+        view = setup_view(
+            self.view,
+            request,
+            guid=self.institution1_admin._id
+        )
+        view.user = self.institution1_admin
+        response = view.post(request)
+        nt.assert_equal(response.status_code, 400)

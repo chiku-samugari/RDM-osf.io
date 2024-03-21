@@ -67,4 +67,5 @@ def update_custom_storage_icon_url(storage):
             storage['nodeRegion'] = 'NII Storage'
         else:
             storage['iconUrl'] = '/static/addons/osfstorage/comicon_custom_storage.png'
+            storage['name'] = storage['nodeRegion']
             storage['addonFullname'] = storage['nodeRegion']

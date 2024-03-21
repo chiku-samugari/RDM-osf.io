@@ -7,20 +7,28 @@ from admin.institutions.views import QuotaUserStorageList
 from osf.models import Institution, OSFUser
 from osf.models.user_storage_quota import UserStorageQuota
 from admin.base import settings
-from django.core.exceptions import PermissionDenied
 from addons.osfstorage.models import Region
 from django.views.generic import ListView, View
 from django.shortcuts import redirect
 from admin.rdm.utils import RdmPermissionMixin
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, Http404
-from rest_framework import status as http_status
 from admin.rdm_custom_storage_location import utils
-from framework.exceptions import HTTPError
+from django.contrib.auth.mixins import UserPassesTestMixin
+from admin.base.utils import render_bad_request_response
 
 
-class IconView(View):
+class IconView(RdmPermissionMixin, UserPassesTestMixin, View):
     raise_exception = True
+
+    def test_func(self):
+        """check user authentication"""
+        # login check
+        if not self.is_authenticated:
+            return False
+
+        return self.is_super_admin or self.is_admin and \
+            self.request.user.affiliated_institutions.exists()
 
     def get(self, request, *args, **kwargs):
         addon_name = kwargs['addon_name']
@@ -36,12 +44,26 @@ class IconView(View):
         raise Http404
 
 
-class ProviderListByInstitution(RdmPermissionMixin, ListView):
+class ProviderListByInstitution(RdmPermissionMixin, UserPassesTestMixin, ListView):
     paginate_by = 25
     template_name = 'institutional_storage_quota_control/' \
                     'list_provider_of_institution.html'
     raise_exception = True
     model = Institution
+    inst_obj = None
+
+    def test_func(self):
+        """check user authentication"""
+        # login check
+        if not self.is_authenticated:
+            return False
+
+        self.inst_obj = self.get_institution()
+        if self.is_admin and self.request.user.affiliated_institutions.exists():
+            institution = self.request.user.affiliated_institutions.first()
+            return self.inst_obj.id == institution.id
+        else:
+            return self.is_super_admin
 
     def get_order_by(self):
         order_by = self.request.GET.get('order_by', 'order_id')
@@ -107,33 +129,33 @@ class ProviderListByInstitution(RdmPermissionMixin, ListView):
         return list_provider
 
     def get_context_data(self, **kwargs):
-        user = self.request.user
-        inst_obj = self.get_institution()
-        if self.is_admin:
-            institution = user.affiliated_institutions.first()
-            if inst_obj.id != institution.id:
-                raise PermissionDenied
-        elif not self.is_super_admin:
-            raise PermissionDenied
-
         query_set = self.get_queryset()
         page_size = self.get_paginate_by(query_set)
         paginator, page, query_set, is_paginated = self.paginate_queryset(query_set, page_size)
         kwargs.setdefault('page', page)
-        kwargs['institution'] = inst_obj
+        kwargs['institution'] = self.inst_obj
         kwargs['list_storage'] = query_set
         kwargs['order_by'] = self.get_order_by()
         kwargs['direction'] = self.get_direction()
         return super(ProviderListByInstitution, self).get_context_data(**kwargs)
 
 
-class InstitutionStorageList(RdmPermissionMixin, ListView):
+class InstitutionStorageList(RdmPermissionMixin, UserPassesTestMixin, ListView):
     paginate_by = 25
     template_name = 'institutional_storage_quota_control/' \
                     'list_institution_storage.html'
     ordering = 'name'
     raise_exception = True
     model = Institution
+
+    def test_func(self):
+        """check user authentication"""
+        # login check
+        if not self.is_authenticated:
+            return False
+
+        return self.is_super_admin or self.is_admin \
+              and self.request.user.affiliated_institutions.exists()
 
     def merge_data(self, institutions):
         """ merge all institution storage names into the list of organization names
@@ -213,10 +235,34 @@ class InstitutionStorageList(RdmPermissionMixin, ListView):
         return super(InstitutionStorageList, self).get_context_data(**kwargs)
 
 
-class UserListByInstitutionStorageID(RdmPermissionMixin, QuotaUserStorageList):
+class UserListByInstitutionStorageID(RdmPermissionMixin, UserPassesTestMixin, QuotaUserStorageList):
     template_name = 'institutional_storage_quota_control/list_institute.html'
     raise_exception = True
     paginate_by = 25
+    institution_id = None
+    institution = None
+    region_id = None
+    region = None
+
+    def test_func(self):
+        """check user authentication"""
+        # login check
+        if not self.is_authenticated:
+            return False
+
+        # Get institution information
+        self.institution_id = int(self.kwargs.get('institution_id'))
+        self.institution = Institution.objects.filter(id=self.institution_id, is_deleted=False).first()
+        if not self.institution:
+            raise Http404(f'Institution with id "{self.institution_id}" not found. Please double check.')
+
+        # Get region information
+        self.region_id = int(self.kwargs.get('region_id'))
+        self.region = Region.objects.filter(id=self.region_id).first()
+        if not self.region:
+            raise Http404(f'Region with id "{self.region_id}" not found. Please double check.')
+
+        return self.institution._id == self.region._id and self.has_auth(self.institution_id)
 
     def get_institution(self):
         region = self.get_region()
@@ -225,7 +271,7 @@ class UserListByInstitutionStorageID(RdmPermissionMixin, QuotaUserStorageList):
                 'where addons_osfstorage_region._id = osf_institution._id ' \
                 'and addons_osfstorage_region.id = {region_id}'.format(region_id=region.id)
         institution = Institution.objects.filter(
-            id=self.kwargs['institution_id']
+            id=self.institution_id
         ).extra(
             select={
                 'storage_name': query,
@@ -236,43 +282,51 @@ class UserListByInstitutionStorageID(RdmPermissionMixin, QuotaUserStorageList):
     def get_user_list(self):
         user_list = []
         for user in OSFUser.objects.filter(
-                affiliated_institutions=self.kwargs['institution_id']
+                affiliated_institutions=self.institution_id
         ):
             user_list.append(self.get_user_storage_quota_info(user))
         return user_list
 
     def get_region(self):
-        region_id = self.kwargs['region_id']
-        institution_id = self.kwargs['institution_id']
-        region = Region.objects.filter(id=region_id).first()
-        institution = Institution.objects.filter(id=institution_id).first()
-        if not region or not institution or institution._id != region._id:
-            raise Http404
-        return region
+        return self.region
 
 
-class UpdateQuotaUserListByInstitutionStorageID(RdmPermissionMixin, View):
+class UpdateQuotaUserListByInstitutionStorageID(RdmPermissionMixin, UserPassesTestMixin, View):
     raise_exception = True
+    institution_id = None
+    institution = None
+
+    def test_func(self):
+        """check user permissions"""
+        # login check
+        if not self.is_authenticated:
+            return False
+
+        self.institution_id = int(self.kwargs.get('institution_id'))
+        self.institution = Institution.objects.filter(id=self.institution_id, is_deleted=False).first()
+        if not self.institution:
+            raise Http404(f'Institution with id "{self.institution_id}" not found. Please double check.')
+        return self.has_auth(self.institution_id)
 
     def post(self, request, *args, **kwargs):
-        institution_id = self.kwargs['institution_id']
         min_value, max_value = connection.ops.integer_field_range('IntegerField')
         region_id = self.request.POST.get('region_id', None)
-        region = Region.objects.filter(id=region_id).first()
-        institution = Institution.objects.filter(id=institution_id).first()
-        if not region or not institution or institution._id != region._id:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+        try:
+            region = Region.objects.get(id=int(region_id))
+        except (ValueError, TypeError):
+            return render_bad_request_response(request, error_msgs='The region id must be a integer')
+        except Region.DoesNotExist:
+            raise Http404(f'Region with id "{region_id}" not found. Please double check.')
 
+        if self.institution._id != region._id:
+            return render_bad_request_response(request, error_msgs='The region not same institution')
         try:
             max_quota = min(int(self.request.POST.get('maxQuota')), max_value)
         except (ValueError, TypeError):
-            return redirect(
-                'institutional_storage_quota_control:institution_user_list',
-                institution_id=institution_id, region_id=region_id
-            )
+            return render_bad_request_response(request=request, error_msgs='maxQuota must be a integer')
 
         for user in OSFUser.objects.filter(
-                affiliated_institutions=institution_id):
+                affiliated_institutions=self.institution_id):
             UserStorageQuota.objects.update_or_create(
                 user=user,
                 region=region,
@@ -281,5 +335,5 @@ class UpdateQuotaUserListByInstitutionStorageID(RdmPermissionMixin, View):
 
         return redirect(
             'institutional_storage_quota_control:institution_user_list',
-            institution_id=institution_id, region_id=region_id
+            institution_id=self.institution_id, region_id=region_id
         )

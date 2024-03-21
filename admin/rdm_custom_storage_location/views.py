@@ -22,8 +22,8 @@ from osf.models.external import ExternalAccountTemporary
 from scripts import refresh_addon_tokens
 from website import settings as osf_settings
 from distutils.util import strtobool
-from framework.exceptions import HTTPError
 from api.base import settings as api_settings
+from admin.rdm.utils import get_institution_id_by_region
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,11 @@ SITE_KEY = 'rdm_custom_storage_location'
 class InstitutionalStorageBaseView(RdmPermissionMixin, UserPassesTestMixin):
     """ Base class for all the Institutional Storage Views """
     def test_func(self):
-        """ Check user permissions """
+        """check user authentication"""
+        # login check
+        if not self.is_authenticated:
+            return False
+
         return not self.is_super_admin and self.is_admin and \
             self.request.user.affiliated_institutions.exists()
 
@@ -42,6 +46,7 @@ class InstitutionalStorageView(InstitutionalStorageBaseView, TemplateView):
     """ View that shows the Institutional Storage's template """
     model = Institution
     template_name = 'rdm_custom_storage_location/institutional_storage.html'
+    raise_exception = True
 
     def get_context_data(self, *args, **kwargs):
         if not (self.is_admin and self.request.user.affiliated_institutions.exists()):
@@ -103,6 +108,7 @@ class TestConnectionView(InstitutionalStorageBaseView, View):
     """ View for testing the credentials to connect to a provider.
     Called when clicking the 'Connect' Button.
     """
+    raise_exception = True
     def post(self, request):
         data = json.loads(request.body)
 
@@ -198,6 +204,8 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
     """ View for saving the credentials to the provider into the database.
     Called when clicking the 'Save' Button.
     """
+    raise_exception = True
+
     def post(self, request):
         institution = request.user.affiliated_institutions.first()
         institution_id = institution._id
@@ -349,6 +357,9 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
                     new_storage_name=new_storage_name,
                 )
             elif provider_short_name == 'onedrivebusiness':
+                # onedrivebusiness not support storage name
+                storage_name = ''
+                new_storage_name = None
                 result = utils.save_onedrivebusiness_credentials(
                     request.user,
                     storage_name,
@@ -614,35 +625,21 @@ class UserMapView(InstitutionalStorageBaseView, View):
         return resp
 
 
-class ChangeAllowedViews(InstitutionalStorageBaseView, View):
-
-    def post(self, request):
-        data = json.loads(request.body)
-        region_id = data.get('id')
-        is_allowed = data.get('is_allowed')
-        if not region_id:
-            response = {
-                'message': 'Failed to change Allow settings.'
-            }
-            return JsonResponse(response, status=http_status.HTTP_400_BAD_REQUEST)
-        region = Region.objects.filter(id=region_id)
-        if region is None:
-            raise HTTPError(http_status.HTTP_404_NOT_FOUND)
-
-        allowed_regions = Region.objects.filter(_id=region[0]._id, is_allowed=True)
-        # At least 1 region is allowed
-        if allowed_regions.count() > 1 \
-                or (allowed_regions.count() == 1 and is_allowed is True):
-            region.update(is_allowed=is_allowed)
-
-        return JsonResponse({}, status=http_status.HTTP_200_OK)
-
-
 class CheckExistingStorage(InstitutionalStorageBaseView, View):
+    raise_exception = True
 
     def post(self, request):
         institution = request.user.affiliated_institutions.first()
-        data = json.loads(request.body)
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return JsonResponse({'message': 'The request body data is invalid'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+
+        if not data:
+            return JsonResponse({'message': 'The request body data is required'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+
         provider_name = data.get('provider')
         region = Region.objects.filter(
             _id=institution._id,
@@ -658,38 +655,27 @@ class CheckExistingStorage(InstitutionalStorageBaseView, View):
             return JsonResponse(response, status=http_status.HTTP_409_CONFLICT)
 
 
-class ChangeReadonlyViews(InstitutionalStorageBaseView, View):
-
-    def post(self, request):
-        data = json.loads(request.body)
-        region_id = data.get('id')
-        is_readonly = data.get('is_readonly')
-        if not region_id:
-            response = {
-                'message': 'Failed to change Read-only settings.'
-            }
-            return JsonResponse(response, status=http_status.HTTP_400_BAD_REQUEST)
-
-        regions = Region.objects.filter(id=region_id)
-
-        if regions is None:
-            return JsonResponse(
-                {'message': 'Failed to change Read-only settings.'},
-                status=http_status.HTTP_400_BAD_REQUEST
-            )
-        regions.update(is_readonly=is_readonly)
-        return JsonResponse({}, status=http_status.HTTP_200_OK)
-
-
 class ChangeAuthenticationAttributeView(InstitutionalStorageBaseView, View):
+    raise_exception = True
 
     def post(self, request):
-        data = json.loads(request.body)
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return JsonResponse({'message': 'The request body data is invalid'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+
+        if not data:
+            return JsonResponse({'message': 'The request body data is required'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+
         institution = request.user.affiliated_institutions.first()
         is_authentication_attribute = data.get('is_active', None)
 
-        if is_authentication_attribute is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+        if is_authentication_attribute is None \
+                or not isinstance(is_authentication_attribute, bool):
+            return JsonResponse({'message': 'The is_active parameter is missing or not a boolean value'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
 
         institution.is_authentication_attribute = is_authentication_attribute
         institution.save()
@@ -697,11 +683,14 @@ class ChangeAuthenticationAttributeView(InstitutionalStorageBaseView, View):
         return JsonResponse({}, status=http_status.HTTP_200_OK)
 
 
-class AddAttributeFormView(RdmPermissionMixin, View):
+class AddAttributeFormView(InstitutionalStorageBaseView, View):
+    raise_exception = True
 
     def post(self, request, **kwargs):
-
         institution = request.user.affiliated_institutions.first()
+        if not institution.is_authentication_attribute:
+            return JsonResponse({'message': 'The institution can not access control by authentication attributes'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
 
         max_current_index_number = AuthenticationAttribute.objects.filter(
             institution=institution
@@ -725,9 +714,8 @@ class AddAttributeFormView(RdmPermissionMixin, View):
                     index_number = deleted_first_attribute.index_number
                     is_deleted = True
                 else:
-                    return JsonResponse({
-                        'message': 'The maximum number of registrations has been reached.'
-                    }, status=http_status.HTTP_404_NOT_FOUND)
+                    return JsonResponse({'message': 'The maximum number of registrations has been reached.'},
+                                         status=http_status.HTTP_404_NOT_FOUND)
 
         if is_deleted:
             deleted_first_attribute.restore()
@@ -740,19 +728,49 @@ class AddAttributeFormView(RdmPermissionMixin, View):
 
 
 class DeleteAttributeFormView(InstitutionalStorageBaseView, View):
+    raise_exception = True
 
     def post(self, request):
-        data = json.loads(request.body)
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return JsonResponse({'message': 'The request body data is invalid'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+
+        if not data:
+            return JsonResponse({'message': 'The request body data is required'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+
         institution = request.user.affiliated_institutions.first()
+
+        if not institution.is_authentication_attribute:
+            return JsonResponse({'message': 'The institution can not access control by authentication attributes'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+
         attribute_id = data.get('id', None)
         if attribute_id is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-        regions = Region.objects.filter(_id=institution._id)
+            return JsonResponse({'message': 'Missing required parameter'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+
         try:
-            attribute = AuthenticationAttribute.objects.get(id=attribute_id)
+            attribute = AuthenticationAttribute.objects.get(
+                id=int(attribute_id), is_deleted=False, institution=institution
+            )
+        except ValueError:
+            return JsonResponse(
+                {"message": "The AuthenticationAttribute id must be a integer"},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
         except AuthenticationAttribute.DoesNotExist:
-            raise HTTPError(http_status.HTTP_404_NOT_FOUND)
+            return JsonResponse(
+                {
+                    "message": f"The AuthenticationAttribute with id {attribute_id} is not exist"
+                },
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
         is_used = False
+        regions = Region.objects.filter(_id=institution._id)
         for region in regions:
             if region.allow_expression is not None:
                 is_used = utils.check_index_number_exists(region.allow_expression, attribute.index_number)
@@ -764,98 +782,156 @@ class DeleteAttributeFormView(InstitutionalStorageBaseView, View):
                     break
 
         if is_used:
-            return JsonResponse({
-                'message': 'Cannot be deleted because it is in use.'
-            }, status=http_status.HTTP_400_BAD_REQUEST)
-        else:
-            try:
-                attribute.delete()
-            except AuthenticationAttribute.DoesNotExist:
-                raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+            return JsonResponse({'message': 'Cannot be deleted because it is in use.'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
 
+        attribute.delete()
         return JsonResponse({}, status=http_status.HTTP_200_OK)
 
 
 class SaveAttributeFormView(InstitutionalStorageBaseView, View):
+    raise_exception = True
 
     def post(self, request):
-        data = json.loads(request.body)
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return JsonResponse({'message': 'The request body data is invalid'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+
+        if not data:
+            return JsonResponse({'message': 'The request body data is required'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
         attribute_id = data.get('id', None)
         attribute_name = data.get('attribute', None)
         attribute_value = data.get('attribute_value', None)
         if attribute_id is None or attribute_name is None or attribute_value is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+            return JsonResponse({'message': 'Missing required parameter'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
 
         if attribute_name not in api_settings.ATTRIBUTE_LIST:
-            return JsonResponse({
-                'message': 'Please specify a valid attribute name.'
-            }, status=http_status.HTTP_400_BAD_REQUEST)
+            return JsonResponse({'message': 'Please specify a valid attribute name.'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+
+        institution = request.user.affiliated_institutions.first()
+
+        if not institution.is_authentication_attribute:
+            return JsonResponse({'message': 'The institution can not access control by authentication attributes'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
 
         try:
-            attribute = AuthenticationAttribute.objects.get(id=attribute_id)
-        except AuthenticationAttribute.DoesNotExist:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
-
-        if not attribute.is_deleted:
+            attribute = AuthenticationAttribute.objects.get(id=int(attribute_id), is_deleted=False, institution=institution)
             attribute.attribute_name = attribute_name
             attribute.attribute_value = attribute_value
             attribute.save()
-
-        return JsonResponse({}, status=http_status.HTTP_200_OK)
+            return JsonResponse({}, status=http_status.HTTP_200_OK)
+        except ValueError:
+            return JsonResponse({
+                'message': 'The AuthenticationAttribute id must be a integer'
+            }, status=http_status.HTTP_400_BAD_REQUEST)
+        except AuthenticationAttribute.DoesNotExist:
+            return JsonResponse({'message': f'The AuthenticationAttribute with id {attribute_id} is not exist'},
+                                 status=http_status.HTTP_404_NOT_FOUND)
 
 
 class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
+    raise_exception = True
 
     def post(self, request):
-        data = json.loads(request.body)
-        region_id = data.get('region_id', None)
-        allow = data.get('allow', None)
-        readonly = data.get('readonly', None)
-        allow_expression = data.get('allow_expression', None)
-        readonly_expression = data.get('readonly_expression', None)
-        storage_name = data.get('storage_name', None)
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return JsonResponse({'message': 'The request body data is invalid'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+
+        if not data:
+            return JsonResponse({'message': 'The request body data is required'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
+        region_id = data.get("region_id", None)
+        allow = data.get("allow", None)
+        readonly = data.get("readonly", None)
+        allow_expression = data.get("allow_expression", None)
+        readonly_expression = data.get("readonly_expression", None)
+        storage_name = data.get("storage_name", None)
         if region_id is None or allow is None or readonly is None:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+            return JsonResponse(
+                {"message": "Missing required parameter"},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
 
-        is_valid_allow = utils.validate_logic_expression(allow_expression)
-        is_valid_readonly = utils.validate_logic_expression(readonly_expression)
-
-        if not is_valid_allow or not is_valid_readonly:
-            return JsonResponse({
-                'message': 'Invalid condition.'
-            }, status=http_status.HTTP_400_BAD_REQUEST)
+        if not isinstance(allow, bool) or not isinstance(readonly, bool):
+            return JsonResponse({'message': 'The allow and readonly parameter must be boolean value'},
+                                 status=http_status.HTTP_400_BAD_REQUEST)
 
         institution = request.user.affiliated_institutions.first()
-        index_numbers = list(AuthenticationAttribute.objects.filter(
-            institution=institution,
-            is_deleted=False,
-            attribute_name__isnull=False,
-            attribute_value__isnull=False).values_list('index_number', flat=True))
-        is_valid_allow = utils.validate_index_number_not_found(allow_expression, index_numbers)
-        is_valid_readonly = utils.validate_index_number_not_found(readonly_expression, index_numbers)
 
-        if not is_valid_allow or not is_valid_readonly:
-            return JsonResponse({
-                'message': 'Invalid condition.'
-            }, status=http_status.HTTP_400_BAD_REQUEST)
+        if institution.is_authentication_attribute:
+            is_valid_allow = utils.validate_logic_expression(allow_expression)
+            is_valid_readonly = utils.validate_logic_expression(readonly_expression)
+
+            if not is_valid_allow or not is_valid_readonly:
+                return JsonResponse(
+                    {"message": "Invalid condition."},
+                    status=http_status.HTTP_400_BAD_REQUEST,
+                )
+
+            index_numbers = list(
+                AuthenticationAttribute.objects.filter(
+                    institution=institution,
+                    is_deleted=False,
+                    attribute_name__isnull=False,
+                    attribute_value__isnull=False,
+                ).values_list("index_number", flat=True)
+            )
+            is_valid_allow = utils.validate_index_number_not_found(
+                allow_expression, index_numbers
+            )
+            is_valid_readonly = utils.validate_index_number_not_found(
+                readonly_expression, index_numbers
+            )
+
+            if not is_valid_allow or not is_valid_readonly:
+                return JsonResponse(
+                    {"message": "Invalid condition."},
+                    status=http_status.HTTP_400_BAD_REQUEST,
+                )
 
         try:
-            region = Region.objects.get(id=region_id)
+            region = Region.objects.get(id=int(region_id))
+            if not self.is_affiliated_institution(get_institution_id_by_region(region)):
+                return self.handle_no_permission()
+
             if storage_name:
                 regions = Region.objects.filter(
                     _id=institution._id, name=storage_name
                 ).exclude(id=region.id)
                 if regions.exists():
-                    return JsonResponse({
-                        'message': 'The name of institutional storage already exists.'
-                    }, status=http_status.HTTP_400_BAD_REQUEST)
+                    return JsonResponse(
+                        {
+                            "message": "The name of institutional storage already exists."
+                        },
+                        status=http_status.HTTP_400_BAD_REQUEST,
+                    )
                 region.name = storage_name
             region.is_allowed = allow
             region.is_readonly = readonly
-            region.allow_expression = allow_expression
-            region.readonly_expression = readonly_expression
+            if institution.is_authentication_attribute:
+                region.allow_expression = allow_expression
+                region.readonly_expression = readonly_expression
             region.save()
-        except Region.DoesNotExist:
-            raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
+            return JsonResponse({}, status=http_status.HTTP_200_OK)
 
-        return JsonResponse({}, status=http_status.HTTP_200_OK)
+        except ValueError:
+            return JsonResponse(
+                {
+                    "message": "The Region id must be a integer"
+                },
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        except Region.DoesNotExist:
+            return JsonResponse(
+                {
+                    "message": f"The Region with id {region_id} is not exist"
+                },
+                status=http_status.HTTP_404_NOT_FOUND,
+            )

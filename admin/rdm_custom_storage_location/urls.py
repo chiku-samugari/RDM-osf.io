@@ -12,8 +12,6 @@ urlpatterns = [
     url(r'^fetch_temporary_token/$', views.FetchTemporaryTokenView.as_view(), name='fetch_temporary_token'),
     url(r'^remove_auth_data_temporary/$', views.RemoveTemporaryAuthData.as_view(), name='remove_auth_data_temporary'),
     url(r'^usermap/$', views.UserMapView.as_view(), name='usermap'),
-    url(r'^change_allow/$', views.ChangeAllowedViews.as_view(), name='change_allow'),
-    url(r'^change_readonly/$', views.ChangeReadonlyViews.as_view(), name='change_readonly'),
     url(r'^check_existing_storage/$', views.CheckExistingStorage.as_view(), name='check_existing_storage'),
     url(r'^change_attribute_authentication/$', views.ChangeAuthenticationAttributeView.as_view(),
         name='change_attribute_authentication'),

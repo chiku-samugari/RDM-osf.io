@@ -19,6 +19,7 @@ from addons.base.models import BaseNodeSettings, BaseStorageAddon
 from framework.auth import Auth
 from addons.osfstorage.models import Region, NodeSettings
 from osf.models.institution import Institution
+from website.util import check_authentication_attribute
 
 
 logger = logging.getLogger(__name__)
@@ -203,17 +204,19 @@ class InstitutionsStorageAddon(BaseStorageAddon):
         institution = Institution.objects.get(id=institution_id)
         regions = Region.objects.filter(_id=institution._id, waterbutler_settings__storage__provider=addon_name).order_by('id')
         idx = 0
-        rdm_options = RdmAddonOption.objects.filter(institution_id=institution_id).order_by('id')
-        rdm_option_indexs = []
-        index = 0
-        for rdm_option in rdm_options:
-            if rdm_option.provider == addon_name:
-                rdm_option_indexs.append(index)
-            index = index + 1
+        # rdm_options = RdmAddonOption.objects.filter(institution_id=institution_id).order_by('id')
+        # rdm_option_indexs = []
+        # index = 0
+        # for rdm_option in rdm_options:
+        #     if rdm_option.provider == addon_name:
+        #         rdm_option_indexs.append(index)
+        #     index = index + 1
 
         for addon_option in addon_options:
             # For each addon option will create a addon node setting
-            if addon_option.is_allowed:
+            region = regions[idx]
+            idx = idx + 1
+            if addon_option.is_allowed and region.is_allowed:
                 provider = cls.cls_provider_switch(addon_option)
                 client = cls.get_client(provider)
 
@@ -224,7 +227,6 @@ class InstitutionsStorageAddon(BaseStorageAddon):
                 # create_folder() may raise
                 cls.create_folder(client, base_folder, folder_name)
                 try:
-                    region = regions[idx]
                     osfstorage_nodesetting = NodeSettings.objects.filter(owner_id=node.get_root().id, is_deleted=False, region_id=region.id).first()
                     addon = node.add_addon(addon_name, auth=Auth(node.creator),
                                         log=True, region_id=region.id)
@@ -234,7 +236,6 @@ class InstitutionsStorageAddon(BaseStorageAddon):
                     addon.set_root_node_id(osfstorage_nodesetting.root_node.id)
                     addon.save()
                     addons.append(addon)
-                    idx = idx + 1
                 except Exception:
                     try:
                         cls.remove_folder(client, base_folder, folder_name)

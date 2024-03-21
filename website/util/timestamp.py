@@ -651,15 +651,17 @@ def file_created_or_updated(node, metadata, user_id, created_flag):
     add_token(user_id, node, file_info)
 
     # Update created/modified user in timestamp result
-    verify_data = RdmFileTimestamptokenVerifyResult.objects.get(file_id=file_info['file_id'])
-    if created_flag:
-        verify_data.upload_file_created_user = user_id
-    else:  # Updated
-        verify_data.upload_file_modified_user = user_id
-    verify_data.upload_file_created_at = file_info['created']
-    verify_data.upload_file_modified_at = file_info['modified']
-    verify_data.upload_file_size = file_info['size']
-    verify_data.save()
+    verify_data = RdmFileTimestamptokenVerifyResult.objects.filter(file_id=file_info['file_id']).first()
+    if verify_data:
+        if created_flag:
+            verify_data.upload_file_created_user = user_id
+        else:  # Updated
+            verify_data.upload_file_modified_user = user_id
+        verify_data.upload_file_created_at = file_info['created']
+        verify_data.upload_file_modified_at = file_info['modified']
+        verify_data.upload_file_size = file_info['size']
+        verify_data.save()
+
 
 def get_child_file_metadata(metadata, metadata_children, root_path):
     children = metadata.get('children', [])

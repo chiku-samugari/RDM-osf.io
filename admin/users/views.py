@@ -55,6 +55,7 @@ from addons.osfstorage.models import Region
 from rest_framework import status as http_status
 from admin.base.utils import reverse_qs
 from framework.exceptions import HTTPError
+from admin.base.utils import render_bad_request_response
 
 logger = logging.getLogger(__name__)
 
@@ -790,51 +791,97 @@ class UserDetailsView(RdmPermissionMixin, UserPassesTestMixin, GuidView):
     """
     template_name = 'users/user_details.html'
     context_object_name = 'current_user'
+    raise_exception = True
+    user = None
 
     def test_func(self):
-        return not self.is_super_admin and self.is_admin \
-            and self.request.user.affiliated_institutions.exists()
+        """check user permissions"""
+        # login check
+        if not self.is_authenticated:
+            return False
+
+        # permitted if is admin and login user has institution
+        if not self.is_super_admin and self.is_admin \
+         and self.request.user.affiliated_institutions.exists():
+            self.user = OSFUser.load(self.kwargs.get('guid'))
+            return self.has_auth(self.user.affiliated_institutions.first().id)
+        else:
+            return False
 
     def get_object(self, queryset=None):
-        user = OSFUser.load(self.kwargs.get('guid'))
         region_id = self.request.GET.get('region_id', None)
         if region_id:
-            institution = user.affiliated_institutions.first()
-            region = Region.objects.filter(id=region_id).first()
-            if region and institution and institution._id == region._id:
+            institution = self.user.affiliated_institutions.first()
+            try:
+                region = Region.objects.get(id=int(region_id))
+            except ValueError:
+                return render_bad_request_response(self.request, 'The Region id must be a integer')
+            except Region.DoesNotExist:
+                raise Http404(f'The Region with id {region_id} is not exist')
+            if institution._id == region._id:
                 max_quota, _ = quota.get_storage_quota_info(
-                    user,
+                    self.user,
                     region
                 )
             else:
-                raise Http404
+                return render_bad_request_response(self.request, 'The Region not same institution')
         else:
-            max_quota, _ = quota.get_quota_info(user, UserQuota.CUSTOM_STORAGE)
+            max_quota, _ = quota.get_quota_info(self.user, UserQuota.CUSTOM_STORAGE)
         return {
-            'username': user.username,
-            'name': user.fullname,
-            'id': user._id,
-            'nodes': list(map(serialize_simple_node, user.contributor_to)),
+            'username': self.user.username,
+            'name': self.user.fullname,
+            'id': self.user._id,
+            'nodes': list(map(serialize_simple_node, self.user.contributor_to)),
             'quota': max_quota,
             'region_id': region_id if region_id is not None else ''
         }
 
 
-class UserInstitutionQuotaView(RdmPermissionMixin, UserPassesTestMixin, BaseUserQuotaView):
+class UserInstitutionQuotaView(RdmPermissionMixin, UserPassesTestMixin, View):
     """
     User screen for institution managers.
     """
+    raise_exception = True
+    user = None
+
     def test_func(self):
-        return not self.is_super_admin and self.is_admin \
-            and self.request.user.affiliated_institutions.exists()
+        """check user permissions"""
+        # login check
+        if not self.is_authenticated:
+            return False
+
+        # permitted if is admin and login user has institution
+        if not self.is_super_admin and self.is_admin \
+         and self.request.user.affiliated_institutions.exists():
+            self.user = OSFUser.load(self.kwargs.get('guid'))
+            return self.has_auth(self.user.affiliated_institutions.first().id)
+        else:
+            return False
 
     def post(self, request, *args, **kwargs):
         region_id = request.POST.get('region_id', None)
-
-        self.update_quota(
-            request.POST.get('maxQuota'),
-            region_id
-        )
+        max_quota = request.POST.get('maxQuota', None)
+        institution = self.user.affiliated_institutions.first()
+        if region_id and max_quota:
+            try:
+                max_quota = int(max_quota)
+                region = Region.objects.get(id=int(region_id))
+                if max_quota <= 0:
+                    max_quota = 1
+            except ValueError:
+                return render_bad_request_response(self.request, 'The Region id and maxQuota must be a integer')
+            except Region.DoesNotExist:
+                raise Http404(f'The Region with id {region_id} is not exist')
+            if institution._id == region._id:
+                UserStorageQuota.objects.update_or_create(
+                    user=self.user,
+                    region=region,
+                    defaults={'max_quota': max_quota}
+                )
+            else:
+                return render_bad_request_response(self.request, 'The Region not same user institution')
+        else:
+            return render_bad_request_response(self.request, 'The Region id and maxQuota is required')
 
         return redirect(
             reverse_qs(
