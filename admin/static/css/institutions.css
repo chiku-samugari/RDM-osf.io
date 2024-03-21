@@ -125,8 +125,14 @@ input.apple-switch.checked:after {
 
 .fixed-table-cell {
     min-width: 100px;
+    word-wrap: break-word;
+    max-width: 200px;
+    white-space: normal !important;
 }
 
 .table-header-cell {
     background-color: #f9f9f9;
+    word-wrap: break-word;
+    max-width: 150px;
+    white-space: normal !important;
 }

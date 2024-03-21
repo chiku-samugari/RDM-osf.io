@@ -327,10 +327,10 @@ AddContributorViewModel = oop.extend(Paginator, {
     validateInviteForm: function () {
         var self = this;
         // Make sure Full Name is not blank
-        if (!self.inviteName().trim().length) {
+        if (!self.inviteName() || !self.inviteName().trim().length) {
             return _('Full Name is required.');
         }
-        if (self.inviteEmail() && !$osf.isEmail(self.inviteEmail().replace(/^\s+|\s+$/g, ''))) {
+        if (!self.inviteEmail() || !$osf.isEmail(self.inviteEmail().replace(/^\s+|\s+$/g, ''))) {
             return _('Not a valid email address.');
         }
         // Make sure that entered email is not already in selection
@@ -510,15 +510,15 @@ AddContributorViewModel = oop.extend(Paginator, {
     onInviteError: function (xhr) {
         var self = this;
         if (xhr.status === 403) {
-            var continueHandle = $osf.handleErrorResponse(xhr);
-            if (continueHandle === false) {
+            if ($osf.handleErrorResponse(xhr) === false) {
                 return;
             }
             self.inviteError(_('You do not have permission to operate a project.'));
+        } else {
+            var response = JSON.parse(xhr.responseText);
+            // Update error message
+            self.inviteError(response.message);
         }
-        var response = JSON.parse(xhr.responseText);
-        // Update error message
-        self.inviteError(response.message);
         self.canSubmit(true);
     },
     hasChildren: function() {

@@ -2968,6 +2968,9 @@ msgstr ""
 msgid "Service Access Control Setting Management"
 msgstr ""
 
+msgid "No data found"
+msgstr ""
+
 msgid "Create setting"
 msgstr ""
 

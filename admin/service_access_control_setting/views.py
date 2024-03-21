@@ -21,7 +21,7 @@ from rest_framework import status as http_status
 from osf.exceptions import ValidationError
 from osf.models import Function, Institution
 from osf.models.service_access_control_setting import ServiceAccessControlSetting
-from admin.base.schemas.utils import from_json
+from admin.base.schemas.utils import validate_json_schema, validate_config_schema
 from admin.base.settings import BASE_DIR
 from admin.rdm.utils import RdmPermissionMixin
 
@@ -64,7 +64,7 @@ class ServiceAccessControlSettingView(UserPassesTestMixin, RdmPermissionMixin, L
         institution_subquery = Institution.objects.filter(_id=OuterRef('institution_id')).values('name')
         # Create queryset
         queryset = ServiceAccessControlSetting.objects.filter(
-            functions__isnull=False, is_deleted=False
+            functions__is_deleted=False, is_deleted=False
         ).annotate(
             institution_name=Subquery(institution_subquery), function_codes=ArrayAgg('functions__function_code')
         ).order_by('institution_name', 'domain', 'is_ial2_or_aal2', 'user_domain')
@@ -84,10 +84,8 @@ class ServiceAccessControlSettingView(UserPassesTestMixin, RdmPermissionMixin, L
             # Load JSON config data
             with open(os.path.join(BASE_DIR, CONFIG_PATH), encoding='utf-8') as fp:
                 config_data = json.load(fp, object_pairs_hook=OrderedDict)
-            # Load config data schema json file
-            function_config_schema = from_json(CONFIG_SCHEMA_FILE_NAME)
             # Validate config data with the JSON schema
-            jsonschema.validate(config_data, function_config_schema)
+            validate_config_schema(config_data, CONFIG_SCHEMA_FILE_NAME)
         except Exception:
             # Return no data
             return {
@@ -152,16 +150,20 @@ class ServiceAccessControlSettingCreateView(UserPassesTestMixin, RdmPermissionMi
                 # Load setting data from uploaded JSON file
                 file = self.parse_file(request.FILES['file'])
                 setting_json = json.loads(file)
-            except ValueError as e:
+            except json.decoder.JSONDecodeError as e:
+                # Fail to decode JSON file, return HTTP 400
+                logger.error(f'JSON file is invalid: {e}')
+                response_body = JSON_FILE_INVALID_RESPONSE
+                status_code = http_status.HTTP_400_BAD_REQUEST
+                raise e
+            except Exception as e:
                 # Fail to load setting data, return HTTP 500
                 logger.error(f'Fail to load setting data with error {e}')
                 raise e
 
             try:
-                # Load setting JSON schema file
-                setting_schema = from_json(SERVICE_ACCESS_CONTROL_SCHEMA_FILE_NAME)
                 # Validate setting data with the JSON schema
-                jsonschema.validate(setting_json, setting_schema)
+                validate_json_schema(setting_json, SERVICE_ACCESS_CONTROL_SCHEMA_FILE_NAME)
             except (jsonschema.ValidationError, jsonschema.SchemaError) as e:
                 logger.error(f'JSON file is invalid: {e}')
                 response_body = JSON_FILE_INVALID_RESPONSE
@@ -172,10 +174,8 @@ class ServiceAccessControlSettingCreateView(UserPassesTestMixin, RdmPermissionMi
                 # Load config data file
                 with open(os.path.join(BASE_DIR, CONFIG_PATH), encoding='utf-8') as fp:
                     function_config_json = json.load(fp)
-                # Load config data schema json file
-                function_config_schema = from_json(CONFIG_SCHEMA_FILE_NAME)
                 # Validate config data with the JSON schema
-                jsonschema.validate(function_config_json, function_config_schema)
+                validate_config_schema(function_config_json, CONFIG_SCHEMA_FILE_NAME)
             except Exception as e:
                 logger.error(f'Config data is invalid: {e}')
                 response_body = CONFIG_DATA_INVALID_RESPONSE
@@ -243,8 +243,9 @@ class ServiceAccessControlSettingCreateView(UserPassesTestMixin, RdmPermissionMi
                     # Bulk insert osf_service_access_control_setting
                     ServiceAccessControlSetting.objects.bulk_create(service_access_control_settings)
                     # Bulk insert osf_function
-                    for each in function_settings:
-                        each.service_access_control_setting_id = each.service_access_control_setting.id
+                    for function_setting_item in function_settings:
+                        # Assign now created osf_service_access_control_setting.id to osf_function.service_access_control_setting_id
+                        function_setting_item.service_access_control_setting_id = function_setting_item.service_access_control_setting.id
                     Function.objects.bulk_create(function_settings)
             except Exception as e:
                 logger.error(f'Exception raised in the create setting transaction: {e}')

@@ -40,7 +40,7 @@
                             {% trans "Project Limit Number" %}
                         </th>
                         {% for function_code, function_name in column_data.items %}
-                            <th class="text-center">{{ function_name }}</th>
+                            <th class="text-center fixed-table-cell">{{ function_name }}</th>
                         {% endfor %}
                     </tr>
                 </thead>
@@ -113,7 +113,7 @@
             </table>
         </div>
     {% else %}
-        <h3>{% trans "No results found" %}</h3>
+        <h3>{% trans "No data found" %}</h3>
     {% endif %}
 
 {% endblock content %}

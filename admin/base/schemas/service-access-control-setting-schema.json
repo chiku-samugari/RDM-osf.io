@@ -26,7 +26,8 @@
           },
           "project_limit_number": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 2147483647
           },
           "is_whitelist": {
             "type": "boolean"
@@ -47,10 +48,8 @@
           "is_whitelist",
           "function_codes"
         ]
-      },
-      "additionalProperties": false
+      }
     }
   },
-  "required": ["data"],
-  "additionalProperties": false
+  "required": ["data"]
 }

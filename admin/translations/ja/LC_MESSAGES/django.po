@@ -3024,6 +3024,9 @@ msgstr "タイムスタンプ機能を選択"
 msgid "Service Access Control Setting Management"
 msgstr "サービスアクセス制御管理"
 
+msgid "No data found"
+msgstr "データがありません。"
+
 msgid "Create setting"
 msgstr "設定作成"
 

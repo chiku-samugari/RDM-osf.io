@@ -244,7 +244,7 @@ var RemoveContributorViewModel = oop.extend(Paginator, {
                 }
             });
             self.clear();
-            window.location.reload();
+            $('.modal').modal('hide');
         });
     },
     deleteAllNodes: function() {

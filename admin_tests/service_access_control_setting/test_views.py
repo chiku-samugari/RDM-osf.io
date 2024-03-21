@@ -108,12 +108,12 @@ class TestServiceAccessControlSettingView(AdminTestCase):
         self.request.user.is_superuser = True
         self.request.user.affiliated_institutions.clear()
         with mock.patch('admin.service_access_control_setting.views.open', mock.mock_open(read_data=self.mock_config_json)) as mock_open_file:
-            with mock.patch('admin.service_access_control_setting.views.from_json') as mock_from_json:
-                mock_from_json.side_effect = ValueError('test fail to load file')
+            with mock.patch('admin.service_access_control_setting.views.validate_config_schema') as mock_validate_config_schema:
+                mock_validate_config_schema.side_effect = ValueError('test fail to load file')
                 self.view.object_list = self.view.get_queryset()
                 res = self.view.get_context_data()
                 mock_open_file.assert_called()
-                mock_from_json.assert_called()
+                mock_validate_config_schema.assert_called()
                 nt.assert_is_not_none(res)
                 nt.assert_equal(res['column_data'], {})
                 nt.assert_equal(res['row_data'], [])
@@ -186,10 +186,20 @@ class TestServiceAccessControlSettingCreateView(AdminTestCase):
             nt.assert_equal(res.status_code, http_status.HTTP_200_OK)
             nt.assert_equal(res.content, b'{}')
 
-    def test_post__read_upload_file_error(self):
+    def test_post__read_upload_file_not_json(self):
         self.request.user.is_superuser = True
         self.request.user.affiliated_institutions.clear()
         self.request.FILES['file'] = SimpleUploadedFile('text.txt', b'text')
+        with mock.patch('admin.service_access_control_setting.views.open', mock.mock_open(read_data=self.mock_config_json)) as mock_open_file:
+            res = self.view.post(self.request)
+            mock_open_file.assert_not_called()
+            nt.assert_equal(res.status_code, http_status.HTTP_400_BAD_REQUEST)
+            nt.assert_equal(res.content, b'{"message": "JSON file is invalid."}')
+
+    def test_post__read_upload_file_error(self):
+        self.request.user.is_superuser = True
+        self.request.user.affiliated_institutions.clear()
+        self.request.FILES['file'] = None
         with mock.patch('admin.service_access_control_setting.views.open', mock.mock_open(read_data=self.mock_config_json)) as mock_open_file:
             with nt.assert_raises(Exception):
                 self.view.post(self.request)
