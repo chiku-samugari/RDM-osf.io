@@ -3746,7 +3746,7 @@ msgstr "不明なエラーがありました。 後でもう一度やり直し�
 
 #: website/static/js/addProjectPlugin.js:58
 msgid "You do not have permission to operate a project."
-msgstr "プロジェクトを作成する権限がありません。"
+msgstr "プロジェクトに対する操作権限がありません。"
 
 #: website/static/js/addProjectPlugin.js:59
 msgid "The new project cannot be created due to the created project number is greater than or equal the project number can create."

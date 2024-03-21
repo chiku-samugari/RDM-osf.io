@@ -20,6 +20,8 @@ $.ajaxSetup({
 });
 
 $('#upload-button').click(function() {
+    // Clear file data before trigger file event
+    $('#file-upload').val('');
     // Trigger input[type='file'] click event
     $('#file-upload').click();
 });
@@ -36,25 +38,28 @@ $('#file-upload').change(function() {
         var formData = new FormData();
         formData.append('file', uploadFile);
         $.ajax({
-            url: 'setting/',
+            url: 'setting',
             type: 'POST',
             data: formData,
+            // Set processData to false to avoid processing file data
             processData: false,
+            // Set contentType to false to avoid adding "Content-Type" header in "multipart/form-data" request
             contentType: false,
             success: function(json) {
                 // Reload the page
                 window.location.reload();
             },
             error: function(jqXHR) {
-                // Reset input[type='file'] value
-                $('#file-upload').val('');
                 var data = jqXHR.responseJSON;
                 if (data && data['message']) {
                     // If response has message, show that message
                     $osf.growl('Error', _(data['message']), 'danger', 5000);
-                } else {
-                    // Otherwise, show default error message 'A server error occurred. Please contact the administrator.'
+                } else if (jqXHR.status === 500) {
+                    // If status is 500, show error message 'A server error occurred. Please contact the administrator.'
                     $osf.growl('Error', 'A server error occurred. Please contact the administrator.', 'danger', 5000);
+                } else {
+                    // Otherwise, show default error message
+                    $osf.growl('Error', _('Some errors occurred'), 'danger', 5000);
                 }
             }
         });

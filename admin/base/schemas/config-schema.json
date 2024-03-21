@@ -5,7 +5,8 @@
       "type": "object",
       "properties": {
         "function_name": {
-          "type": "string"
+          "type": "string",
+          "pattern": "\\S+"
         },
         "api_group": {
           "type": "array",
@@ -14,17 +15,19 @@
             "type": "object",
             "properties": {
               "api": {
-                "type": "string"
+                "type": "string",
+                "pattern": "\\S+"
               },
               "method": {
-                "type": "string"
+                "type": "string",
+                "pattern": "\\S+"
               }
             },
             "required": ["api", "method"]
           }
         }
       },
-      "additionalProperties": false
+      "required": ["function_name", "api_group"]
     }
   },
   "additionalProperties": false

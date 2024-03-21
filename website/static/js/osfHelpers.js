@@ -102,7 +102,12 @@ var ajaxJSON = function(method, url, options) {
     }
     $.extend(true, ajaxFields, opts.fields);
 
-    return $.ajax(ajaxFields);
+    return $.ajax(ajaxFields).fail(function(xhr) {
+        if (xhr.status === 403 && handleErrorResponse(xhr) === false) {
+            // If response status is 403, check if the response requests to redirect to 403 page
+            return;
+        }
+    });
 };
 
  /**
@@ -1071,15 +1076,12 @@ function handleErrorResponse(xhr) {
         var data = xhr.responseJSON;
         if (data && data.errors && data.errors.length > 0) {
             var error_message = data.errors[0];
-            if (error_message.type && error_message.type === 1) {
-                // Continue handle on client
-                return true;
+            if (error_message.type != null && error_message.type === 0) {
+                // Redirect to HTTP 403
+                window.location.href = '/403';
+                return false;
             }
         }
-
-        // Redirect to HTTP 403
-        window.location.href = '/403';
-        return false;
     }
     // Continue handle on client
     return true;

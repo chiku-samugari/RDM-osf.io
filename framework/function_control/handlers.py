@@ -2,13 +2,12 @@
 import logging
 import json
 import os
-import jsonschema
 import re
 
 from django.http import JsonResponse
 from flask import request, abort, Response
 from rest_framework import status as http_status
-from admin.base.schemas.utils import from_json
+from admin.base.schemas.utils import validate_config_schema
 from admin.base.settings import BASE_DIR
 from framework.flask import redirect
 
@@ -27,10 +26,8 @@ def check_api_service_access(request_url_path, request_method, user):
         # Load config data file
         with open(os.path.join(BASE_DIR, CONFIG_PATH), encoding='utf-8') as fp:
             function_config_json = json.load(fp)
-        # Load config data schema json file
-        schema = from_json(CONFIG_SCHEMA_FILE_NAME)
         # Validate config data with the JSON schema
-        jsonschema.validate(function_config_json, schema)
+        validate_config_schema(function_config_json, CONFIG_SCHEMA_FILE_NAME)
     except Exception as e:
         # Fail to load or validate config data, return None
         logger.warning(f'Failed to load config schema with exception {e}')
