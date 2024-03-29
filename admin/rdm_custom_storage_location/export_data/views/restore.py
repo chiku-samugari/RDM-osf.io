@@ -10,7 +10,6 @@ from celery.states import PENDING
 from celery.contrib.abortable import AbortableAsyncResult, ABORTED
 from django.db import transaction
 from django.db.models import Q
-from django.db.models.functions import Trunc
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from rest_framework import authentication as drf_authentication
