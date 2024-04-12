@@ -1,4 +1,3 @@
-import logging
 import json
 from operator import itemgetter
 from django.urls import reverse
@@ -7,7 +6,9 @@ import mock
 from django.test import RequestFactory
 from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied
+from django.http import Http404
 
+from addons.osfstorage.models import Region
 from api.base import settings as api_settings
 from api.base.settings import NII_STORAGE_REGION_ID
 from tests.base import AdminTestCase
@@ -18,18 +19,12 @@ from osf_tests.factories import (
     RegionFactory,
     UserFactory
 )
-from osf.models import Institution, Node, OSFUser, BaseFileNode
-from osf.models.user_storage_quota import UserStorageQuota
-
+from osf.models import Institution, Node, OSFUser, BaseFileNode, UserStorageQuota
 from admin_tests.utilities import setup_form_view, setup_user_view, setup_view
 
 from admin.institutions import views
 from admin.institutions.forms import InstitutionForm
 from admin.base.forms import ImportFileForm
-from addons.osfstorage.models import Region
-from django.http import Http404
-
-logger = logging.getLogger(__name__)
 
 
 class TestInstitutionList(AdminTestCase):
@@ -895,7 +890,6 @@ class TestRecalculateQuotaOfUsersInInstitution(AdminTestCase):
         self.user.save()
         self.request.user = self.user
         mock_region.filter.return_value.exists.return_value = False
-        logger.debug(f'self.url={self.url}')
         response = self.view.dispatch(request=self.request, region_id=self.region.id)
         nt.assert_equal(response.status_code, 302)
         nt.assert_equal(response.url, self.url)
@@ -908,7 +902,13 @@ class TestInstitutionalStorage(AdminTestCase):
         self.user = AuthUserFactory(fullname='fullname')
         self.institution = InstitutionFactory()
 
-        waterbutler_credentials = {'storage': {'region': 'PartsUnknown', 'username': 'mankind', 'token': 'heresmrsocko'}}
+        waterbutler_credentials = {
+            'storage': {
+                'region': 'PartsUnknown',
+                'username': 'mankind',
+                'token': 'heresmrsocko'
+            }
+        }
         waterbutler_settings = {'storage': {'provider': 's3', 'container': 'osf_storage', 'use_public': True}}
         self.region = Region.objects.create(
             name='Test s3',
@@ -1097,9 +1097,16 @@ class TestQuotaUserStorageList(AdminTestCase):
         addon.region = self.view.get_region()
         addon.save()
         project.creator.add_addon('osfstorage')
-        mock_basefilenode.return_value = [BaseFileNode(type='osf.osfstoragefile', target_content_type_id=2,
-                                 target_object_id=project.id, parent_id=addon.id,
-                                 deleted_on=None, deleted_by_id=None,)]
+        mock_basefilenode.return_value = [
+            BaseFileNode(
+                type='osf.osfstoragefile',
+                target_content_type_id=2,
+                target_object_id=project.id,
+                parent_id=addon.id,
+                deleted_on=None,
+                deleted_by_id=None,
+            )
+        ]
         response = self.view.get_user_storage_quota_info(user)
         nt.assert_equal(response['quota'], api_settings.DEFAULT_MAX_QUOTA)
 
@@ -1118,12 +1125,24 @@ class TestQuotaUserStorageList(AdminTestCase):
         def mock_files_effect(**kwargs):
             parent_id = kwargs.get('parent_id')
             if parent_id == addon.root_node_id:
-                return [BaseFileNode(type='osf.osfstoragefolder', target_content_type_id=2,
-                                     target_object_id=project.id, is_root=True,
-                                     deleted_on=None, deleted_by_id=None,),
-                        BaseFileNode(type='osf.osfstoragefile', target_content_type_id=2,
-                                     target_object_id=project.id, parent_id=addon.root_node_id,
-                                     deleted_on=None, deleted_by_id=None,)]
+                return [
+                    BaseFileNode(
+                        type='osf.osfstoragefolder',
+                        target_content_type_id=2,
+                        target_object_id=project.id,
+                        is_root=True,
+                        deleted_on=None,
+                        deleted_by_id=None,
+                    ),
+                    BaseFileNode(
+                        type='osf.osfstoragefile',
+                        target_content_type_id=2,
+                        target_object_id=project.id,
+                        parent_id=addon.root_node_id,
+                        deleted_on=None,
+                        deleted_by_id=None,
+                    )
+                ]
             return []
 
         mock_basefilenode.side_effect = mock_files_effect
@@ -1142,9 +1161,6 @@ class TestQuotaUserStorageList(AdminTestCase):
 class TestStatisticalStatusDefaultInstitutionalStorage(AdminTestCase):
     def setUp(self):
         self.institution = InstitutionFactory()
-        # self.us = RegionFactory()
-        # self.us._id = self.institution._id
-        # self.us.save()
         self.user = AuthUserFactory()
         self.user.affiliated_institutions.add(self.institution)
         self.user.save()
@@ -1201,7 +1217,6 @@ class TestStatisticalStatusDefaultInstitutionalStorage(AdminTestCase):
 
     def test_get_region_have_region_id(self):
         region = RegionFactory(id=10, name='Storage')
-        # request = RequestFactory().get('/fake_path?region_id={}'.format('10'))
         request = RequestFactory().get('/fake_path', kwargs={'region_id': region.id})
         request.user = self.user
         view = setup_view(

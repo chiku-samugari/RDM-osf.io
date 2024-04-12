@@ -10,7 +10,6 @@ from tests.base import OsfTestCase
 
 @pytest.mark.django_db
 class TestArchiveUtils(OsfTestCase):
-
     def setUp(self):
         super(TestArchiveUtils, self).setUp()
         self.config = {

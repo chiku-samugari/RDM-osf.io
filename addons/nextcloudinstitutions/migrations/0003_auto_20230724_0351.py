@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 from django.db import migrations, models
 import django.db.models.deletion
 
+
 def add_region_and_root_id_value(apps, schema_editor):
     NextcloudNodeSettings = apps.get_model('addons_nextcloudinstitutions', 'nodesettings')
     OsfNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
@@ -16,8 +17,10 @@ def add_region_and_root_id_value(apps, schema_editor):
                 nextcloud.root_node_id = osfnodesettings.root_node_id
                 nextcloud.save()
 
+
 def noop(*args):
     pass
+
 
 class Migration(migrations.Migration):
 

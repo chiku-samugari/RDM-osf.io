@@ -13,9 +13,7 @@ from osf_tests.factories import (
     RegionFactory
 )
 from osf.models import Institution, UserQuota, OSFUser
-
 from admin_tests.utilities import setup_view
-
 from admin.institutions import views
 
 
@@ -253,7 +251,7 @@ class TestUserListByInstitutionID(AdminTestCase):
 
     def test_default_user_list_by_institution_id(self, *args, **kwargs):
 
-        res = self.view.get_userlist()
+        res = self.view.get_user_list()
         nt.assert_is_instance(res, list)
 
     def test_search_email_by_institution_id(self):
@@ -268,7 +266,7 @@ class TestUserListByInstitutionID(AdminTestCase):
         view = views.UserListByInstitutionID()
         view = setup_view(view, request,
                           institution_id=self.institution.id)
-        res = view.get_userlist()
+        res = view.get_user_list()
 
         nt.assert_equal(res[0]['username'], self.user2.username)
         nt.assert_equal(len(res), 1)
@@ -285,7 +283,7 @@ class TestUserListByInstitutionID(AdminTestCase):
         view = views.UserListByInstitutionID()
         view = setup_view(view, request,
                           institution_id=self.institution.id)
-        res = view.get_userlist()
+        res = view.get_user_list()
 
         nt.assert_equal(res[0]['id'], self.user2._id)
         nt.assert_equal(len(res), 1)
@@ -302,7 +300,7 @@ class TestUserListByInstitutionID(AdminTestCase):
 
         view = views.UserListByInstitutionID()
         view = setup_view(view, request, institution_id=self.institution.id)
-        res = view.get_userlist()
+        res = view.get_user_list()
 
         nt.assert_equal(len(res), 1)
         nt.assert_in(res[0]['fullname'], self.user2.fullname)
@@ -321,7 +319,7 @@ class TestUserListByInstitutionID(AdminTestCase):
         view = views.UserListByInstitutionID()
         view = setup_view(view, request,
                           institution_id=self.institution.id)
-        res = view.get_userlist()
+        res = view.get_user_list()
 
         nt.assert_equal(res[0]['id'], self.user._id)
         nt.assert_in(res[0]['fullname'], self.user.fullname)
@@ -341,9 +339,10 @@ class TestUserListByInstitutionID(AdminTestCase):
         view = views.UserListByInstitutionID()
         view = setup_view(view, request,
                           institution_id=self.institution.id)
-        res = view.get_userlist()
+        res = view.get_user_list()
 
         nt.assert_equal(len(res), 0)
+
 
 @pytest.mark.skip('Clone test case from tests/test_quota.py for making coverage')
 class TestExportFileTSV(AdminTestCase):
@@ -391,7 +390,7 @@ class TestQuotaUserList(AdminTestCase):
         self.request.user = self.user
 
         self.view = views.QuotaUserList()
-        self.view.get_userlist = self.get_userlist
+        self.view.get_user_list = self.get_user_list
         self.view.request = self.request
         self.view.paginate_by = 10
         self.view.kwargs = {}
@@ -401,8 +400,8 @@ class TestQuotaUserList(AdminTestCase):
         return self.institution
 
     def get_institution_has_storage_name(self):
-        query = 'select name '\
-                'from addons_osfstorage_region '\
+        query = 'select name ' \
+                'from addons_osfstorage_region ' \
                 'where addons_osfstorage_region._id = osf_institution._id'
         institution = Institution.objects.filter(
             id=self.institution.id).extra(
@@ -412,7 +411,7 @@ class TestQuotaUserList(AdminTestCase):
         )
         return institution.first()
 
-    def get_userlist(self):
+    def get_user_list(self):
         user_list = []
         for user in OSFUser.objects.filter(
                 affiliated_institutions=self.institution.id):

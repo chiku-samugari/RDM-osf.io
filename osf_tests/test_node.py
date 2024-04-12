@@ -3,14 +3,16 @@ import datetime
 import mock
 import pytest
 import pytz
+
 from addons.osfstorage.models import NodeSettings, Region
+from addons.osfstorage.tests import factories
 from addons.wiki.models import WikiPage, WikiVersion
 from addons.wiki.tests.factories import WikiVersionFactory, WikiFactory
 from api_tests.utils import disconnected_from_listeners
 from django.utils import timezone
 from framework.auth.core import Auth
 from framework.celery_tasks import handlers
-from framework.exceptions import PermissionsError
+from framework.exceptions import PermissionsError, HTTPError
 from framework.sessions import set_session
 from nose.tools import assert_not_in
 from osf.exceptions import NodeStateError
@@ -60,6 +62,8 @@ from osf_tests.factories import (
     RegionFactory,
 )
 from osf_tests.utils import capture_signals, assert_datetime_equal, mock_archive
+from tests.base import OsfTestCase
+from tests.test_websitefiles import TestFolder, TestFile
 from website import language, settings
 from website.citations.utils import datetime_to_csl
 from website.project.model import has_anonymous_link
@@ -67,11 +71,9 @@ from website.project.signals import contributor_added, contributor_removed, afte
 from website.project.views.node import serialize_collections
 from website.util import api_url_for, web_url_for
 from website.views import find_bookmark_collection
-from addons.osfstorage.tests import factories
+
 from .factories import get_default_metaschema
-from tests.base import OsfTestCase
-from framework.exceptions import HTTPError
-from tests.test_websitefiles import TestFolder, TestFile
+
 pytestmark = pytest.mark.django_db
 
 
@@ -409,7 +411,8 @@ class TestParentNode:
     def test_fork_hasadd_default_node_addons_have_region(self, user, auth, project_with_affiliations_with_region):
         fork = project_with_affiliations_with_region.fork_node(auth=auth)
         user_affiliations = user.affiliated_institutions.values_list('id', flat=True)
-        project_affiliations = project_with_affiliations_with_region.affiliated_institutions.values_list('id', flat=True)
+        project_affiliations = project_with_affiliations_with_region.affiliated_institutions.values_list(
+            'id', flat=True)
         fork_affiliations = fork.affiliated_institutions.values_list('id', flat=True)
         assert set(project_affiliations) != set(user_affiliations)
         assert set(fork_affiliations) == set(user_affiliations)
@@ -793,11 +796,13 @@ class TestProject:
         assert fetch_newly_created_project.storage_type == region_id
 
     def test_project_storage_type_except_not_exist(self, project, auth):
-        with mock.patch('addons.osfstorage.models.NodeSettings.objects.get', side_effect=NodeSettings.DoesNotExist):
+        with mock.patch('addons.osfstorage.models.NodeSettings.objects.get',
+                        side_effect=NodeSettings.DoesNotExist):
             set_project_storage_type(project)
 
     def test_project_storage_type_except_multiple_returned(self, project, auth):
-        with mock.patch('addons.osfstorage.models.NodeSettings.objects.get', side_effect=NodeSettings.MultipleObjectsReturned):
+        with mock.patch('addons.osfstorage.models.NodeSettings.objects.get',
+                        side_effect=NodeSettings.MultipleObjectsReturned):
             set_project_storage_type(project)
 
     def test_project_storage_type_with_custom_region(self, project, auth):
@@ -4880,8 +4885,10 @@ class TestAbstractNode(OsfTestCase):
             self.new_component.create_waterbutler_log(
                 auth=Auth(user=self.user),
                 action='file_added',
-                payload={'metadata': {'path': None},
-                         'provider': 'osfstorage'}
+                payload={
+                    'metadata': {'path': None},
+                    'provider': 'osfstorage'
+                }
             )
         assert e.value.code == 400
 
@@ -4894,8 +4901,10 @@ class TestAbstractNode(OsfTestCase):
             self.new_component.create_waterbutler_log(
                 auth=Auth(user=self.user),
                 action='file_added',
-                payload={'metadata': {'path': '123/'},
-                         'provider': 'osfstorage'}
+                payload={
+                    'metadata': {'path': '123/'},
+                    'provider': 'osfstorage'
+                }
             )
 
         assert e.value.code == 400
@@ -4928,7 +4937,9 @@ class TestAbstractNode(OsfTestCase):
             self.new_component.create_waterbutler_log(
                 auth=Auth(user=self.user),
                 action='file_added',
-                payload={'metadata': {'path': '123/'},
-                         'provider': 'osfstorage'}
+                payload={
+                    'metadata': {'path': '123/'},
+                    'provider': 'osfstorage'
+                }
             )
         assert e.value.code == 400

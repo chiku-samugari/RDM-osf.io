@@ -1,8 +1,9 @@
 import mock
 import unittest
-import pytest
 
+import pytest
 from nose.tools import assert_equal
+
 from addons.base.tests.models import OAuthAddonNodeSettingsTestSuiteMixin
 from addons.base.tests.models import OAuthAddonUserSettingTestSuiteMixin
 from addons.box.models import NodeSettings

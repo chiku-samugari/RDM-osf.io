@@ -23,8 +23,7 @@ from admin.base import settings
 from admin.base.forms import ImportFileForm
 from admin.institutions.forms import InstitutionForm, InstitutionalMetricsAdminRegisterForm
 from django.contrib.auth.models import Group
-from osf.models import Institution, Node, OSFUser, UserQuota, Email
-from osf.models.user_storage_quota import UserStorageQuota
+from osf.models import Institution, Node, OSFUser, UserQuota, Email, UserStorageQuota
 from website.util import quota
 from addons.osfstorage.models import Region
 from api.base import settings as api_settings
@@ -273,7 +272,6 @@ class InstitutionalMetricsAdminRegister(PermissionRequiredMixin, FormView):
 class QuotaUserList(ListView):
     """Base class for UserListByInstitutionID and StatisticalStatusDefaultStorage.
     """
-
     def get_institution(self):
         raise NotImplementedError("QuotaUserList subclasses must implement a \
             'get_institution' method.")

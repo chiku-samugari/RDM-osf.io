@@ -1,7 +1,10 @@
+import logging
+
 from addons.osfstorage import models
 from osf import models as osf_models
-import logging
+
 logger = logging.getLogger(__name__)
+
 
 def get_parent_id(parent):
     parent_id = None
@@ -13,11 +16,13 @@ def get_parent_id(parent):
             parent_id = get_parent_id(parent)
     return parent_id
 
+
 def copy_files(src, target_node, parent=None, name=None):
     """Copy the files from src to the target node
     :param Folder src: The source to copy children from
     :param Node target_node: The node to copy files to
     :param Folder parent: The parent of to attach the clone of src to, if applicable
+    :param name:
     """
     assert not parent or not parent.is_file, 'Parent must be a folder'
     renaming = src.name != name
@@ -34,7 +39,11 @@ def copy_files(src, target_node, parent=None, name=None):
         most_recent_fileversion = fileversions.first()
         parent_id = get_parent_id(parent)
         osfstorage_region = target_node.osfstorage_region
-        osfstorage_nodesettings = models.NodeSettings.objects.filter(owner_id=target_node.id, is_deleted=False, root_node_id=parent_id).first()
+        osfstorage_nodesettings = models.NodeSettings.objects.filter(
+            owner_id=target_node.id,
+            is_deleted=False,
+            root_node_id=parent_id
+        ).first()
         if osfstorage_nodesettings:
             osfstorage_region = osfstorage_nodesettings.region
         if most_recent_fileversion.region and most_recent_fileversion.region != osfstorage_region:

@@ -12,6 +12,7 @@ from tests.base import OsfTestCase
 from tests.utils import mock_auth
 from future.moves.urllib.parse import unquote
 
+
 def set_preprint_providers():
     """Populate `PreprintProvider` to test database for testing."""
 

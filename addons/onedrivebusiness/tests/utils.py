@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import mock
-from nose.tools import (assert_equals, assert_true, assert_false)
+from nose.tools import (assert_equals, assert_true)
 from openpyxl import Workbook
 
 from addons.base.tests.base import OAuthAddonTestCaseMixin, AddonTestCase
@@ -9,8 +9,8 @@ from addons.onedrivebusiness.models import OneDriveBusinessProvider
 from addons.onedrivebusiness.serializer import OneDriveBusinessSerializer
 from addons.onedrivebusiness import utils
 
-class OneDriveBusinessAddonTestCase(OAuthAddonTestCaseMixin, AddonTestCase):
 
+class OneDriveBusinessAddonTestCase(OAuthAddonTestCaseMixin, AddonTestCase):
     ADDON_SHORT_NAME = 'onedrivebusiness'
     ExternalAccountFactory = OneDriveBusinessAccountFactory
     Provider = OneDriveBusinessProvider
@@ -62,17 +62,19 @@ class OneDriveBusinessAddonTestCase(OAuthAddonTestCaseMixin, AddonTestCase):
         ret = utils.get_region_external_account(mock_node)
         assert_equals(ret, None)
         mock_rdm_addon_option_objects_filter.assert_has_calls([
-            mock.call(institution_id=mock_node.owner.creator.affiliated_institutions.first().id, is_allowed=True, provider='onedrivebusiness'),
+            mock.call(institution_id=mock_node.owner.creator.affiliated_institutions.first().id,
+                      is_allowed=True,
+                      provider='onedrivebusiness'),
         ])
 
     @mock.patch('addons.onedrivebusiness.utils.RdmAddonOption.objects.filter')
     @mock.patch('addons.osfstorage.models.Region.objects.filter')
     @mock.patch('addons.onedrivebusiness.utils.RegionExternalAccount.objects.filter')
     def test_get_region_external_account_with_configured_institutions(
-        self,
-        mock_region_external_account_objects_filter,
-        mock_region_objects_filter,
-        mock_rdm_addon_option_objects_filter
+            self,
+            mock_region_external_account_objects_filter,
+            mock_region_objects_filter,
+            mock_rdm_addon_option_objects_filter
     ):
         mock_node = mock.Mock()
         mock_user = mock.Mock()

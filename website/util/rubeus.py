@@ -4,7 +4,6 @@ formatted hgrid list/folders.
 """
 import logging
 import re
-import traceback
 from django.utils import timezone
 
 from framework import sentry
@@ -13,12 +12,12 @@ from framework.auth.decorators import Auth
 from django.apps import apps
 from django.db.models import Exists, OuterRef, Case, When, Value, IntegerField
 
+from api.base import settings as api_settings
 from website import settings
 from website.util import paths
 from website.settings import DISK_SAVING_MODE
 from osf.utils import sanitize
 from osf.utils.permissions import WRITE_NODE
-from api.base import settings as api_settings
 
 
 logger = logging.getLogger(__name__)
@@ -134,14 +133,18 @@ def build_addon_root(node_settings, name, permissions=None,
     if hasattr(node_settings, 'region'):
         ret.update({'nodeRegion': node_settings.region.name})
         ret.update({'waterbutlerURL': node_settings.region.waterbutler_url})
-        is_readonly = check_authentication_attribute(user,
-                                                     node_settings.region.readonly_expression,
-                                                     node_settings.region.is_readonly)
+        is_readonly = check_authentication_attribute(
+            user,
+            node_settings.region.readonly_expression,
+            node_settings.region.is_readonly
+        )
         if is_readonly:
-            ret.update({'permissions': {
-                'view': True,
-                'edit': False
-            }})
+            ret.update({
+                'permissions': {
+                    'view': True,
+                    'edit': False
+                }
+            })
     else:
         if node_settings.config.short_name in ADDON_METHOD_PROVIDER and isinstance(auth, Auth):
             institution = auth.user.affiliated_institutions.first()
@@ -149,14 +152,18 @@ def build_addon_root(node_settings, name, permissions=None,
                 _id=institution._id,
                 waterbutler_settings__storage__provider=node_settings.config.short_name
             ).first()
-            is_readonly = check_authentication_attribute(auth.user,
-                                                         region.readonly_expression,
-                                                         region.is_readonly)
+            is_readonly = check_authentication_attribute(
+                auth.user,
+                region.readonly_expression,
+                region.is_readonly
+            )
             if is_readonly:
-                ret.update({'permissions': {
-                    'view': True,
-                    'edit': False
-                }})
+                ret.update({
+                    'permissions': {
+                        'view': True,
+                        'edit': False
+                    }
+                })
 
     return ret
 
@@ -293,7 +300,6 @@ class NodeFileCollector(object):
         data = {}
         institution_id = None
         for osf_addon in osf_addons:
-            logger.debug(f'osf_addon is {osf_addon}')
             region = osf_addon.region
             institution_id = region._id
             if region and region.waterbutler_settings:
@@ -303,9 +309,11 @@ class NodeFileCollector(object):
                 if storage:
                     region_provider = storage.get('provider', None)
                     region_provider_set.add(region_provider)
-            region.is_allowed = check_authentication_attribute(self.auth.user,
-                                                               region.allow_expression,
-                                                               region.is_allowed)
+            region.is_allowed = check_authentication_attribute(
+                self.auth.user,
+                region.allow_expression,
+                region.is_allowed
+            )
             data[osf_addon.id] = {
                 'region_disabled': region_disabled,
                 'region_provider': region_provider,
@@ -314,7 +322,8 @@ class NodeFileCollector(object):
         for addon in node.get_addons():
             if addon.config.has_hgrid_files:
                 # skip storage
-                if addon.short_name == 'osfstorage' and (data[addon.id]['region_disabled'] or not data[addon.id]['is_allowed']):
+                if (addon.short_name == 'osfstorage'
+                        and (data[addon.id]['region_disabled'] or not data[addon.id]['is_allowed'])):
                     continue  # skip (hide osfstorage)
                 if addon.config.for_institutions:
                     if addon.config.short_name not in region_provider_set:
@@ -328,17 +337,18 @@ class NodeFileCollector(object):
                                 _id=institution_id,
                                 waterbutler_settings__storage__provider=addon.short_name).first()
                         if region is not None:
-                            region.is_allowed = check_authentication_attribute(self.auth.user,
-                                                                               region.allow_expression,
-                                                                               region.is_allowed)
+                            region.is_allowed = check_authentication_attribute(
+                                self.auth.user,
+                                region.allow_expression,
+                                region.is_allowed
+                            )
                             if not region.is_allowed:
                                 continue
-                # temp = addon.config.get_hgrid_data(addon, self.auth, **self.extra)
+
                 # WARNING: get_hgrid_data can return None if the addon is added but has no credentials.
                 try:
                     temp = addon.config.get_hgrid_data(addon, self.auth, **self.extra)
                 except Exception as e:
-                    traceback.print_exc()
                     logger.warn(
                         getattr(
                             e,
@@ -418,9 +428,7 @@ def check_authentication_attribute(user, expression, is_enabled):
     :param str expression: logical expression
     :param bool is_enabled: turn on or off
     :return bool: user satisfy condition or note
-
     """
-
     from osf.models import AuthenticationAttribute, InstitutionEntitlement, UserExtendedData
     institution = user.affiliated_institutions.first()
     if institution:

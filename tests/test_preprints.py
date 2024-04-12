@@ -1863,7 +1863,7 @@ class TestPreprintProvider(OsfTestCase):
 
     def test_change_preprint_provider_from_osf(self):
         subject_two = SubjectFactory(provider=self.provider_one,
-            bepress_subject=self.subject_osf)
+                                     bepress_subject=self.subject_osf)
         preprint = PreprintFactory(subjects=[[subject_two._id]], provider=self.provider_osf, creator=self.user)
         subject_problems = preprint.map_subjects_between_providers(self.provider_osf, self.provider_one, self.auth)
         preprint.refresh_from_db()
@@ -1872,7 +1872,7 @@ class TestPreprintProvider(OsfTestCase):
 
     def test_change_preprint_provider_to_osf(self):
         subject_two = SubjectFactory(provider=self.provider_one,
-            bepress_subject=self.subject_osf)
+                                     bepress_subject=self.subject_osf)
         preprint = PreprintFactory(subjects=[[self.subject_osf._id]], provider=self.provider_one, creator=self.user)
         subject_problems = preprint.map_subjects_between_providers(self.provider_one, self.provider_osf, self.auth)
         preprint.refresh_from_db()
@@ -2349,7 +2349,8 @@ class TestPreprintConfirmationEmails(OsfTestCase):
         self.user = AuthUserFactory()
         self.write_contrib = AuthUserFactory()
         self.project = ProjectFactory(creator=self.user)
-        self.preprint = PreprintFactory(creator=self.user, project=self.project, provider=PreprintProviderFactory(_id='osf2'), is_published=False)
+        self.preprint = PreprintFactory(creator=self.user, project=self.project,
+                                        provider=PreprintProviderFactory(_id='osf2'), is_published=False)
         self.preprint.add_contributor(self.write_contrib, permissions=WRITE)
         self.preprint_branded = PreprintFactory(creator=self.user, is_published=False)
 

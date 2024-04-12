@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import inspect  # noqa
-import logging
 import traceback
 
 from boxsdk import Client as BoxClient, OAuth2
@@ -45,9 +43,6 @@ from osf.models.external import ExternalAccountTemporary, ExternalAccount
 from osf.utils import external_util
 import datetime
 
-from website.util import inspect_info  # noqa
-
-logger = logging.getLogger(__name__)
 
 providers = None
 
@@ -70,8 +65,7 @@ no_storage_name_providers = ['osfstorage', 'onedrivebusiness']
 def have_storage_name(provider_name):
     return provider_name not in no_storage_name_providers
 
-
-def get_providers(available_list=None):
+def get_providers():
     provider_list = []
     for provider in osf_settings.ADDONS_AVAILABLE:
         if 'storage' in provider.categories and provider.short_name in enabled_providers_list:
@@ -80,8 +74,6 @@ def get_providers(available_list=None):
             provider.modal_path = get_modal_path(provider.short_name)
             provider_list.append(provider)
     provider_list.sort(key=lambda x: x.full_name.lower())
-    if isinstance(available_list, list):
-        return [addon for addon in provider_list if addon.short_name in available_list]
     return provider_list
 
 def get_addon_by_name(addon_short_name):
@@ -110,6 +102,7 @@ def get_oauth_info_notification(institution_id, provider_short_name):
             'provider_name': temp_external_account.provider_name,
         }
 
+
 def set_allowed(institution, provider_name, is_allowed):
     # Note: May be impact when multiple
     addon_options = get_rdm_addon_option(institution.id, provider_name)
@@ -120,9 +113,11 @@ def set_allowed(institution, provider_name, is_allowed):
     # if not is_allowed:
     #     addon_option.external_accounts.clear()
 
+
 def change_allowed_for_institutions(institution, provider_name):
     if provider_name in enabled_providers_forinstitutions_list:
         set_allowed(institution, provider_name, True)
+
 
 def set_default_storage(institution_id):
     default_region = Region.objects.first()
@@ -145,6 +140,7 @@ def set_default_storage(institution_id):
             mfr_url=default_region.mfr_url,
         )
     return region
+
 
 def update_storage(institution_id, storage_name, wb_credentials, wb_settings, new_storage_name=None):
     default_region = Region.objects.first()
@@ -175,6 +171,7 @@ def update_storage(institution_id, storage_name, wb_credentials, wb_settings, ne
             region.waterbutler_settings = wb_settings
             region.save()
     return region
+
 
 def transfer_to_external_account(user, institution_id, provider_short_name):
     temp_external_account = ExternalAccountTemporary.objects.filter(_id=institution_id, provider=provider_short_name).first()
@@ -265,7 +262,7 @@ def test_s3compat_connection(host_url, access_key, secret_key, bucket):
             'message': 'All the fields above are required.'
         }, http_status.HTTP_400_BAD_REQUEST)
 
-    logger.debug(f'Check to make sure that the above credentials are valid, and that they have permission to list buckets.')
+    # Check to make sure that the above credentials are valid, and that they have permission to list buckets
     try:
         user_info = s3compat_utils.get_user_info(host, access_key, secret_key)
         e_message = ''
@@ -280,7 +277,7 @@ def test_s3compat_connection(host_url, access_key, secret_key, bucket):
             'e_message': e_message
         }, http_status.HTTP_400_BAD_REQUEST)
 
-    logger.debug(f'Listing buckets is required permission that can be changed via IAM')
+    # Listing buckets is required permission that can be changed via IAM
     try:
         res = s3compat_utils.can_list(host, access_key, secret_key)
         e_message = ''
@@ -294,7 +291,7 @@ def test_s3compat_connection(host_url, access_key, secret_key, bucket):
             'e_message': e_message
         }, http_status.HTTP_400_BAD_REQUEST)
 
-    logger.debug(f'Check buckets is existing')
+    # Check buckets is existing
     try:
         res = s3compat_utils.bucket_exists(host, access_key, secret_key, bucket)
         e_message = ''
@@ -323,12 +320,12 @@ def test_s3compatb3_connection(host_url, access_key, secret_key, bucket):
         }, http_status.HTTP_400_BAD_REQUEST)
 
     try:
-        user_info = s3compatb3_utils.get_user_info(host, access_key, secret_key)
+        connection = s3compatb3_utils.get_connection(host, access_key, secret_key)
         e_message = ''
     except Exception as e:
-        user_info = None
+        connection = None
         e_message = traceback.format_exception_only(type(e), e)[0].rstrip('\n')
-    if not user_info:
+    if not connection:
         return ({
             'message': 'Unable to access account.\n'
             'Check to make sure that the above credentials are valid, '
@@ -516,15 +513,15 @@ def test_swift_connection(auth_version, auth_url, access_key, secret_key, tenant
         'data': swift_response
     }, http_status.HTTP_200_OK)
 
+
 def test_dropboxbusiness_connection(institution):
-    fm = dropboxbusiness_utils.get_two_addon_options(institution.id,
-                                                     allowed_check=False)
-    if fm is None:
+    fms = dropboxbusiness_utils.get_two_addon_options(institution.id, allowed_check=False)
+    if fms is None:
         return ({
             'message': u'Invalid Institution ID.: {}'.format(institution.id)
         }, http_status.HTTP_400_BAD_REQUEST)
 
-    f_option, m_option = fm[0]
+    f_option, m_option = fms[0]
     f_token = dropboxbusiness_utils.addon_option_to_token(f_option)
     m_token = dropboxbusiness_utils.addon_option_to_token(m_option)
     if f_token is None or m_token is None:
@@ -600,6 +597,7 @@ def validate_onedrivebusiness_connection(institution_id, folder_id_or_path):
         'message': 'Credentials are valid'
     }, http_status.HTTP_200_OK), folder_id
 
+
 def save_s3_credentials(institution_id, storage_name, access_key, secret_key, bucket, new_storage_name=None):
     test_connection_result = test_s3_connection(access_key, secret_key, bucket)
     if test_connection_result[1] != http_status.HTTP_200_OK:
@@ -627,6 +625,7 @@ def save_s3_credentials(institution_id, storage_name, access_key, secret_key, bu
     return ({
         'message': 'Saved credentials successfully!!'
     }, http_status.HTTP_200_OK)
+
 
 def save_s3compat_credentials(institution_id, storage_name, host_url, access_key, secret_key,
                               bucket, server_side_encryption=False, new_storage_name=None):
@@ -659,6 +658,7 @@ def save_s3compat_credentials(institution_id, storage_name, host_url, access_key
     return ({
         'message': 'Saved credentials successfully!!'
     }, http_status.HTTP_200_OK)
+
 
 def save_s3compatb3_credentials(institution_id, storage_name, host_url, access_key, secret_key,
                                 bucket, new_storage_name=None):
@@ -693,6 +693,7 @@ def save_s3compatb3_credentials(institution_id, storage_name, host_url, access_k
         'message': 'Saved credentials successfully!!'
     }, http_status.HTTP_200_OK)
 
+
 def save_box_credentials(user, storage_name, folder_id, new_storage_name=None):
     institution_id = user.affiliated_institutions.first()._id
 
@@ -713,12 +714,14 @@ def save_box_credentials(user, storage_name, folder_id, new_storage_name=None):
             'provider': 'box',
         }
     }
+
     region = update_storage(institution_id, storage_name, wb_credentials, wb_settings, new_storage_name)
     external_util.set_region_external_account(region, account)
 
     return ({
         'message': 'OAuth was set successfully'
     }, http_status.HTTP_200_OK)
+
 
 def save_googledrive_credentials(user, storage_name, folder_id, new_storage_name=None):
     institution_id = user.affiliated_institutions.first()._id
@@ -742,12 +745,14 @@ def save_googledrive_credentials(user, storage_name, folder_id, new_storage_name
             'provider': 'googledrive',
         }
     }
+
     region = update_storage(institution_id, storage_name, wb_credentials, wb_settings, new_storage_name)
     external_util.set_region_external_account(region, account)
 
     return ({
         'message': 'OAuth was set successfully'
     }, http_status.HTTP_200_OK)
+
 
 def save_nextcloud_credentials(institution_id, storage_name, host_url, username, password,
                                folder, provider, new_storage_name=None):
@@ -784,12 +789,14 @@ def save_nextcloud_credentials(institution_id, storage_name, host_url, username,
         'message': 'Saved credentials successfully!!'
     }, http_status.HTTP_200_OK)
 
+
 def save_osfstorage_credentials(institution_id):
     region = set_default_storage(institution_id)
     external_util.remove_region_external_account(region)
     return ({
         'message': 'NII storage was set successfully'
     }, http_status.HTTP_200_OK)
+
 
 def save_swift_credentials(institution_id, storage_name, auth_version, access_key, secret_key,
                            tenant_name, user_domain_name, project_domain_name, auth_url,
@@ -828,6 +835,7 @@ def save_swift_credentials(institution_id, storage_name, auth_version, access_ke
         'message': 'Saved credentials successfully!!'
     }, http_status.HTTP_200_OK)
 
+
 def save_owncloud_credentials(institution_id, storage_name, host_url, username, password,
                               folder, provider, new_storage_name=None):
     test_connection_result = test_owncloud_connection(host_url, username, password, folder,
@@ -862,6 +870,7 @@ def save_owncloud_credentials(institution_id, storage_name, host_url, username, 
     return ({
         'message': 'Saved credentials successfully!!'
     }, http_status.HTTP_200_OK)
+
 
 def save_onedrivebusiness_credentials(user, storage_name, provider_name, folder_id_or_path, new_storage_name=None):
     institution_id = user.affiliated_institutions.first()._id
@@ -900,6 +909,7 @@ def use_https(url):
     host.scheme = 'https'
     return host
 
+
 def save_dropboxbusiness_credentials(institution, storage_name, provider_name, new_storage_name=None):
     test_connection_result = test_dropboxbusiness_connection(institution)
     if test_connection_result[1] != http_status.HTTP_200_OK:
@@ -908,7 +918,9 @@ def save_dropboxbusiness_credentials(institution, storage_name, provider_name, n
     wb_credentials, wb_settings = wd_info_for_institutions(provider_name)
     region = update_storage(institution._id,  # not institution.id
                             storage_name,
-                            wb_credentials, wb_settings, new_storage_name)
+                            wb_credentials,
+                            wb_settings,
+                            new_storage_name)
     external_util.remove_region_external_account(region)
     ### sync_all() is not supported by Dropbox Business Addon
     # sync_all(institution._id, target_addons=[provider_name])
@@ -917,8 +929,10 @@ def save_dropboxbusiness_credentials(institution, storage_name, provider_name, n
         'message': 'Dropbox Business was set successfully!!'
     }, http_status.HTTP_200_OK)
 
+
 def save_basic_storage_institutions_credentials_common(
-        institution, storage_name, folder, provider_name, provider, separator=':', extended_data=None, new_storage_name=None):
+        institution, storage_name, folder, provider_name, provider, separator=':', extended_data=None,
+        new_storage_name=None):
     try:
         provider.account.save()
     except ValidationError:
@@ -933,12 +947,11 @@ def save_basic_storage_institutions_credentials_common(
         if provider.account.oauth_key != password:
             provider.account.oauth_key = password
             provider.account.save()
+
     # Note: May be impact when multiple
-    # Storage Addons for Institutions must have only one ExternalAccont.
+    # Storage Addons for Institutions must have only one ExternalAccount.
     rdm_addon_options = get_rdm_addon_option(institution.id, provider_name, need_create=True)
-    # if rdm_addon_option.external_accounts.count() > 0:
-    #     rdm_addon_option.external_accounts.clear()
-    if len(rdm_addon_options) > 0:
+    if rdm_addon_options:
         rdm_addon_option = rdm_addon_options[len(rdm_addon_options) - 1]
         rdm_addon_option.external_accounts.add(provider.account)
         rdm_addon_option.extended[KEYNAME_BASE_FOLDER] = folder
@@ -950,7 +963,9 @@ def save_basic_storage_institutions_credentials_common(
     wb_credentials, wb_settings = wd_info_for_institutions(provider_name)
     region = update_storage(institution._id,  # not institution.id
                             storage_name,
-                            wb_credentials, wb_settings, new_storage_name)
+                            wb_credentials,
+                            wb_settings,
+                            new_storage_name)
     external_util.remove_region_external_account(region)
 
     sync_all(institution._id, target_addons=[provider_name])
@@ -961,7 +976,8 @@ def save_basic_storage_institutions_credentials_common(
 
 
 def save_nextcloudinstitutions_credentials(
-        institution, storage_name, host_url, username, password, folder, notification_secret, provider_name, new_storage_name=None):
+        institution, storage_name, host_url, username, password, folder, notification_secret, provider_name,
+        new_storage_name=None):
     test_connection_result = test_owncloud_connection(
         host_url, username, password, folder, provider_name)
     if test_connection_result[1] != http_status.HTTP_200_OK:
@@ -974,9 +990,14 @@ def save_nextcloudinstitutions_credentials(
     extended_data = {}
     extended_data[KEYNAME_NOTIFICATION_SECRET] = notification_secret
     return save_basic_storage_institutions_credentials_common(
-        institution, storage_name, folder, provider_name, provider, extended_data=extended_data, new_storage_name=new_storage_name)
+        institution, storage_name, folder, provider_name, provider,
+        extended_data=extended_data,
+        new_storage_name=new_storage_name
+    )
 
-def save_s3compatinstitutions_credentials(institution, storage_name, host_url, access_key, secret_key, bucket, provider_name, new_storage_name=None):
+
+def save_s3compatinstitutions_credentials(institution, storage_name, host_url, access_key, secret_key, bucket,
+                                          provider_name, new_storage_name=None):
     host = host_url.rstrip('/').replace('https://', '').replace('http://', '')
     test_connection_result = test_s3compat_connection(
         host, access_key, secret_key, bucket)
@@ -991,7 +1012,9 @@ def save_s3compatinstitutions_credentials(institution, storage_name, host_url, a
     return save_basic_storage_institutions_credentials_common(
         institution, storage_name, bucket, provider_name, provider, separator, new_storage_name)
 
-def save_ociinstitutions_credentials(institution, storage_name, host_url, access_key, secret_key, bucket, provider_name, new_storage_name=None):
+
+def save_ociinstitutions_credentials(institution, storage_name, host_url, access_key, secret_key, bucket, provider_name,
+                                     new_storage_name=None):
     host = host_url.rstrip('/').replace('https://', '').replace('http://', '')
     test_connection_result = test_s3compatb3_connection(
         host, access_key, secret_key, bucket)
@@ -1006,18 +1029,20 @@ def save_ociinstitutions_credentials(institution, storage_name, host_url, access
     return save_basic_storage_institutions_credentials_common(
         institution, storage_name, bucket, provider_name, provider, separator, new_storage_name)
 
+
 def get_credentials_common(institution, provider_name):
     clear_usermap_tmp(provider_name, institution)
     # Note: May be impact when multiple
     rdm_addon_options = get_rdm_addon_option(institution.id, provider_name,
-                                            create=False)
+                                             create=False)
     if not rdm_addon_options.exists():
         return None
     rdm_addon_option = rdm_addon_options.order_by('-id').first()
-    exacc = rdm_addon_option.external_accounts.first()
-    if not exacc:
+    external_account = rdm_addon_option.external_accounts.first()
+    if not external_account:
         return None
-    return rdm_addon_option, exacc
+    return rdm_addon_option, external_account
+
 
 def get_nextcloudinstitutions_credentials(institution):
     provider_name = 'nextcloudinstitutions'
@@ -1115,14 +1140,16 @@ def extuser_exists(provider_name, post_params, extuser):
     else:  # unsupported
         return None  # ok
 
+
 def get_usermap(provider_name, institution):
     # Note: May be impact when multiple
-    rdm_addon_options = get_rdm_addon_option(institution.id, provider_name,
-                                            create=False)
+    rdm_addon_options = get_rdm_addon_option(institution.id, provider_name, create=False)
     if not rdm_addon_options.exists():
         return None
+
     rdm_addon_option = rdm_addon_options.order_by('-id').first()
     return rdm_addon_option.extended.get(KEYNAME_USERMAP)
+
 
 def save_usermap_to_tmp(provider_name, institution, usermap):
     # Note: May be impact when multiple
@@ -1132,21 +1159,22 @@ def save_usermap_to_tmp(provider_name, institution, usermap):
         rdm_addon_option.extended[KEYNAME_USERMAP_TMP] = usermap
         rdm_addon_option.save()
 
+
 def clear_usermap_tmp(provider_name, institution):
     # Note: May be impact when multiple
-    rdm_addon_options = get_rdm_addon_option(institution.id, provider_name,
-                                            create=False)
+    rdm_addon_options = get_rdm_addon_option(institution.id, provider_name, create=False)
     if not rdm_addon_options.exists():
         return
+
     rdm_addon_option = rdm_addon_options.order_by('-id').first()
     new_usermap = rdm_addon_option.extended.get(KEYNAME_USERMAP_TMP)
     if new_usermap:
         del rdm_addon_option.extended[KEYNAME_USERMAP_TMP]
         rdm_addon_option.save()
 
+
 # Note: May be impact when multiple
 def save_usermap_from_tmp(rdm_addon_option):
-    #rdm_addon_option = get_rdm_addon_option(institution.id, provider_name, create=False)
     new_usermap = rdm_addon_option.extended.get(KEYNAME_USERMAP_TMP)
     if new_usermap:
         rdm_addon_option.extended[KEYNAME_USERMAP] = new_usermap
@@ -1160,9 +1188,7 @@ def check_index_number_exists(expression, item):
     :param str expression: logical expression
     :param int item: index number
     :return bool: index number exists or not
-
     """
-
     result = re.findall(r'\d+', expression)
     return True if str(item) in result else False
 
@@ -1173,9 +1199,7 @@ def validate_index_number_not_found(expression, index_list):
     :param str expression: logical expression
     :param list index_list: list of index number
     :return bool: index number is used or not
-
     """
-
     index_number_input = re.findall(r'\d+', expression)
     return all(int(value) in index_list for value in index_number_input)
 
@@ -1185,18 +1209,16 @@ def validate_logic_expression(expression):
 
     :param str expression: logical expression
     :return bool: logic expression is valid or not
-
     """
-
     if expression:
         if has_special_character(expression):
             return False
         if expression.count('|') % 2 != 0 or \
                 expression.count('&') % 2 != 0:
             return False
-        expression = expression.\
-            replace('&&', ' and ').\
-            replace('||', ' or ').\
+        expression = expression. \
+            replace('&&', ' and '). \
+            replace('||', ' or '). \
             replace('!', ' not ')
 
         if expression.find('&') >= 0:

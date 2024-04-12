@@ -13,16 +13,15 @@ from django.urls import reverse
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth.models import Permission
 from django.contrib.messages.storage.fallback import FallbackStorage
-from framework.exceptions import HTTPError
 
 from api.base import settings as api_settings
 from tests.base import AdminTestCase
 from website import settings
 from framework.auth import Auth
+from framework.exceptions import HTTPError
 from osf.models.user import OSFUser
 from osf.models.spam import SpamStatus
-from osf.models import UserQuota
-from osf.models.user_storage_quota import UserStorageQuota
+from osf.models import UserQuota, UserStorageQuota
 from osf_tests.factories import (
     UserFactory,
     AuthUserFactory,

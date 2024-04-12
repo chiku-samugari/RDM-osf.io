@@ -44,6 +44,7 @@ def open_directory_link(auth, node, provider, **kwargs):
 
     return serialized
 
+
 @must_be_contributor_or_public
 def grid_data(auth, node, **kwargs):
     """View that returns the formatted data for rubeus.js/hgrid
@@ -54,12 +55,13 @@ def grid_data(auth, node, **kwargs):
         for _, child in enumerate(ret[0]['children']):
             if child.get('provider') == 'osfstorage' and 'nodeRegion' in child:
                 update_custom_storage_icon_url(child)
-            # update icon url for components
             elif 'nodeType' in child and child.get('nodeType') == 'component':
+                # update icon url for components
                 for component in child.get('children'):
                     if component.get('provider') == 'osfstorage' and 'nodeRegion' in component:
                         update_custom_storage_icon_url(component)
     return {'data': ret}
+
 
 def update_custom_storage_icon_url(storage):
     if storage.get('provider') == 'osfstorage' and 'nodeRegion' in storage:

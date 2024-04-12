@@ -19,7 +19,7 @@ def dropboxbusiness_root(addon_config, node_settings, auth, **kwargs):
         region = Region.objects.filter(
             _id=institution._id,
             waterbutler_settings__storage__provider='dropboxbusiness',
-            id=node_settings.region.id
+            id=node_settings.region.id,
         ).first()
         if region:
             node_settings.region = region

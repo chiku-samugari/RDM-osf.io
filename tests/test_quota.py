@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import datetime
-import logging
 import mock
-import pytest
 from nose.tools import *  # noqa (PEP8 asserts)
+import pytest
 
 from addons.osfstorage.models import OsfStorageFileNode
 from api.base import settings as api_settings
@@ -11,20 +10,18 @@ from api.base.settings import NII_STORAGE_REGION_ID, ADDON_METHOD_PROVIDER
 from api_tests.utils import create_test_file
 from framework.auth import signing
 from framework.exceptions import HTTPError
-from osf.models import (
-    FileLog, FileInfo, TrashedFileNode, TrashedFolder, UserQuota, ProjectStorageType, BaseFileNode, AbstractNode
-
-)
-from osf.models.user_storage_quota import UserStorageQuota
-from osf_tests.factories import (
-    AuthUserFactory, ProjectFactory, UserFactory, InstitutionFactory, RegionFactory, BaseFileNodeFactory
-)
 from tests.base import OsfTestCase
+from osf.models import (
+    FileLog, FileInfo, TrashedFileNode, TrashedFolder, UserQuota, ProjectStorageType, BaseFileNode,
+    AbstractNode,
+    UserStorageQuota,
+)
+from osf_tests.factories import (
+    AuthUserFactory, ProjectFactory, UserFactory, InstitutionFactory, RegionFactory,
+)
 from tests.test_websitefiles import TestFolder, TestFile
 from website.util import web_url_for, quota
 from website.util.quota import get_region_id_of_institutional_storage_by_path
-
-logger = logging.getLogger(__name__)
 
 
 @pytest.mark.enable_implicit_clean
@@ -643,8 +640,8 @@ class TestSaveFileInfo(OsfTestCase):
 
 
 class TestSaveUsedQuota(OsfTestCase):
-    def __init__(self, methodName: str = ...):
-        super().__init__(methodName)
+    def __init__(self, method_name: str = ...):
+        super().__init__(method_name)
         self.addon_provider = ADDON_METHOD_PROVIDER[0]
 
     def setUp(self):
@@ -1695,8 +1692,8 @@ class TestSaveUsedQuota(OsfTestCase):
             max_quota=api_settings.DEFAULT_MAX_QUOTA,
             used=5000
         )
-        self.base_file_node._path='/' + self.node_root._id + self.base_file_node.materialized_path
-        self.base_file_node.parent_id=self.node_root.id
+        self.base_file_node._path = '/' + self.node_root._id + self.base_file_node.materialized_path
+        self.base_file_node.parent_id = self.node_root.id
         self.base_file_node.save()
         quota.update_used_quota(
             self=None,
@@ -1705,7 +1702,7 @@ class TestSaveUsedQuota(OsfTestCase):
             event_type=FileLog.FILE_ADDED,
             payload={
                 'provider': self.addon_provider,
-                'root_path':self.node_root._id,
+                'root_path': self.node_root._id,
                 'metadata': {
                     'provider': self.addon_provider,
                     'name': self.base_file_node.name,
@@ -1812,8 +1809,8 @@ class TestSaveUsedQuota(OsfTestCase):
             storage_type=ProjectStorageType.CUSTOM_STORAGE
         )
 
-        self.base_file_node._path='/' + self.node_root._id + self.base_file_node.materialized_path
-        self.base_file_node.parent_id=self.node_root.id
+        self.base_file_node._path = '/' + self.node_root._id + self.base_file_node.materialized_path
+        self.base_file_node.parent_id = self.node_root.id
         self.base_file_node.save()
         FileInfo.objects.create(file=self.base_file_node, file_size=1000)
 
@@ -1836,7 +1833,7 @@ class TestSaveUsedQuota(OsfTestCase):
             event_type=FileLog.FILE_REMOVED,
             payload={
                 'provider': self.addon_provider,
-                'root_path':self.node_root._id,
+                'root_path': self.node_root._id,
                 'metadata': {
                     'provider': self.addon_provider,
                     'name': self.base_file_node.name,
@@ -1941,7 +1938,7 @@ class TestSaveUsedQuota(OsfTestCase):
             event_type=FileLog.FILE_REMOVED,
             payload={
                 'provider': 'osfstorage',
-                'root_path':folder1._id,
+                'root_path': folder1._id,
                 'metadata': {
                     'provider': 'osfstorage',
                     'name': folder1.name,
@@ -2131,7 +2128,6 @@ class TestQuotaApiBrowser(OsfTestCase):
 
 
 class TestGetRegionIdOfInstitutionalStorageByPath(OsfTestCase):
-
     def setUp(self):
         self.target = mock.Mock()
         self.provider = 'dropboxbusiness'
@@ -2184,7 +2180,7 @@ class TestGetRegionIdOfInstitutionalStorageByPath(OsfTestCase):
     def test_get_region_id_of_institutional_storage_by_path_with_custom_storage(self):
         region_mock = mock.Mock()
         root_node_mock = mock.Mock()
-        root_node_mock.id=123
+        root_node_mock.id = 123
         region_mock.id = 456
         institution_mock = mock.Mock()
         institution_mock.affiliated_institutions.first.return_value = institution_mock
@@ -2219,7 +2215,7 @@ class TestGetRegionIdOfInstitutionalStorageByPath(OsfTestCase):
 
     def test_get_region_id_of_institutional_storage_by_path_with_custom_storage_no_region(self):
         root_node_mock = mock.Mock()
-        root_node_mock.id=123
+        root_node_mock.id = 123
         root_node_filter_mock = mock.Mock()
         root_node_filter_mock.first.return_value = root_node_mock
         institution_mock = mock.Mock()

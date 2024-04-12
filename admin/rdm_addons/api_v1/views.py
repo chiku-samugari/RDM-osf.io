@@ -12,6 +12,7 @@ from django.http.response import JsonResponse
 from django.utils.decorators import method_decorator
 import flask
 
+from addons.dropboxbusiness import utils as dropboxbusiness_utils
 from addons.osfstorage.models import Region
 from osf.models import ExternalAccount, Guid, AbstractNode, Institution
 from osf.utils import permissions
@@ -20,7 +21,6 @@ from admin.rdm_addons.utils import get_rdm_addon_option
 from framework.auth import Auth
 
 from admin.rdm_addons import utils
-from addons.dropboxbusiness import utils as dropboxbusiness_utils
 
 
 class OAuthView(RdmPermissionMixin, UserPassesTestMixin, View):
@@ -52,14 +52,20 @@ def disconnect(external_account_id, institution_id, user):
         raise Http404
 
     rdm_addon_options = get_rdm_addon_option(institution_id, account.provider)
+
     if account.provider in ['dropboxbusiness', 'dropboxbusiness_manage']:
         # Do not disconnect Dropbox Business provider
         institution = Institution.objects.get(id=institution_id)
-        region = Region.objects.filter(_id=institution._id, waterbutler_settings__storage__provider='dropboxbusiness').order_by('id')
+        region = Region.objects.filter(
+            _id=institution._id,
+            waterbutler_settings__storage__provider='dropboxbusiness'
+        ).order_by('id')
+
         if region.count() >= rdm_addon_options.count():
             # Create new osf_rdmaddonoption
             dropboxbusiness_utils.create_two_addon_options(institution_id)
             return HttpResponse('')
+
     rdm_addon_option = rdm_addon_options.last()
 
     if not rdm_addon_option.external_accounts.filter(id=account.id).exists():

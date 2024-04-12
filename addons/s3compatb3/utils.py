@@ -177,12 +177,27 @@ def get_user_info(host, access_key, secret_key):
         connection = connect_s3compatb3(host, access_key, secret_key)
         buckets = connection.buckets.all()
         [bucket.name for bucket in buckets]
-        return connection
-        #identity = boto3.client('sts').get_caller_identity()
-        #return identity
+        identity = boto3.client('sts').get_caller_identity()
+        return identity
     except ClientError:
         return None
     return None
+
+
+def get_connection(host, access_key, secret_key):
+    """Returns an S3 Compatible Storage connection or None
+    """
+    if not (access_key and secret_key):
+        return None
+
+    try:
+        connection = connect_s3compatb3(host, access_key, secret_key)
+        buckets = connection.buckets.all()
+        [bucket.name for bucket in buckets]
+        return connection
+    except ClientError:
+        return None
+
 
 def get_bucket_location_or_error(host, access_key, secret_key, bucket_name):
     """Returns the location of a bucket or raises AddonError

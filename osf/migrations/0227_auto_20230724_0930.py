@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 
 from django.db import migrations
 
+
 def add_parent_id_value(apps, schema_editor):
     BaseFileNode = apps.get_model('osf', 'basefilenode')
     rootbasefilenodes = BaseFileNode.objects.filter(is_root=True)
@@ -15,8 +16,10 @@ def add_parent_id_value(apps, schema_editor):
                     basefilenode.parent_id = rootbasefilenode.id
                     basefilenode.save()
 
+
 def noop(*args):
     pass
+
 
 class Migration(migrations.Migration):
 

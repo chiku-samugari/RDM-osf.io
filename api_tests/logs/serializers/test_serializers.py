@@ -1,14 +1,25 @@
 import pytest
+from unittest import mock
 
 from framework.auth import Auth
-from osf.models import NodeLog
-from api.logs.serializers import NodeLogSerializer, NodeLogParamsSerializer, NodeLogFileParamsSerializer
-from osf_tests.factories import ProjectFactory, UserFactory, AuthUserFactory, InstitutionFactory, RegionFactory, UserQuotaFactory
+from osf.models import NodeLog, ProjectStorageType
+from api.logs.serializers import (
+    NodeLogSerializer,
+    NodeLogParamsSerializer,
+    NodeLogFileParamsSerializer
+)
+from osf_tests.factories import (
+    ProjectFactory,
+    UserFactory,
+    AuthUserFactory,
+    InstitutionFactory,
+    RegionFactory,
+    UserQuotaFactory
+)
 from tests.utils import make_drf_request_with_version
-from unittest import mock
-from osf.models import ProjectStorageType
 
 pytestmark = pytest.mark.django_db
+
 
 class TestNodeLogSerializer:
 
@@ -99,7 +110,8 @@ class TestNodeLogParamsSerializer:
         }
         mock_abstractnode = mock.MagicMock()
         mock_abstractnode.return_value = node
-        with mock.patch('osf.models.project_storage_type.ProjectStorageType.objects.get', side_effect=ProjectStorageType.DoesNotExist('mock error')):
+        with mock.patch('osf.models.project_storage_type.ProjectStorageType.objects.get',
+                        side_effect=ProjectStorageType.DoesNotExist('mock error')):
             with mock.patch('osf.models.node.AbstractNode.load', mock_abstractnode):
                 res = NodeLogParamsSerializer.get_storage_name(None, obj_value)
                 assert res == 'NII Storage'

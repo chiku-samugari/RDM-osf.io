@@ -40,6 +40,7 @@ from website.project.decorators import (
 )
 from osf.utils.tokens import process_token_or_pass
 from website.util.rubeus import collect_addon_js
+from website.util.quota import recalculate_used_quota_by_user
 from website.project.model import has_anonymous_link, NodeUpdateError, validate_title
 from website.project.forms import NewNodeForm
 from website.project.utils import sizeof_fmt
@@ -65,7 +66,6 @@ from addons.iqbrims.utils import serialize_iqbrims_widget
 from admin.rdm_addons.utils import validate_rdm_addons_allowed
 from api.base import settings as api_settings
 from osf.models.project_storage_type import ProjectStorageType
-from website.util.quota import recalculate_used_quota_by_user
 
 
 from nii.mapcore_api import MAPCoreException

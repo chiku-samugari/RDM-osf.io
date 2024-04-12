@@ -110,11 +110,13 @@ class AddonListView(RdmPermissionMixin, UserPassesTestMixin, TemplateView):
                 addon_name = addon['addon_short_name']
                 rdm_addon_options = utils.get_rdm_addon_option(institution.id, addon_name)
                 if rdm_addon_options.exists():
+                    rdm_addon_option = rdm_addon_options.first()
                     addon['option'] = {}
-                    addon['option'] = model_to_dict(rdm_addon_options.first())
-                    addon['option']['external_accounts'] = rdm_addon_options.first().external_accounts.values()
+                    addon['option'] = model_to_dict(rdm_addon_option)
+                    addon['option']['external_accounts'] = rdm_addon_option.external_accounts.values()
 
             return ctx
+
 
 class IconView(RdmPermissionMixin, UserPassesTestMixin, View):
     """View for each addon's icon"""
@@ -176,6 +178,7 @@ class AddonAllowView(RdmPermissionMixin, UserPassesTestMixin, View):
                 for account in accounts:
                     user.external_accounts.remove(account)
                 user.save()
+
 
 class AddonForceView(RdmPermissionMixin, UserPassesTestMixin, View):
     """View for saving whether to force use of each add-on"""

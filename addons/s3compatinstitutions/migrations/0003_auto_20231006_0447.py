@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 from django.db import migrations, models
 import django.db.models.deletion
 
+
 def add_region_and_root_id_value(apps, schema_editor):
     S3NodeSettings = apps.get_model('addons_s3compatinstitutions', 'nodesettings')
     OsfNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
@@ -16,8 +17,10 @@ def add_region_and_root_id_value(apps, schema_editor):
                 s3.root_node_id = osfnodesettings.root_node_id
                 s3.save()
 
+
 def noop(*args):
     pass
+
 
 class Migration(migrations.Migration):
 

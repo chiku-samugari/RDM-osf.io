@@ -227,7 +227,8 @@ class TestAddonAllowView(AdminTestCase):
 
     def test_get(self, *args, **kwargs):
         self.view.get(self.request, *args, **self.view.kwargs)
-        rdm_addon_option = utils.get_rdm_addon_option(self.rdm_addon_option.institution.id, self.view.kwargs['addon_name'])[0]
+        rdm_addon_option = utils.get_rdm_addon_option(
+            self.rdm_addon_option.institution.id, self.view.kwargs['addon_name'])[0]
         nt.assert_true(rdm_addon_option.is_allowed)
         nt.assert_equal(rdm_addon_option.provider, self.view.kwargs['addon_name'])
         nt.assert_equal(rdm_addon_option.institution_id, self.view.kwargs['institution_id'])
@@ -235,11 +236,13 @@ class TestAddonAllowView(AdminTestCase):
     def test_get_disallowed(self, *args, **kwargs):
         self.view.kwargs['allowed'] = False
         self.view.get(self.request, *args, **self.view.kwargs)
-        rdm_addon_option = utils.get_rdm_addon_option(self.rdm_addon_option.institution.id, self.view.kwargs['addon_name'])[0]
+        rdm_addon_option = utils.get_rdm_addon_option(
+            self.rdm_addon_option.institution.id, self.view.kwargs['addon_name'])[0]
         nt.assert_equal(rdm_addon_option.is_allowed, False)
         nt.assert_equal(rdm_addon_option.provider, self.view.kwargs['addon_name'])
         nt.assert_equal(rdm_addon_option.institution_id, self.view.kwargs['institution_id'])
         nt.assert_equal(self.user.external_accounts.filter(pk=self.external_account.id).exists(), False)
+
 
 class TestNoInstitutionAddonAllowView(AdminTestCase):
     def setUp(self):
@@ -291,6 +294,7 @@ class TestNoInstitutionAddonAllowView(AdminTestCase):
         nt.assert_equal(rdm_addon_option.is_allowed, False)
         nt.assert_equal(rdm_addon_option.provider, self.view.kwargs['addon_name'])
         nt.assert_equal(self.user.external_accounts.filter(pk=self.external_account.id).exists(), False)
+
 
 class TestAddonForceView(AdminTestCase):
     def setUp(self):
@@ -363,14 +367,16 @@ class TestAddonForceView(AdminTestCase):
 
     def test_get(self, *args, **kwargs):
         self.view.get(self.request, *args, **self.view.kwargs)
-        rdm_addon_option = utils.get_rdm_addon_option(self.rdm_addon_option.institution.id, self.view.kwargs['addon_name'])[0]
+        rdm_addon_option = utils.get_rdm_addon_option(
+            self.rdm_addon_option.institution.id, self.view.kwargs['addon_name'])[0]
         nt.assert_true(rdm_addon_option.is_forced)
         nt.assert_equal(rdm_addon_option.provider, self.view.kwargs['addon_name'])
 
     def test_get_not_forced(self, *args, **kwargs):
         self.view.kwargs['forced'] = False
         self.view.get(self.request, *args, **self.view.kwargs)
-        rdm_addon_option = utils.get_rdm_addon_option(self.rdm_addon_option.institution.id, self.view.kwargs['addon_name'])[0]
+        rdm_addon_option = utils.get_rdm_addon_option(
+            self.rdm_addon_option.institution.id, self.view.kwargs['addon_name'])[0]
         nt.assert_equal(rdm_addon_option.is_forced, False)
         nt.assert_equal(rdm_addon_option.provider, self.view.kwargs['addon_name'])
         nt.assert_true(self.user.external_accounts.filter(pk=self.external_account.id).exists())

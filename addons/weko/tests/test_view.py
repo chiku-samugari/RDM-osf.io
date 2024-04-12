@@ -4,16 +4,13 @@ from rest_framework import status as http_status
 import mock
 from nose.tools import *  # noqa
 
-from framework.auth import Auth
-from tests.base import OsfTestCase, get_default_metaschema
-from osf_tests.factories import ProjectFactory, AuthUserFactory, InstitutionFactory
-from framework.exceptions import HTTPError
+from tests.base import OsfTestCase
+from osf_tests.factories import AuthUserFactory, InstitutionFactory
 
 from addons.base.tests.views import (
     OAuthAddonConfigViewsTestCaseMixin
 )
 from addons.weko.tests.utils import WEKOAddonTestCase
-from website.util import api_url_for
 from addons.weko.tests.utils import ConnectionMock
 from admin.rdm_addons.utils import get_rdm_addon_option
 

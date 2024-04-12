@@ -15,7 +15,7 @@ $(function() {
     $osf.applyBindings(viewModel, '#connectedEmails');
     viewModel.init();
 
-    if($('#changePassword').length){
+    if ($('#changePassword').length) {
         new passwordForms.ChangePassword('#changePassword');
     }
 
@@ -29,7 +29,7 @@ $(function() {
         '#exportAccount'
     );
 
-    if($('#externalIdentity').length){
+    if ($('#externalIdentity').length) {
         $osf.applyBindings(
             new accountSettings.ExternalIdentityViewModel(),
             '#externalIdentity'

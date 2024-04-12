@@ -17,7 +17,8 @@ from framework.exceptions import HTTPError
 from tests.base import OsfTestCase, assert_is_redirect, fake
 from osf_tests.factories import (
     UserFactory, UnregUserFactory, AuthFactory,
-    ProjectFactory, NodeFactory, AuthUserFactory, PrivateLinkFactory, InstitutionFactory
+    ProjectFactory, NodeFactory, AuthUserFactory, PrivateLinkFactory,
+    InstitutionFactory,
 )
 
 from framework.auth import Auth
@@ -292,7 +293,7 @@ class TestPrivateLink(OsfTestCase):
 
         self.user = AuthUserFactory()
         self.user.affiliated_institutions = [InstitutionFactory()]
-        self.project = ProjectFactory(is_public=False,creator=self.user)
+        self.project = ProjectFactory(is_public=False, creator=self.user)
         self.link = PrivateLinkFactory()
         self.link.nodes.add(self.project)
         self.link.save()
@@ -343,12 +344,14 @@ class TestMustBeContributorDecorator(AuthAppTestCase):
         self.contrib.affiliated_institutions = [InstitutionFactory()]
         self.non_contrib = AuthUserFactory()
         admin = UserFactory()
-        self.public_project = ProjectFactory(is_public=True,creator=self.user)
-        self.public_project.add_contributor(admin, auth=Auth(self.public_project.creator), permissions=permissions.ADMIN)
-        self.private_project = ProjectFactory(is_public=False,creator=self.user)
+        self.public_project = ProjectFactory(is_public=True, creator=self.user)
+        self.public_project.add_contributor(admin, auth=Auth(self.public_project.creator),
+                                            permissions=permissions.ADMIN)
+        self.private_project = ProjectFactory(is_public=False, creator=self.user)
         self.public_project.add_contributor(self.contrib, auth=Auth(self.public_project.creator))
         self.private_project.add_contributor(self.contrib, auth=Auth(self.private_project.creator))
-        self.private_project.add_contributor(admin, auth=Auth(self.private_project.creator), permissions=permissions.ADMIN)
+        self.private_project.add_contributor(admin, auth=Auth(self.private_project.creator),
+                                             permissions=permissions.ADMIN)
         self.public_project.save()
         self.private_project.save()
 
@@ -465,8 +468,8 @@ class TestMustBeContributorOrPublicDecorator(AuthAppTestCase):
         self.user.affiliated_institutions = [InstitutionFactory()]
         self.contrib = AuthUserFactory()
         self.non_contrib = AuthUserFactory()
-        self.public_project = ProjectFactory(is_public=True,creator=self.user)
-        self.private_project = ProjectFactory(is_public=False,creator=self.user)
+        self.public_project = ProjectFactory(is_public=True, creator=self.user)
+        self.private_project = ProjectFactory(is_public=False, creator=self.user)
         self.public_project.add_contributor(self.contrib, auth=Auth(self.public_project.creator))
         self.private_project.add_contributor(self.contrib, auth=Auth(self.private_project.creator))
         self.public_project.save()
@@ -542,7 +545,8 @@ class TestMustBeContributorOrPublicDecorator(AuthAppTestCase):
         user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.public_project, creator=user)
         contrib = UserFactory()
-        self.public_project.add_contributor(contrib, auth=Auth(self.public_project.creator), permissions=permissions.WRITE)
+        self.public_project.add_contributor(contrib, auth=Auth(self.public_project.creator),
+                                            permissions=permissions.WRITE)
         self.public_project.save()
         with assert_raises(HTTPError) as exc_info:
             view_that_needs_contributor_or_public(
@@ -557,7 +561,8 @@ class TestMustBeContributorOrPublicDecorator(AuthAppTestCase):
         user.affiliated_institutions = [InstitutionFactory()]
         node = NodeFactory(parent=self.private_project, creator=user)
         contrib = UserFactory()
-        self.private_project.add_contributor(contrib, auth=Auth(self.private_project.creator), permissions=permissions.WRITE)
+        self.private_project.add_contributor(contrib, auth=Auth(self.private_project.creator),
+                                             permissions=permissions.WRITE)
         self.private_project.save()
         with assert_raises(HTTPError) as exc_info:
             view_that_needs_contributor_or_public(
@@ -581,10 +586,12 @@ class TestMustBeContributorOrPublicButNotAnonymizedDecorator(AuthAppTestCase):
         admin = UserFactory()
         self.user = AuthUserFactory()
         self.user.affiliated_institutions = [InstitutionFactory()]
-        self.public_project = ProjectFactory(is_public=True,creator=self.user)
-        self.public_project.add_contributor(admin, auth=Auth(self.public_project.creator), permissions=permissions.ADMIN)
-        self.private_project = ProjectFactory(is_public=False,creator=self.user)
-        self.private_project.add_contributor(admin, auth=Auth(self.private_project.creator), permissions=permissions.ADMIN)
+        self.public_project = ProjectFactory(is_public=True, creator=self.user)
+        self.public_project.add_contributor(admin, auth=Auth(self.public_project.creator),
+                                            permissions=permissions.ADMIN)
+        self.private_project = ProjectFactory(is_public=False, creator=self.user)
+        self.private_project.add_contributor(admin, auth=Auth(self.private_project.creator),
+                                             permissions=permissions.ADMIN)
         self.public_project.add_contributor(self.contrib, auth=Auth(self.public_project.creator))
         self.private_project.add_contributor(self.contrib, auth=Auth(self.private_project.creator))
         self.public_project.save()

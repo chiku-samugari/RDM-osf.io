@@ -61,6 +61,7 @@ class NodeLogFileParamsSerializer(RestrictedDictSerializer):
         except KeyError:
             return None
 
+
 class NodeLogParamsSerializer(RestrictedDictSerializer):
 
     addon = ser.CharField(read_only=True)

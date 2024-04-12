@@ -1,12 +1,12 @@
 import mock
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from nose import tools as nt
 from nose.tools import assert_raises
 
 from addons.osfstorage.settings import DEFAULT_REGION_NAME
 from addons.s3compatinstitutions.models import S3CompatInstitutionsProvider
 from admin.rdm_custom_storage_location import utils
-from admin.rdm_custom_storage_location.utils import get_providers
 from osf.models import RdmAddonOption
 from osf.models.external import ExternalAccountTemporary
 from osf_tests.factories import (
@@ -16,7 +16,6 @@ from osf_tests.factories import (
     ExternalAccountFactory
 )
 from tests.base import AdminTestCase
-from django.db import IntegrityError
 
 
 class TestUtils(AdminTestCase):
@@ -44,7 +43,7 @@ class TestUtils(AdminTestCase):
         }
 
     def test_get_providers(self):
-        provider_list = get_providers()
+        provider_list = utils.get_providers()
         assert provider_list
         provider_list_short_name = [p.short_name for p in provider_list]
         nt.assert_in('s3', provider_list_short_name, 's3')
@@ -60,14 +59,6 @@ class TestUtils(AdminTestCase):
         nt.assert_in('owncloud', provider_list_short_name, 'owncloud')
         nt.assert_in('s3compat', provider_list_short_name, 's3compat')
         nt.assert_in('s3compatinstitutions', provider_list_short_name, 's3compatinstitutions')
-
-        provider_list = get_providers(available_list=[])
-        nt.assert_equal(len(provider_list), 0)
-
-        available_list = ['s3', 's3compat']
-        provider_list = get_providers(available_list=available_list)
-        provider_list_short_name = [p.short_name for p in provider_list]
-        nt.assert_list_equal(provider_list_short_name, available_list)
 
     def test_update_storage(self):
         res = utils.update_storage(self.institution.id,
@@ -119,8 +110,12 @@ class TestUtils(AdminTestCase):
     @mock.patch('admin.rdm_custom_storage_location.utils.test_s3_connection')
     @mock.patch('osf.utils.external_util.remove_region_external_account')
     def test_save_s3_credentials_successfully(self, mock_external_util, mock_test_s3_connection, ):
-        mock_test_s3_connection.return_value = ({'message': 'Credentials are valid',
-                                                 'data': 's3_response'}, 200)
+        mock_test_s3_connection.return_value = (
+            {
+                'message': 'Credentials are valid',
+                'data': 's3_response'
+            }, 200
+        )
         mock_external_util.return_value = None
         storage_name = 'test_storage_name'
         access_key = 'fake_access_key'
@@ -152,8 +147,12 @@ class TestUtils(AdminTestCase):
     @mock.patch('admin.rdm_custom_storage_location.utils.test_s3compat_connection')
     @mock.patch('osf.utils.external_util.remove_region_external_account')
     def test_save_s3compat_credentials_successfully(self, mock_external_util, mock_test_s3compat_connection, ):
-        mock_test_s3compat_connection.return_value = ({'message': 'Credentials are valid',
-                                                       'data': {'id': 2, 'display_name': 'fake_display_name', }}, 200)
+        mock_test_s3compat_connection.return_value = (
+            {
+                'message': 'Credentials are valid',
+                'data': {'id': 2, 'display_name': 'fake_display_name', }
+            }, 200
+        )
         mock_external_util.return_value = None
         storage_name = 'test_storage_name'
         host_url = 'https://fake_host'
@@ -189,8 +188,12 @@ class TestUtils(AdminTestCase):
     @mock.patch('admin.rdm_custom_storage_location.utils.test_s3compatb3_connection')
     @mock.patch('osf.utils.external_util.remove_region_external_account')
     def test_save_s3compatb3_credentials_successfully(self, mock_external_util, mock_test_s3compatb3_connection, ):
-        mock_test_s3compatb3_connection.return_value = ({'message': 'Credentials are valid',
-                                                         'data': {'id': 2, 'display_name': 'fake_display_name', }}, 200)
+        mock_test_s3compatb3_connection.return_value = (
+            {
+                'message': 'Credentials are valid',
+                'data': {'id': 2, 'display_name': 'fake_display_name', }
+            }, 200
+        )
         mock_external_util.return_value = None
         storage_name = 'test_storage_name'
         host_url = 'https://fake_host'
@@ -259,7 +262,8 @@ class TestUtils(AdminTestCase):
     @mock.patch('osf.utils.external_util.set_region_external_account')
     @mock.patch('admin.rdm_custom_storage_location.utils.test_googledrive_connection')
     @mock.patch('admin.rdm_custom_storage_location.utils.transfer_to_external_account')
-    def test_save_googledrive_credentials_successfully(self, mock_transfer_to_external_account, mock_test_googledrive_connection,
+    def test_save_googledrive_credentials_successfully(self, mock_transfer_to_external_account,
+                                                       mock_test_googledrive_connection,
                                                        mock_set_region_external_account):
         user = UserFactory()
         institution = InstitutionFactory()
@@ -297,7 +301,8 @@ class TestUtils(AdminTestCase):
 
     @mock.patch('osf.utils.external_util.remove_region_external_account')
     @mock.patch('admin.rdm_custom_storage_location.utils.test_owncloud_connection')
-    def test_save_nextcloud_credentials_successfully(self, mock_test_owncloud_connection, mock_remove_region_external_account):
+    def test_save_nextcloud_credentials_successfully(self, mock_test_owncloud_connection,
+                                                     mock_remove_region_external_account):
         storage_name = 'test_storage_name'
         host_url = 'https://fake_host'
         username = 'fake_username'
@@ -560,14 +565,15 @@ class TestUtils(AdminTestCase):
         new_storage_name = 'fake_new_storage_name'
         extended_data = None
 
-        external_account = ExternalAccountFactory(provider=provider_name, provider_id='{}{}{}'.format(host, separator, username))
+        external_account = ExternalAccountFactory(provider=provider_name,
+                                                  provider_id='{}{}{}'.format(host, separator, username))
         provider = S3CompatInstitutionsProvider(account=None, host=host, username=username,
                                                 password=password, separator=separator)
 
         RdmAddonOption.objects.create(provider=provider_name, institution_id=institution.id)
         mock_external_account.return_value = external_account
         mock_save.side_effect = ValidationError('ERROR')
-        with assert_raises(ValidationError)as e:
+        with assert_raises(ValidationError) as e:
             utils.save_basic_storage_institutions_credentials_common(institution, storage_name,
                                                                      folder, provider_name,
                                                                      provider, separator,
@@ -674,8 +680,15 @@ class TestUtils(AdminTestCase):
 
     @mock.patch('admin.rdm_custom_storage_location.utils.test_s3compatb3_connection')
     def test_save_ociinstitutions_credentials_successfully(self, mock_test_s3compatb3_connection):
-        mock_test_s3compatb3_connection.return_value = ({'message': 'Credentials are valid',
-                                                         'data': {'id': 'user_info.id', 'display_name': 'user_info.display_name', }}, 200)
+        mock_test_s3compatb3_connection.return_value = (
+            {
+                'message': 'Credentials are valid',
+                'data': {
+                    'id': 'user_info.id',
+                    'display_name': 'user_info.display_name',
+                }
+            }, 200
+        )
         user = UserFactory()
         institution = InstitutionFactory()
         user.affiliated_institutions.add(institution)

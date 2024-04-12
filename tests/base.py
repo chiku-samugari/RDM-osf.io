@@ -4,12 +4,10 @@ import abc
 import datetime as dt
 import functools
 import logging
-import re
 import unittest
 import uuid
 
 import blinker
-import responses
 import mock
 import pytest
 
@@ -33,7 +31,7 @@ from webtest_plus import TestApp
 
 from .json_api_test_app import JSONAPITestApp
 
-from nose.tools import *  # noqa (PEP8 asserts); noqa (PEP8 asserts)
+from nose.tools import assert_less
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +135,6 @@ class AppTestCase(unittest.TestCase):
                 self.context.pop()
             except Exception:
                 pass
-                # do nothing
         for signal in self.DISCONNECTED_SIGNALS:
             for receiver in self.DISCONNECTED_SIGNALS[signal]:
                 signal.connect(receiver)

@@ -57,6 +57,7 @@ def test_institution_banner_path():
     expected_banner_path = '/static/img/institutions/banners/osf-banner.png'
     assert inst.banner_path == expected_banner_path
 
+
 @pytest.mark.django_db
 def test_get_institutional_storage():
     inst = InstitutionFactory()

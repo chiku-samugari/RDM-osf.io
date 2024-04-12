@@ -269,7 +269,7 @@ class TestAUser(OsfTestCase):
         region._id = institution._id
         region.save()
         mock_region.return_value = region
-        res = self.app.get('/login/', auth=self.user.auth)
+        self.app.get('/login/', auth=self.user.auth)
         assert_equal(region, self.user.get_addon('osfstorage').default_region)
 
 

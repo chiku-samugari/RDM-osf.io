@@ -127,7 +127,7 @@ $('.change_readonly').change(function () {
     toggle_button(this);
 });
 
-$("#storage_name, input[name*='attribute_value'], input[name*='attribute'], .storage_input_value").on('keyup', function(e){
+$("#storage_name, input[name*='attribute_value'], input[name*='attribute'], .storage_input_value").on('keyup', function (e) {
     var value = e.target.value;
     if (value.trim()) {
         e.target.setCustomValidity('');
@@ -137,7 +137,7 @@ $("#storage_name, input[name*='attribute_value'], input[name*='attribute'], .sto
     e.target.reportValidity();
 });
 
-$("input[name*='attribute_value'], input[name*='attribute']").on('input', function(e) {
+$("input[name*='attribute_value'], input[name*='attribute']").on('input', function (e) {
     var length = e.target.value.length;
     if (length >= 30) {
         e.target.title = e.target.value;
@@ -212,8 +212,8 @@ $('#multi-inst-storage .save_button').click(function (e) {
         var readonlyCheckboxElement = document.getElementById('readonly_checkbox_' + id);
         var params = {
             'region_id': id,
-            'allow': allowCheckboxElement.value === 'on' ? true : false,
-            'readonly': readonlyCheckboxElement.value === 'on' ? true : false,
+            'allow': allowCheckboxElement.value === 'on',
+            'readonly': readonlyCheckboxElement.value === 'on',
             'allow_expression': allowExpressionElement.value.trim(),
             'readonly_expression': readonlyExpressionElement.value.trim(),
             'storage_name': storageName.trim()
@@ -263,8 +263,7 @@ $('.save_attribute').click(function (e) {
         if (!attributeName) {
             is_submitted = false;
             attributeNameElement.setCustomValidity(_('This field is required.'));
-        }
-        else if (!ATTRIBUTE_LIST.includes(attributeName)) {
+        } else if (!ATTRIBUTE_LIST.includes(attributeName)) {
             is_submitted = false;
             attributeNameElement.setCustomValidity(_('No matches found.'));
         }
@@ -285,7 +284,7 @@ $('.save_attribute').click(function (e) {
 
 $('.attribute_name').autocomplete({
     source: ATTRIBUTE_LIST,
-    select: function(event, ui) {
+    select: function (event, ui) {
         var selected_value = ui.item.value;
         if (selected_value.length >= 30) {
             $(this)[0].title = selected_value;
@@ -295,9 +294,9 @@ $('.attribute_name').autocomplete({
     }
 });
 
-$('.attribute_name').on('keydown', function(e) {
+$('.attribute_name').on('keydown', function (e) {
     var keyCode = e.keyCode || e.which;
-    if (keyCode == 9) {
+    if (keyCode === 9) {
         e.preventDefault();
         var id = this.getAttribute('id');
         if (!ATTRIBUTE_LIST.includes(this.value)) {
@@ -690,13 +689,11 @@ function changeStatusExpression(type, id, chekboxValue) {
 }
 
 function resetCheckbox(typeCheckbox, typeExpression, id) {
-    var allowCheckboxElement = document.getElementById(typeCheckbox +  '_' + id);
-    var allowExpressionElement = document.getElementById(typeExpression + '_' + id);
-    if (allowCheckboxElement.dataset.value == 'true') {
+    var allowCheckboxElement = document.getElementById(typeCheckbox + '_' + id);
+    if (allowCheckboxElement.dataset.value === 'true') {
         allowCheckboxElement.classList.add('checked');
         changeStatusExpression(typeExpression, id, true);
-    }
-    else {
+    } else {
         allowCheckboxElement.classList.remove('checked');
         changeStatusExpression(typeExpression, id, false);
     }

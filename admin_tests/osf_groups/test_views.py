@@ -12,8 +12,8 @@ from osf_tests.factories import UserFactory, ProjectFactory, OSFGroupFactory, In
 from osf.utils.permissions import WRITE
 from admin.osf_groups.serializers import serialize_node_for_groups
 
-class TestOSFGroupsView(AdminTestCase):
 
+class TestOSFGroupsView(AdminTestCase):
     def setUp(self):
         super(TestOSFGroupsView, self).setUp()
         self.user = UserFactory()

@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
+from unittest import mock
+
 import pytest
 from nose import tools as nt
+
+from addons.osfstorage.models import NodeSettings
 from addons.osfstorage.tests import factories
 from osf_tests.factories import ProjectFactory, RegionFactory, NodeFactory
 from tests.base import OsfTestCase
-from unittest import mock
-from addons.osfstorage.models import NodeSettings
 
 
 @pytest.mark.django_db
@@ -27,6 +29,7 @@ class TestAddonModelMixin(OsfTestCase):
 
         self.new_component = NodeFactory(parent=self.project, creator=self.user)
         self.new_component.save()
+
     def test_get_addon_region(self):
         root_id = 1
         res = self.new_component.get_addon('osfstorage', False, self.region.id, root_id)

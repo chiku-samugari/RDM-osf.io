@@ -6,18 +6,17 @@ from django.utils import timezone
 from nose.tools import *  # noqa
 
 from addons.osfstorage.models import OsfStorageFile, OsfStorageFolder, OsfStorageFileNode
+from addons.osfstorage.tests import factories
 from addons.s3.models import S3File
 from osf.models import File
 from osf.models import Folder
 from osf.models.files import BaseFileNode
 from tests.base import OsfTestCase
-from osf_tests.factories import AuthUserFactory, ProjectFactory
+from osf_tests.factories import AuthUserFactory, ProjectFactory, RegionFactory, NodeFactory
 from website.files import exceptions
 from website.files.utils import attach_versions
-from osf import models
-from addons.osfstorage.tests import factories
-from osf_tests.factories import ProjectFactory, RegionFactory, NodeFactory
 from website.notifications.events.files import ComplexFileEvent
+from osf import models
 
 
 class TestFileNode(BaseFileNode):
@@ -787,6 +786,7 @@ class TestComplexFileEvent(FilesTestCase):
         with mock.patch('osf.models.node.AbstractNode.load', return_value=None):
             with mock.patch('osf.models.preprint.Preprint.load', return_value=None):
                 with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', return_value=None):
-                    with mock.patch('website.notifications.events.files.get_root_institutional_storage', return_value=file_child):
+                    with mock.patch('website.notifications.events.files.get_root_institutional_storage',
+                                    return_value=file_child):
                         res = ComplexFileEvent(self.user, self.new_component, 'added', payload)
                         assert res is not None

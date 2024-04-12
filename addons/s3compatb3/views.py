@@ -91,21 +91,20 @@ def s3compatb3_add_user_account(auth, **kwargs):
     #         'message': 'The host is not available.'
     #     }, http_status.HTTP_400_BAD_REQUEST
 
-    user_info = utils.get_user_info(host, access_key, secret_key)
-    if not user_info:
+    connection = utils.get_connection(host, access_key, secret_key)
+    if not connection:
         return {
             'message': ('Unable to access account.\n'
-                'Check to make sure that the above credentials are valid, '
-                'and that they have permission to list buckets.')
+                        'Check to make sure that the above credentials are valid, '
+                        'and that they have permission to list buckets.')
         }, http_status.HTTP_400_BAD_REQUEST
 
     if not utils.can_list(host, access_key, secret_key):
         return {
             'message': ('Unable to list buckets.\n'
-                'Listing buckets is required permission that can be changed via IAM')
+                        'Listing buckets is required permission that can be changed via IAM')
         }, http_status.HTTP_400_BAD_REQUEST
 
-    account = None
     try:
         account = ExternalAccount(
             provider=SHORT_NAME,

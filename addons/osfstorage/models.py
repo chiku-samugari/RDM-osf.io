@@ -12,6 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from psycopg2._psycopg import AsIs
 
 from addons.base.models import BaseNodeSettings, BaseStorageAddon, BaseUserSettings
+from addons.base.utils import get_root_institutional_storage
 from osf.utils.fields import EncryptedJSONField
 from osf.utils.datetime_aware_jsonfield import DateTimeAwareJSONField
 from osf.exceptions import InvalidTagError, NodeStateError, TagNotFoundError
@@ -27,7 +28,6 @@ from website.util import api_url_for
 from website import settings as website_settings
 from addons.osfstorage.settings import DEFAULT_REGION_ID
 from website.util import api_v2_url
-from addons.base.utils import get_root_institutional_storage
 
 settings = apps.get_app_config('addons_osfstorage')
 
@@ -172,11 +172,11 @@ class OsfStorageFileNode(BaseFileNode):
     def update_region_from_latest_version(self, destination_parent):
         raise NotImplementedError
 
-    def move_under(self, destination_parent, name=None, is_check_permission=True):
-        if self.is_preprint_primary and is_check_permission:
+    def move_under(self, destination_parent, name=None):
+        if self.is_preprint_primary:
             if self.target != destination_parent.target or self.provider != destination_parent.provider:
                 raise exceptions.FileNodeIsPrimaryFile()
-        if self.is_checked_out and is_check_permission:
+        if self.is_checked_out:
             raise exceptions.FileNodeCheckedOutError()
         self.update_region_from_latest_version(destination_parent)
         return super(OsfStorageFileNode, self).move_under(destination_parent, name)
@@ -273,9 +273,13 @@ class OsfStorageFile(OsfStorageFileNode, File):
 
     @property
     def versions_sorted_by_identifier(self):
-        versions_order_by_identifier = self.versions.annotate(version_identifier=Cast('identifier', IntegerField())).order_by('-version_identifier')
+        versions_order_by_identifier = self.versions.annotate(
+            version_identifier=Cast('identifier', IntegerField())
+        ).order_by('-version_identifier')
+
         if versions_order_by_identifier.exists():
             return versions_order_by_identifier
+
         return self.versions
 
     @property
@@ -319,7 +323,6 @@ class OsfStorageFile(OsfStorageFileNode, File):
             most_recent_fileversion.save()
 
     def create_version(self, creator, location, metadata=None):
-        logger.warning(f'create version here {creator}')
         latest_version = self.get_version()
         version = FileVersion(identifier=self.versions.count() + 1, creator=creator, location=location)
 
@@ -501,6 +504,7 @@ class OsfStorageFolder(OsfStorageFileNode, Folder):
         for child in self.children.all().prefetch_related('versions'):
             child.update_region_from_latest_version(destination_parent)
 
+
 class Region(models.Model):
     # GRDM ver.: Region._id may be Institution._id
     _id = models.CharField(max_length=255, db_index=True)
@@ -516,10 +520,6 @@ class Region(models.Model):
 
     def __unicode__(self):
         return '{}'.format(self.name)
-
-    def __str__(self):
-        """The string representation"""
-        return '{} : ({})'.format(self.name, self._id)
 
     def get_absolute_url(self):
         return '{}regions/{}'.format(self.absolute_api_v2_url, self._id)
@@ -571,9 +571,6 @@ class Region(models.Model):
 class UserSettings(BaseUserSettings):
     default_region = models.ForeignKey(Region, null=True, on_delete=models.CASCADE)
 
-    def __str__(self):
-        return f'{self.pk}'
-
     def on_add(self):
         default_region = Region.objects.get(_id=DEFAULT_REGION_ID)
         self.default_region = default_region
@@ -604,9 +601,6 @@ class NodeSettings(BaseNodeSettings, BaseStorageAddon):
     user_settings = models.ForeignKey(UserSettings, null=True, blank=True, on_delete=models.CASCADE)
     owner = models.ForeignKey(AbstractNode, related_name='%(app_label)s_node_settings',
                               null=True, blank=True, on_delete=models.CASCADE)
-
-    def __str__(self):
-        return f'{self.pk}'
 
     @property
     def folder_name(self):

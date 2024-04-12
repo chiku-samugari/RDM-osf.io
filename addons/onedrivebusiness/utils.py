@@ -40,6 +40,7 @@ def get_region_external_account(node_settings):
     else:
         return None
 
+
 def get_column_id(sheet, text):
     for row in sheet.iter_rows():
         for cell in list(row):

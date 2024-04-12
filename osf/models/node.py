@@ -2374,7 +2374,6 @@ class AbstractNode(DirtyFieldsMixin, TypedModel, AddonModelMixin, IdentifierMixi
         try:
             metadata = payload['metadata']
             file_id = metadata['path']
-
             if payload['provider'] == 'osfstorage' and file_id is None:
                 raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
             root_folder_id = None
@@ -2390,7 +2389,6 @@ class AbstractNode(DirtyFieldsMixin, TypedModel, AddonModelMixin, IdentifierMixi
                     root_folder_id = root_folder_id.id
                     metadata['path'] = payload['root_path'] + metadata['path']
             node_addon = self.get_addon(payload['provider'], root_id=root_folder_id)
-            logger.debug(f'node_addon is {node_addon}')
         except KeyError:
             raise HTTPError(http_status.HTTP_400_BAD_REQUEST)
 
@@ -2526,6 +2524,7 @@ def remove_addons(auth, resource_object_list):
             for addon in addon_list:
                 addon.after_delete(auth.user)
 
+
 def set_project_storage_type(instance):
     from addons.osfstorage.models import NodeSettings  # this import was essential
     storage_type = ProjectStorageType.CUSTOM_STORAGE
@@ -2539,7 +2538,7 @@ def set_project_storage_type(instance):
         return
     except NodeSettings.MultipleObjectsReturned:
         pass
-    obj, created = ProjectStorageType.objects.update_or_create(
+    ProjectStorageType.objects.update_or_create(
         node_id=instance.id, defaults={'node_id': instance.id, 'storage_type': storage_type}
     )
 
@@ -2590,10 +2589,12 @@ def add_default_node_addons(sender, instance, created, **kwargs):
                         for region in regions:
                             instance.add_addon(addon.short_name, auth=None, log=False, region_id=region.id)
                     else:
-                        instance.add_addon(addon.short_name, auth=None, log=False, region_id=api_settings.NII_STORAGE_REGION_ID)
+                        instance.add_addon(addon.short_name, auth=None, log=False,
+                                           region_id=api_settings.NII_STORAGE_REGION_ID)
                 else:
                     instance.add_addon(addon.short_name, auth=None, log=False)
         set_project_storage_type(instance)
+
 
 @receiver(post_save, sender=Node)
 @receiver(post_save, sender='osf.Registration')

@@ -6,11 +6,11 @@ from admin.institutional_storage_quota_control import views
 from django.http import Http404
 from django.test import RequestFactory
 from django.urls import reverse
-from framework.exceptions import HTTPError
-from osf.models.user_storage_quota import UserStorageQuota
 from nose import tools as nt
-from osf.models import UserQuota
+
+from osf.models import UserQuota, UserStorageQuota
 from admin_tests.utilities import setup_view, setup_user_view
+from framework.exceptions import HTTPError
 from osf_tests.factories import (
     AuthUserFactory,
     InstitutionFactory,

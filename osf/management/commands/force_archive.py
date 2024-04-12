@@ -164,6 +164,7 @@ def perform_wb_copy(reg, node_settings):
     if res.status_code not in (http_status.HTTP_200_OK, http_status.HTTP_201_CREATED, http_status.HTTP_202_ACCEPTED):
         raise HTTPError(res.status_code)
 
+
 def manually_archive(tree, reg, node_settings, parent=None, region_id=None):
     if not isinstance(tree, list):
         tree = [tree]
@@ -336,6 +337,7 @@ def build_file_tree(reg, node_settings):
     current_tree = _recurse(node_settings.get_root(), n)
     return revert_log_actions(current_tree, reg, obj_cache)
 
+
 def archive(registration, region_id=None):
     for reg in registration.node_and_primary_descendants():
         reg.registered_from.creator.get_or_create_cookie()  # Allow WB requests
@@ -365,6 +367,7 @@ def archive(registration, region_id=None):
             else:
                 assert reg.archiving, '{}: Must be `archiving` for WB to copy'.format(reg._id)
                 perform_wb_copy(reg, node_settings)
+
 
 def archive_registrations():
     for reg in deepcopy(VERIFIED):

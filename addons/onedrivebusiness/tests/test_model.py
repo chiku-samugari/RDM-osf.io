@@ -11,7 +11,6 @@ from addons.base.tests.models import (
     OAuthAddonUserSettingTestSuiteMixin
 )
 from addons.onedrivebusiness import SHORT_NAME, FULL_NAME
-from addons.onedrivebusiness import settings
 from addons.onedrivebusiness.models import NodeSettings
 from addons.onedrivebusiness.tests.factories import (
     OneDriveBusinessUserSettingsFactory,
@@ -141,10 +140,10 @@ class TestNodeSettings(OAuthAddonNodeSettingsTestSuiteMixin, unittest.TestCase):
 
     def test_serialize_settings(self):
         self.node_settings.drive_id = 'drive-1234'
-        settings = self.node_settings.serialize_waterbutler_settings()
+        _waterbutler_settings = self.node_settings.serialize_waterbutler_settings()
         expected = {
             'nid': self.node._id,
             'folder': self.node_settings.folder_id,
             'drive_id': 'drive-1234',
         }
-        assert_equal(settings, expected)
+        assert_equal(_waterbutler_settings, expected)

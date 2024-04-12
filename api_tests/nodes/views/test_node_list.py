@@ -1,9 +1,9 @@
 import pytest
 from nose.tools import *  # noqa:
+from unittest import mock
 
 from django.utils import timezone
 from api.base import settings as api_settings
-
 from api.base.settings.defaults import API_BASE, MAX_PAGE_SIZE
 from api.base.utils import default_node_permission_queryset
 from api_tests.nodes.filters.test_filters import NodesListFilteringMixin, NodesListDateFilteringMixin
@@ -31,7 +31,6 @@ from rest_framework import exceptions
 from tests.utils import assert_equals
 from website.views import find_bookmark_collection
 from osf.utils.workflows import DefaultStates
-from unittest import mock
 
 
 @pytest.fixture()

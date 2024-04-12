@@ -181,6 +181,7 @@ class TestclassStatisticsView(AdminTestCase):
         nt.assert_true('provider_data_array' in ctx)
         nt.assert_true('token' in ctx)
 
+
 class TestImageView(AdminTestCase):
     """test ImageView"""
     def setUp(self):
@@ -190,7 +191,8 @@ class TestImageView(AdminTestCase):
         self.institution1 = InstitutionFactory()
         self.user.affiliated_institutions.add(self.institution1)
         project = ProjectFactory(creator=self.user)
-        self.rdm_statistics = rdm_statistics_factories.RdmStatisticsFactory.create(institution=self.institution1, provider='s3', owner=self.user, project=project)
+        self.rdm_statistics = rdm_statistics_factories.RdmStatisticsFactory.create(
+            institution=self.institution1, provider='s3', owner=self.user, project=project)
         self.rdm_statistics.save()
         self.view = views.ImageView()
         self.view = setup_user_view(self.view, self.request, user=self.user)

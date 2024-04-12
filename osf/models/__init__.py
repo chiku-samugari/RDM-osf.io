@@ -61,6 +61,7 @@ from osf.models.rdm_timestamp_grant_pattern import RdmTimestampGrantPattern  # n
 from osf.models.timestamp_task import TimestampTask  # noqa
 from osf.models.fileinfo import FileInfo  # noqa
 from osf.models.user_quota import UserQuota  # noqa
+from osf.models.user_storage_quota import UserStorageQuota  # noqa
 from osf.models.project_storage_type import ProjectStorageType  # noqa
 from osf.models.region_external_account import RegionExternalAccount  # noqa
 from osf.models.institution_entitlement import InstitutionEntitlement  # noqa

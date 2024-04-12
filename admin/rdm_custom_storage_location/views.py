@@ -17,14 +17,13 @@ import logging
 from addons.osfstorage.models import Region
 from admin.rdm.utils import RdmPermissionMixin
 from admin.rdm_custom_storage_location import utils
+from api.base import settings as api_settings
+from framework.exceptions import HTTPError
 from osf.models import Institution, OSFUser, AuthenticationAttribute
 from osf.models.external import ExternalAccountTemporary
 from scripts import refresh_addon_tokens
 from website import settings as osf_settings
 from distutils.util import strtobool
-from framework.exceptions import HTTPError
-from api.base import settings as api_settings
-
 
 logger = logging.getLogger(__name__)
 
@@ -213,15 +212,16 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
         storage_name = data.get('storage_name')
         if storage_name is not None:
             storage_name = storage_name.strip()
+
         new_storage_name = data.get('new_storage_name')
         if new_storage_name is not None:
             new_storage_name = new_storage_name.strip()
+
         if not storage_name and utils.have_storage_name(provider_short_name):
             return JsonResponse({
                 'message': 'Storage name is missing.'
             }, status=http_status.HTTP_400_BAD_REQUEST)
 
-        result = None
         try:
             if provider_short_name == 's3':
                 result = utils.save_s3_credentials(
@@ -361,7 +361,9 @@ class SaveCredentialsView(InstitutionalStorageBaseView, View):
         except IntegrityError:
             result = ({'message': 'The name of institutional storage already exists.'},
                       http_status.HTTP_400_BAD_REQUEST)
+
         status = result[1]
+
         return JsonResponse(result[0], status=status)
 
 
@@ -615,7 +617,6 @@ class UserMapView(InstitutionalStorageBaseView, View):
 
 
 class ChangeAllowedViews(InstitutionalStorageBaseView, View):
-
     def post(self, request):
         data = json.loads(request.body)
         region_id = data.get('id')
@@ -631,15 +632,13 @@ class ChangeAllowedViews(InstitutionalStorageBaseView, View):
 
         allowed_regions = Region.objects.filter(_id=region[0]._id, is_allowed=True)
         # At least 1 region is allowed
-        if allowed_regions.count() > 1 \
-                or (allowed_regions.count() == 1 and is_allowed is True):
+        if allowed_regions.count() > 1 or (allowed_regions.count() == 1 and is_allowed is True):
             region.update(is_allowed=is_allowed)
 
         return JsonResponse({}, status=http_status.HTTP_200_OK)
 
 
 class CheckExistingStorage(InstitutionalStorageBaseView, View):
-
     def post(self, request):
         institution = request.user.affiliated_institutions.first()
         data = json.loads(request.body)
@@ -659,7 +658,6 @@ class CheckExistingStorage(InstitutionalStorageBaseView, View):
 
 
 class ChangeReadonlyViews(InstitutionalStorageBaseView, View):
-
     def post(self, request):
         data = json.loads(request.body)
         region_id = data.get('id')
@@ -682,7 +680,6 @@ class ChangeReadonlyViews(InstitutionalStorageBaseView, View):
 
 
 class ChangeAuthenticationAttributeView(InstitutionalStorageBaseView, View):
-
     def post(self, request):
         data = json.loads(request.body)
         institution = request.user.affiliated_institutions.first()
@@ -698,9 +695,7 @@ class ChangeAuthenticationAttributeView(InstitutionalStorageBaseView, View):
 
 
 class AddAttributeFormView(RdmPermissionMixin, View):
-
     def post(self, request, **kwargs):
-
         institution = request.user.affiliated_institutions.first()
 
         max_current_index_number = AuthenticationAttribute.objects.filter(
@@ -740,7 +735,6 @@ class AddAttributeFormView(RdmPermissionMixin, View):
 
 
 class DeleteAttributeFormView(InstitutionalStorageBaseView, View):
-
     def post(self, request):
         data = json.loads(request.body)
         institution = request.user.affiliated_institutions.first()
@@ -777,7 +771,6 @@ class DeleteAttributeFormView(InstitutionalStorageBaseView, View):
 
 
 class SaveAttributeFormView(InstitutionalStorageBaseView, View):
-
     def post(self, request):
         data = json.loads(request.body)
         attribute_id = data.get('id', None)
@@ -805,7 +798,6 @@ class SaveAttributeFormView(InstitutionalStorageBaseView, View):
 
 
 class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
-
     def post(self, request):
         data = json.loads(request.body)
         region_id = data.get('region_id', None)
@@ -830,7 +822,8 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
             institution=institution,
             is_deleted=False,
             attribute_name__isnull=False,
-            attribute_value__isnull=False).values_list('index_number', flat=True))
+            attribute_value__isnull=False
+        ).values_list('index_number', flat=True))
         is_valid_allow = utils.validate_index_number_not_found(allow_expression, index_numbers)
         is_valid_readonly = utils.validate_index_number_not_found(readonly_expression, index_numbers)
 
@@ -850,6 +843,7 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
                         'message': 'The name of institutional storage already exists.'
                     }, status=http_status.HTTP_400_BAD_REQUEST)
                 region.name = storage_name
+
             region.is_allowed = allow
             region.is_readonly = readonly
             region.allow_expression = allow_expression

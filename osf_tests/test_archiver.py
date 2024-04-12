@@ -231,8 +231,10 @@ def _mock_get_or_add(name, *args, **kwargs):
     active_addons.add(name)
     return _mock_get_addon(name)
 
+
 def _mock_has_addon(name, *args, **kwargs):
     return name in active_addons
+
 
 def use_fake_addons(func):
     @functools.wraps(func)
@@ -247,6 +249,7 @@ def use_fake_addons(func):
             ret = func(*args, **kwargs)
             return ret
     return wrapper
+
 
 def generate_file_tree(nodes):
     file_trees = {
@@ -589,7 +592,7 @@ class TestArchiverTasks(ArchiverTestCase):
             archive_addon('osfstorage', self.archive_job._id)
             assert_equal(self.archive_job.get_target('osfstorage').status, ARCHIVER_INITIATED)
             cookie = self.user.get_or_create_cookie()
-            assert(mock_make_copy_request.called_with(
+            assert (mock_make_copy_request.called_with(
                 self.archive_job._id,
                 settings.WATERBUTLER_URL + '/ops/copy',
                 data=dict(

@@ -13,6 +13,7 @@ from guardian.shortcuts import assign_perm, get_perms, remove_perm, get_group_pe
 from include import IncludeQuerySet
 
 from api.providers.workflows import Workflows, PUBLIC_STATES
+from api.base.settings.defaults import ADDON_METHOD_PROVIDER
 from framework import status
 from framework.auth import Auth
 from framework.auth.core import get_user
@@ -46,7 +47,7 @@ from website.project import signals as project_signals
 from website import settings, mails, language
 from website.project.licenses import set_license
 from api.base.rdmlogger import RdmLogger, rdmlog
-from api.base.settings.defaults import ADDON_METHOD_PROVIDER
+
 
 logger = logging.getLogger(__name__)
 
@@ -528,7 +529,7 @@ class AddonModelMixin(models.Model):
                     addon = self.get_addon(config.short_name)
                     if addon:
                         addons.append(addon)
-        logger.debug(f'addons is {addons}')
+
         return addons
 
     def get_oauth_addons(self):
@@ -561,18 +562,16 @@ class AddonModelMixin(models.Model):
         return self.add_addon(name, *args, **kwargs)
 
     def get_addon(self, name, is_deleted=False, region_id=None, root_id=None):
-        logger.debug(f'addon name is {name}')
-        logger.debug(f'addon region_id is {region_id}')
-        logger.debug(f'addon root_id is {root_id}')
-
         try:
             settings_model = self._settings_model(name)
         except LookupError:
             return None
+
         if not settings_model:
             return None
+
+        settings_obj = None
         try:
-            settings_obj = None
             settings_obj = settings_model.objects.get(owner=self)
         except ObjectDoesNotExist:
             pass
@@ -584,27 +583,24 @@ class AddonModelMixin(models.Model):
                 settings_obj = settings_model.objects.filter(owner=self,
                                                              region_id=region_id).first()
             else:
-                logger.debug('get the first addon')
                 settings_obj = settings_model.objects.filter(owner=self).first()
+
         if settings_obj and (not settings_obj.is_deleted or is_deleted):
             return settings_obj
         else:
             return None
 
     def get_multi_addon(self, name, is_deleted=False):
-        logger.debug(f'addon name is {name}')
         addon_settings = []
         try:
             settings_model = self._settings_model(name)
         except LookupError:
             return None
+
         if not settings_model:
             return None
-        try:
-            settings_objs = None
-            settings_objs = settings_model.objects.filter(owner=self)
-        except ObjectDoesNotExist:
-            pass
+
+        settings_objs = settings_model.objects.filter(owner=self)
 
         if settings_objs.exists():
             for settings_obj in settings_objs:
@@ -616,7 +612,6 @@ class AddonModelMixin(models.Model):
         """Get all osfstorage addons were owned
 
         :return QuerySet: Osfstorage add-ons was owned
-
         """
         try:
             settings_model = self._settings_model('osfstorage')
@@ -632,7 +627,6 @@ class AddonModelMixin(models.Model):
 
         :param str addon_name: Name of add-on
         :return NodeSettings: Add-on was found
-
         """
         try:
             settings_model = self._settings_model(addon_name)
@@ -655,8 +649,8 @@ class AddonModelMixin(models.Model):
         :param bool _force: For migration testing ONLY. Do not set to True
             in the application, or else projects will be allowed to have
             duplicate addons!
+        :param region_id:
         :return bool: Add-on was added
-
         """
         if not override and addon_name in settings.SYSTEM_ADDED_ADDONS[self.settings_type]:
             return False
@@ -672,7 +666,6 @@ class AddonModelMixin(models.Model):
             addon = settings_model.objects.filter(owner=self, region_id=region_id).first()
         else:
             addon = self.get_addon(addon_name, is_deleted=True)
-        logger.debug(f'addon is {addon}')
         if addon:
             if addon.deleted:
                 addon.undelete(save=True)
@@ -711,11 +704,11 @@ class AddonModelMixin(models.Model):
         :param bool _force: For migration testing ONLY. Do not set to True
             in the application, or else projects will be allowed to delete
             mandatory add-ons!
+        :param region_id:
         :return bool: Add-on was deleted
         """
         from website.util import timestamp
         addon = self.get_addon(addon_name, region_id=region_id)
-        logger.debug(f'addon is {addon}')
         if not addon:
             return False
         if self.settings_type in addon.config.added_mandatory and not _force:

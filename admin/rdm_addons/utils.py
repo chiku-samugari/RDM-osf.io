@@ -64,35 +64,42 @@ def collect_addon_js(addons):
             js_url_list.append(hash_path)
     return js_url_list
 
+
 def _get_rdm_addon_options_get_only(institution_id, addon_name):
     try:
         if institution_id:
             rdm_addon_options = RdmAddonOption.objects.filter(
                 institution_id=institution_id,
-                provider=addon_name).order_by('id')
+                provider=addon_name
+            ).order_by('id')
         else:
             rdm_addon_options = RdmAddonNoInstitutionOption.objects.filter(
-                provider=addon_name).order_by('id')
+                provider=addon_name
+            ).order_by('id')
         return rdm_addon_options
     except Exception:
         return None
+
 
 def get_rdm_addon_option(institution_id, addon_name, create=True, need_create=False):
     """get model objects of RdmAddonOption or RdmAddonNoInstitutionOption"""
     if not create:
         return _get_rdm_addon_options_get_only(institution_id, addon_name)
+
     created = False
     if institution_id:
         rdm_addon_options = RdmAddonOption.objects.filter(institution_id=institution_id, provider=addon_name)
         if not rdm_addon_options.exists() or need_create:
-            rdm_addon_option = RdmAddonOption.objects.create(
-                institution_id=institution_id, provider=addon_name)
+            RdmAddonOption.objects.create(institution_id=institution_id, provider=addon_name)
             created = True
-            rdm_addon_options = RdmAddonOption.objects.filter(institution_id=institution_id, provider=addon_name).order_by('id')
+            rdm_addon_options = RdmAddonOption.objects.filter(
+                institution_id=institution_id,
+                provider=addon_name
+            ).order_by('id')
     else:
         rdm_addon_options = RdmAddonNoInstitutionOption.objects.filter(provider=addon_name)
         if not rdm_addon_options.exists() or need_create:
-            rdm_addon_option = RdmAddonNoInstitutionOption.objects.create(provider=addon_name)
+            RdmAddonNoInstitutionOption.objects.create(provider=addon_name)
             created = True
             rdm_addon_options = RdmAddonNoInstitutionOption.objects.filter(provider=addon_name).order_by('id')
 
@@ -112,21 +119,23 @@ def get_rdm_addon_option(institution_id, addon_name, create=True, need_create=Fa
 
 def update_with_rdm_addon_settings(addon_setting, user):
     """add configuration information specific to RDM to the GakuNin RDM Addon settings"""
-    institutoin_id = get_institution_id(user)
+    institution_id = get_institution_id(user)
     for addon in addon_setting:
         addon_name = addon['addon_short_name']
-        rdm_addon_options = get_rdm_addon_option(institutoin_id, addon_name).order_by('-id')
+        rdm_addon_options = get_rdm_addon_option(institution_id, addon_name).order_by('-id')
         # Note: May be impact when multiple
         if rdm_addon_options.exists():
-            addon['is_allowed'] = rdm_addon_options.first().is_allowed
-            addon['is_forced'] = rdm_addon_options.first().is_forced
-            addon['has_external_accounts'] = rdm_addon_options.first().external_accounts.exists()
+            rdm_addon_option = rdm_addon_options.first()
+            addon['is_allowed'] = rdm_addon_option.is_allowed
+            addon['is_forced'] = rdm_addon_option.is_forced
+            addon['has_external_accounts'] = rdm_addon_option.external_accounts.exists()
             addon['has_user_external_accounts'] = user.external_accounts.filter(provider=addon_name).exists()
 
 def validate_rdm_addons_allowed(auth, addon_name):
     institution_id = get_institution_id(auth.user)
     rdm_addon_options = get_rdm_addon_option(institution_id, addon_name)
     # Note: May be impact when multiple
-    if not rdm_addon_options.first().is_allowed:
+    rdm_addon_option = rdm_addon_options.first()
+    if not rdm_addon_option.is_allowed:
         raise PermissionsError('Unable to access account.\n'
                                'You are prohibited from using this add-on.')

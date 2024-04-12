@@ -8,6 +8,8 @@ from django.db import models
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 
+from addons.osfstorage.models import Region, NodeSettings
+from osf.models.institution import Institution
 from osf.models.node import Node
 from osf.models.rdm_addons import RdmAddonOption
 from website import settings as website_settings
@@ -17,9 +19,6 @@ from admin.rdm_addons.utils import get_rdm_addon_option
 from addons.base import exceptions
 from addons.base.models import BaseNodeSettings, BaseStorageAddon
 from framework.auth import Auth
-from addons.osfstorage.models import Region, NodeSettings
-from osf.models.institution import Institution
-
 
 logger = logging.getLogger(__name__)
 
@@ -191,8 +190,6 @@ class InstitutionsStorageAddon(BaseStorageAddon):
 
     @classmethod
     def cls_init_addon(cls, node, institution_id, addon_name):
-        logger.debug(f'addon_name is {addon_name}')
-        logger.debug(f'root node id is {node}')
         # Note: May be impact when multiple
         addon_options = cls.cls_get_addon_option(institution_id, addon_name)
         if addon_options is None or not addon_options.exists():
@@ -201,7 +198,10 @@ class InstitutionsStorageAddon(BaseStorageAddon):
 
         addons = []
         institution = Institution.objects.get(id=institution_id)
-        regions = Region.objects.filter(_id=institution._id, waterbutler_settings__storage__provider=addon_name).order_by('id')
+        regions = Region.objects.filter(
+            _id=institution._id,
+            waterbutler_settings__storage__provider=addon_name
+        ).order_by('id')
         idx = 0
         rdm_options = RdmAddonOption.objects.filter(institution_id=institution_id).order_by('id')
         rdm_option_indexs = []
@@ -225,9 +225,13 @@ class InstitutionsStorageAddon(BaseStorageAddon):
                 cls.create_folder(client, base_folder, folder_name)
                 try:
                     region = regions[idx]
-                    osfstorage_nodesetting = NodeSettings.objects.filter(owner_id=node.get_root().id, is_deleted=False, region_id=region.id).first()
+                    osfstorage_nodesetting = NodeSettings.objects.filter(
+                        owner_id=node.get_root().id,
+                        is_deleted=False,
+                        region_id=region.id
+                    ).first()
                     addon = node.add_addon(addon_name, auth=Auth(node.creator),
-                                        log=True, region_id=region.id)
+                                           log=True, region_id=region.id)
                     addon.set_addon_option(addon_option)
                     addon.set_folder_id(folder_name)
                     addon.set_region_id(region.id)
@@ -239,7 +243,10 @@ class InstitutionsStorageAddon(BaseStorageAddon):
                     try:
                         cls.remove_folder(client, base_folder, folder_name)
                     except Exception:
-                        logger.exception(u'cannot remove unnecessary folder: ({})/{}, {}'.format(addon_name, base_folder, folder_name))
+                        logger.exception(
+                            u'cannot remove unnecessary folder: ({})/{}, {}'.format(
+                                addon_name, base_folder, folder_name)
+                        )
                     raise
         return addons
 
@@ -298,12 +305,12 @@ class InstitutionsStorageAddon(BaseStorageAddon):
     # NOTE: override in s3compatinstitutions
     def set_folder_id(self, folder_id, auth=None):
         self.folder_id = folder_id
-        # NOTE: override in s3compatinstitutions
 
-    def set_region_id(self, region_id, auth=None):
+    # NOTE: override in s3compatinstitutions
+    def set_region_id(self, region_id):
         self.region_id = region_id
 
-    def set_root_node_id(self, root_node_id, auth=None):
+    def set_root_node_id(self, root_node_id):
         self.root_node_id = root_node_id
 
     def sync_title(self):

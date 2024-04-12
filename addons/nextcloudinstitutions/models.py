@@ -10,13 +10,13 @@ from addons.base.institutions_utils import (
     InstitutionsNodeSettings,
     InstitutionsStorageAddon
 )
+from addons.osfstorage.models import Region
 from addons.nextcloud.models import NextcloudProvider
 from addons.nextcloudinstitutions import settings, apps, utils
 from osf.models.files import File, Folder, BaseFileNode
+from osf.models.node import AbstractNode
 from osf.utils.permissions import ADMIN, READ, WRITE
 from website.util import timestamp
-from addons.osfstorage.models import Region
-from osf.models.node import AbstractNode
 
 logger = logging.getLogger(__name__)
 
@@ -104,9 +104,18 @@ class NodeSettings(InstitutionsNodeSettings, InstitutionsStorageAddon):
     SHORT_NAME = SHORT_NAME
 
     folder_id = models.TextField(blank=True, null=True)
-    region = models.ForeignKey(Region, blank=True, null=True, related_name='next_cloud_institutions_region_id', on_delete=models.CASCADE)
-    root_node = models.ForeignKey(BaseFileNode, related_name='next_cloud_institutions_root_node_id', blank=True, null=True, default=None, on_delete=models.CASCADE)
-    owner = models.ForeignKey(AbstractNode, related_name='next_cloud_institutions_node_settings', null=True, blank=True, on_delete=models.CASCADE)
+    region = models.ForeignKey(
+        Region, blank=True, null=True,
+        related_name='next_cloud_institutions_region_id',
+        on_delete=models.CASCADE)
+    root_node = models.ForeignKey(
+        BaseFileNode, blank=True, null=True, default=None,
+        related_name='next_cloud_institutions_root_node_id',
+        on_delete=models.CASCADE)
+    owner = models.ForeignKey(
+        AbstractNode, null=True, blank=True,
+        related_name='next_cloud_institutions_node_settings',
+        on_delete=models.CASCADE)
 
     @classmethod
     def addon_settings(cls):

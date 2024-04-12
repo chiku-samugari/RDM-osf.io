@@ -1,19 +1,20 @@
-import pytest
+from unittest import mock
 
+import pytest
+from django.http import HttpRequest
+from django.test import RequestFactory
+
+from addons.osfstorage.models import Region
+from api.base.requests import EmbeddedRequest
 from api.base.settings.defaults import API_BASE
+from api.regions.views import RegionMixin
+from osf.models import Node
 from osf_tests.factories import (
     AuthUserFactory,
     RegionFactory,
     ProjectFactory,
     NodeFactory
 )
-from unittest import mock
-from addons.osfstorage.models import Region
-from api.regions.views import RegionMixin
-from django.test import RequestFactory
-from api.base.requests import EmbeddedRequest
-from django.http import HttpRequest
-from osf.models import Node
 
 
 @pytest.mark.django_db

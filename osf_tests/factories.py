@@ -32,7 +32,6 @@ from osf.utils.workflows import DefaultStates, DefaultTriggers
 from addons.osfstorage.models import OsfStorageFile, Region
 from api.base import settings as api_settings
 
-
 fake = Factory.create()
 
 # If tests are run on really old processors without high precision this might fail. Unlikely to occur.
@@ -287,17 +286,23 @@ class AuthenticationAttributeFactory(DjangoModelFactory):
         model = models.AuthenticationAttribute
 
     @classmethod
-    def _create(cls, target_class, institution=None, index_number=None, attribute_name=None, attribute_value=None,
+    def _create(cls, target_class,
+                institution=None, index_number=None,
+                attribute_name=None, attribute_value=None,
                 *args, **kwargs):
         institution = institution or InstitutionFactory()
         index_number = index_number or api_settings.DEFAULT_INDEX_NUMBER
         attribute_name = attribute_name
         attribute_value = attribute_value
 
-        return super(AuthenticationAttributeFactory, cls)._create(target_class, institution=institution,
-                                                                  index_number=index_number,
-                                                                  attribute_name=attribute_name,
-                                                                  attribute_value=attribute_value, *args, **kwargs)
+        return super(AuthenticationAttributeFactory, cls)._create(
+            target_class,
+            institution=institution,
+            index_number=index_number,
+            attribute_name=attribute_name,
+            attribute_value=attribute_value,
+            *args, **kwargs
+        )
 
 
 class NodeLicenseRecordFactory(DjangoModelFactory):
@@ -1145,6 +1150,7 @@ class BaseFileNodeFactory(DjangoModelFactory):
     provider = 'osfstorage'
     path = 'fake_path'
     name = factory.Faker('company')
+
 
 class RegionExtraFactory:
     def __init__(self, institution_id, name):

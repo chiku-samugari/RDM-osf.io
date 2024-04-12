@@ -1,7 +1,5 @@
 from __future__ import unicode_literals
 
-import logging
-import inspect  # noqa
 import csv
 import pytz
 from furl import furl
@@ -17,21 +15,25 @@ from django.core.mail import send_mail
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.core.paginator import Paginator
+from rest_framework import status as http_status
 
+from addons.osfstorage.models import Region
+from admin.base.utils import reverse_qs
 from api.base.settings import NII_STORAGE_REGION_ID
 from osf.exceptions import UserStateError
 from osf.models.base import Guid
 from osf.models.user import OSFUser
 from osf.models.node import Node, NodeLog
 from osf.models.spam import SpamStatus
-from osf.models import UserQuota
+from osf.models import UserQuota, UserStorageQuota
 from framework.auth import get_user
 from framework.auth.utils import impute_names
 from framework.auth.core import generate_verification_key
-from osf.models.user_storage_quota import UserStorageQuota
+from framework.exceptions import HTTPError
+
 from website.mailchimp_utils import subscribe_on_confirm
 from website import search
-from website.util import quota, inspect_info  # noqa
+from website.util import quota
 
 from admin.base.views import GuidView
 from osf.models.admin_log_entry import (
@@ -51,12 +53,6 @@ from admin.users.serializers import serialize_user, serialize_simple_preprint, s
 from admin.users.forms import EmailResetForm, WorkshopForm, UserSearchForm, MergeUserForm, AddSystemTagForm
 from admin.users.templatetags.user_extras import reverse_user
 from website.settings import DOMAIN, OSF_SUPPORT_EMAIL
-from addons.osfstorage.models import Region
-from rest_framework import status as http_status
-from admin.base.utils import reverse_qs
-from framework.exceptions import HTTPError
-
-logger = logging.getLogger(__name__)
 
 
 class UserDeleteView(PermissionRequiredMixin, DeleteView):
@@ -816,7 +812,7 @@ class UserDetailsView(RdmPermissionMixin, UserPassesTestMixin, GuidView):
             'id': user._id,
             'nodes': list(map(serialize_simple_node, user.contributor_to)),
             'quota': max_quota,
-            'region_id': region_id if region_id is not None else ''
+            'region_id': region_id or ''
         }
 
 

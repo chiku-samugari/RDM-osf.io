@@ -66,7 +66,6 @@ class TestSaveCredentials(AdminTestCase):
 
         nt.assert_false(RegionExternalAccount.objects.filter(region=region).exists())
         nt.assert_false(ExternalAccount.objects.filter(id=external_account.id).exists())
-        #inst_storage = Region.objects.filter(id=region.id).first()
         inst_storage = Region.objects.get(id=region.id)
         nt.assert_equals(inst_storage.name, default_storage.name)
         nt.assert_equals(inst_storage.waterbutler_credentials,

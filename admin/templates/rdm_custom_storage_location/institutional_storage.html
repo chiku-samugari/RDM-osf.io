@@ -4,79 +4,78 @@
 {% load i18n %}
 
 {% block top_includes %}
-    <link rel="stylesheet" type="text/css" href="/static/css/institutions.css"/>
-    <link rel="stylesheet" href="/static/css/rdm_addons.css">
-    <link rel="stylesheet" href="/static/css/rdm_institutional_storage.css">
+<link rel="stylesheet" type="text/css" href="/static/css/institutions.css" />
+<link rel="stylesheet" href="/static/css/rdm_addons.css">
+<link rel="stylesheet" href="/static/css/rdm_institutional_storage.css">
 {% endblock %}
 
 {% load user_extras %}
 {% load spam_extras %}
 
 {% block title %}
-    <title>{% trans "Institutional Storage" %}</title>
+<title>{% trans "Institutional Storage" %}</title>
 {% endblock title %}
 
 {% block content %}
-    <style>
-        .table > tbody > tr > td {
-            vertical-align: middle;
-        }
+<style>
+    .table > tbody > tr > td {
+        vertical-align: middle;
+    }
 
-        .table {
-            margin-bottom: 0;
-        }
+    .table {
+        margin-bottom: 0;
+    }
 
-        .table > thead > tr > th {
-            border: none;
-            font-size: large;
-            text-align: right;
-            white-space: nowrap;
-        }
+    .table > thead > tr > th {
+        border: none;
+        font-size: large;
+        text-align: right;
+        white-space: nowrap;
+    }
 
-        .table tbody tr .storage_input_content {
-            width: 300px;
-        }
+    .table tbody tr .storage_input_content {
+        width: 300px;
+    }
 
-        .legend{
-            width: auto;
-            margin-left: 26px;
-            font-size: 1.2em;
-            padding: 0 1.3em;
-            border: none;
-            white-space: nowrap;
-        }
+    .legend {
+        width: auto;
+        margin-left: 26px;
+        font-size: 1.2em;
+        padding: 0 1.3em;
+        border: none;
+        white-space: nowrap;
+    }
 
-        .row > div > fieldset {
-            border: solid;
-            padding-left: 7px;
-            border-width: thin;
-            height:230px; position:
-            relative;
-        }
+    .row > div > fieldset {
+        padding-left: 7px;
+        border: thin solid;
+        height: 230px;
+        position: relative;
+    }
 
-        #add_new_block > .form-inline {
-            margin-bottom:10px;
-            display: flex;
-            white-space: nowrap;
-        }
+    #add_new_block > .form-inline {
+        margin-bottom: 10px;
+        display: flex;
+        white-space: nowrap;
+    }
 
-        .right-button-element {
-            display: flex;
-            justify-content: right;
-        }
+    .right-button-element {
+        display: flex;
+        justify-content: right;
+    }
 
-        .right-button-element .btn-default {
-            margin-right: 10px;
-        }
+    .right-button-element .btn-default {
+        margin-right: 10px;
+    }
 
-        #btn_add_attribute_form {
-            width: 90px;
-            position: absolute;
-            bottom: 7px;
-            left: 7px;
-        }
-    </style>
-    <h2 style="margin-bottom:40px;">{% trans "Institutional Storage " %}<small>({{ institution.name }})</small></h2>
+    #btn_add_attribute_form {
+        width: 90px;
+        position: absolute;
+        bottom: 7px;
+        left: 7px;
+    }
+</style>
+<h2 style="margin-bottom:40px;">{% trans "Institutional Storage " %}<small>({{ institution.name }})</small></h2>
 
 <div class="row">
     <div class="col-md-6">
@@ -84,13 +83,13 @@
             {% csrf_token %}
             <div class="row form-inline storage-name">
                 <div class="form-group">
-                    <label for="storage_name" style="width:80px;">{% trans  "Name" %}:</label>
+                    <label for="storage_name" style="width:80px;">{% trans "Name" %}:</label>
                     <input type="text" class="form-control" id="storage_name" name="storage_name" maxlength="200">
                 </div>
             </div>
             <div class="row form-inline storage-name">
                 <div class="form-group">
-                    <label for="storage_name" style="width:80px;">{% trans "Provider" %}:</label>
+                    <label for="providers" style="width:80px;">{% trans "Provider" %}:</label>
                     <select id="providers" name="options" class="form-control">
                         {% for provider_item in providers %}
                             <option value="{{ provider_item.short_name }}">{{ provider_item.full_name }}</option>
@@ -98,7 +97,8 @@
                     </select>
                 </div>
             </div>
-            <button id="add_storage" style="width:90px; margin-bottom:30px; margin-top:10px" class="btn btn-success">{% trans "Add" %}</button>
+            <button id="add_storage" style="width:90px; margin-bottom:30px; margin-top:10px"
+                    class="btn btn-success">{% trans "Add" %}</button>
         </form>
     </div>
     <div class="col-md-6" style="height: 230px;">
@@ -112,28 +112,41 @@
             </legend>
             <div id="add_new_block" style="overflow: auto; max-height: 132px;">
                 {% for attribute in attributes %}
-                <form id="attribute_authentication_form_{{attribute.id}}" class="form-inline">
+                    <form id="attribute_authentication_form_{{ attribute.id }}" class="form-inline">
                         <tr>
-                            <td><label style="width: 3%; text-align: right; margin: 6px 6px 0px 0px;">{{ attribute.index_number }}.</label></td>
+                            <td>
+                                <label style="width: 3%; text-align: right; margin: 6px 6px 0 0;">
+                                    {{ attribute.index_number }}.
+                                </label>
+                            </td>
                             <td>
                                 <div class="input-group flex-item" style="width: 30%;">
-                                    <input type="text" name="attribute" placeholder="{% trans 'New attribute' %}" id="attribute_name_{{forloop.counter}}"
-                                           maxlength="200" class="form-control attribute_name attribute_{{attribute.id}}" value="{{ attribute.attribute_name | default_if_none:'' }}"
+                                    <input type="text" name="attribute" placeholder="{% trans 'New attribute' %}"
+                                           id="attribute_name_{{ forloop.counter }}"
+                                           maxlength="200"
+                                           class="form-control attribute_name attribute_{{ attribute.id }}"
+                                           value="{{ attribute.attribute_name | default_if_none:'' }}"
                                            {% if not institution.is_authentication_attribute %} disabled {% endif %}
                                            oninput="setCustomValidity('')">
                                 </div>
                                 <div class="input-group flex-item" style="margin:0px 25px 0px 10px; width: 30%;">
-                                    <input type="text" name="attribute_value" placeholder="{% trans 'New attribute value' %}"
-                                           maxlength="200" class="form-control attribute_value_{{attribute.id}}" value="{{ attribute.attribute_value | default_if_none:'' }}"
+                                    <input type="text" name="attribute_value"
+                                           placeholder="{% trans 'New attribute value' %}"
+                                           maxlength="200" class="form-control attribute_value_{{ attribute.id }}"
+                                           value="{{ attribute.attribute_value | default_if_none:'' }}"
                                            {% if not institution.is_authentication_attribute %} disabled {% endif %}>
                                 </div>
                                 <div class="input-group flex-item">
-                                    <button class="btn btn-danger delete_attribute" type="button" index_attribute="{{ attribute.id }}">X</button>
-                                    <button class="btn btn-success save_attribute" type="button" index_attribute="{{ attribute.id }}" style="margin-left:5px; width:90px">{% trans 'Save' %}</button>
+                                    <button class="btn btn-danger delete_attribute" type="button"
+                                            index_attribute="{{ attribute.id }}">X
+                                    </button>
+                                    <button class="btn btn-success save_attribute" type="button"
+                                            index_attribute="{{ attribute.id }}"
+                                            style="margin-left:5px; width:90px">{% trans 'Save' %}</button>
                                 </div>
                             </td>
                         </tr>
-                </form>
+                    </form>
                 {% endfor %}
             </div>
             <div class="form-inline">
@@ -142,6 +155,7 @@
         </fieldset>
     </div>
 </div>
+
 <div class="row" id="multi-inst-storage">
     <div class="col-md-12">
         <div class="panel panel-default">
@@ -152,29 +166,32 @@
                 <form role="form">
                     <table class="table table-condensed">
                         <thead>
-                            <tr>
-                                <th style="width: 20%; text-align: left;">{% trans "Name" %}</th>
-                                <th style="width: 17%; text-align: left;">{% trans "Provider" %}</th>
-                                <th style="width: 7%;"></th>
-                                <th style="width: 5%; text-align: left;">{% trans "Allow" %}</th>
-                                <th style="width: 7%"></th>
-                                <th style="width: 5%; text-align: left;">{% trans "Read only" %}</th>
-                                <th style="width: 20%;"></th>
-                            </tr>
+                        <tr>
+                            <th style="width: 20%; text-align: left;">{% trans "Name" %}</th>
+                            <th style="width: 17%; text-align: left;">{% trans "Provider" %}</th>
+                            <th style="width: 7%;"></th>
+                            <th style="width: 5%; text-align: left;">{% trans "Allow" %}</th>
+                            <th style="width: 7%"></th>
+                            <th style="width: 5%; text-align: left;">{% trans "Read only" %}</th>
+                            <th style="width: 20%;"></th>
+                        </tr>
                         </thead>
                         <tbody>
-                            {% for provider_item in providers_configured %}
+                        {% for provider_item in providers_configured %}
                             <tr>
                                 <td class="storage_input_content">
                                     <div>
-                                        <input {% if provider_item.provider.short_name != 'osfstorage' and provider_item.provider.short_name != 'onedrivebusiness' %} maxlength="200"
-                                               value="{{ provider_item.region.name }}"
-                                               {% else %}
-                                               disabled
-                                               value=""
-                                               {% endif %}
-                                               class="form-control storage_input_value" type="text"
-                                               name="{{ provider_item.provider.short_name }}" id="storage_name_{{ provider_item.region.id }}">
+                                        <input
+                                                {% if provider_item.provider.short_name != 'osfstorage' and provider_item.provider.short_name != 'onedrivebusiness' %}
+                                                    maxlength="200"
+                                                    value="{{ provider_item.region.name }}"
+                                                {% else %}
+                                                    disabled
+                                                    value=""
+                                                {% endif %}
+                                                    class="form-control storage_input_value" type="text"
+                                                    name="{{ provider_item.provider.short_name }}"
+                                                    id="storage_name_{{ provider_item.region.id }}">
                                     </div>
                                 </td>
                                 <td>
@@ -186,16 +203,19 @@
                                     </div>
                                 </td>
                                 <td style="text-align: right;">
-                                    <input id="allow_{{ provider_item.region.id }}" class="form-control" type="text" maxlength="200" style="height: 30px;" placeholder="{% trans 'All' %}"
-                                           {% if not institution.is_authentication_attribute or institution.is_authentication_attribute and not provider_item.region.is_allowed %}
+                                    <input id="allow_{{ provider_item.region.id }}" class="form-control" type="text"
+                                           maxlength="200" style="height: 30px;" placeholder="{% trans 'All' %}"
+                                            {% if not institution.is_authentication_attribute or institution.is_authentication_attribute and not provider_item.region.is_allowed %}
                                            disabled
-                                           {% endif %}
+                                            {% endif %}
                                            value="{{ provider_item.region.allow_expression | default_if_none:'' }}">
                                 </td>
                                 <td>
                                     <div class="input-group form-check">
-                                        <input type="checkbox" data-provider="{{ provider_item.provider.short_name }}"
-                                               data-id="{{ provider_item.region.id }}" id="allow_checkbox_{{provider_item.region.id}}"
+                                        <input type="checkbox"
+                                               data-provider="{{ provider_item.provider.short_name }}"
+                                               data-id="{{ provider_item.region.id }}"
+                                               id="allow_checkbox_{{ provider_item.region.id }}"
                                                value="{% if provider_item.region.is_allowed %}on{% else %}off{% endif %}"
                                                data-value="{% if provider_item.region.is_allowed %}true{% else %}false{% endif %}"
                                                class="btn apple-switch change_allow {% if provider_item.region.is_allowed %} checked {% endif %}"
@@ -203,16 +223,20 @@
                                     </div>
                                 </td>
                                 <td style="text-align: right;">
-                                    <input id="readonly_{{ provider_item.region.id }}" class="form-control" type="text" maxlength="200" style="height: 30px;" placeholder="{% trans 'All' %}"
-                                           {% if not institution.is_authentication_attribute or institution.is_authentication_attribute and not provider_item.region.is_readonly %}
+                                    <input id="readonly_{{ provider_item.region.id }}" class="form-control"
+                                           type="text" maxlength="200" style="height: 30px;"
+                                           placeholder="{% trans 'All' %}"
+                                            {% if not institution.is_authentication_attribute or institution.is_authentication_attribute and not provider_item.region.is_readonly %}
                                            disabled
-                                           {% endif %}
+                                            {% endif %}
                                            value="{{ provider_item.region.readonly_expression | default_if_none:'' }}">
                                 </td>
                                 <td>
                                     <div class="input-group form-check">
-                                        <input type="checkbox" data-provider="{{ provider_item.provider.short_name }}"
-                                               data-id="{{ provider_item.region.id }}" id="readonly_checkbox_{{provider_item.region.id}}"
+                                        <input type="checkbox"
+                                               data-provider="{{ provider_item.provider.short_name }}"
+                                               data-id="{{ provider_item.region.id }}"
+                                               id="readonly_checkbox_{{ provider_item.region.id }}"
                                                value="{% if provider_item.region.is_readonly %}on{% else %}off{% endif %}"
                                                data-value="{% if provider_item.region.is_readonly %}true{% else %}false{% endif %}"
                                                class="btn apple-switch change_readonly {% if provider_item.region.is_readonly %} checked {% endif %}"
@@ -220,11 +244,14 @@
                                     </div>
                                 </td>
                                 <td class="right-button-element">
-                                    <button class="btn btn-default" type="reset" data-id="{{ provider_item.region.id }}">{% trans "Cancel" %}</button>
-                                    <button class="btn btn-success save_button" data-id="{{ provider_item.region.id }}" type="button">{% trans "Save" %}</button>
+                                    <button class="btn btn-default" type="reset"
+                                            data-id="{{ provider_item.region.id }}">{% trans "Cancel" %}</button>
+                                    <button class="btn btn-success save_button"
+                                            data-id="{{ provider_item.region.id }}"
+                                            type="button">{% trans "Save" %}</button>
                                 </td>
                             </tr>
-                            {% endfor %}
+                        {% endfor %}
                         </tbody>
                     </table>
                 </form>
@@ -232,19 +259,19 @@
         </div>
     </div>
 </div>
-    {% for provider_item in providers %}
-        {% include provider_item.modal_path %}
-    {% endfor %}
+{% for provider_item in providers %}
+    {% include provider_item.modal_path %}
+{% endfor %}
 
-    <input type="hidden" id="osf_domain" value="{{ osf_domain }}">
+<input type="hidden" id="osf_domain" value="{{ osf_domain }}">
 
-    <br class="clear">
+<br class="clear">
 {% endblock content %}
 
 {% block bottom_js %}
     <script>
-        $(document).ready(function() {
-            $("input[name*='attribute_value'], input[name*='attribute']").each(function(i, obj) {
+        $(document).ready(function () {
+            $("input[name*='attribute_value'], input[name*='attribute']").each(function (i, obj) {
                 var length = obj.value.length;
                 if (length >= 30) {
                     obj.title = obj.value;

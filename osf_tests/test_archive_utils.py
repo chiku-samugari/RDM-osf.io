@@ -33,7 +33,7 @@ class TestArchiveUtils(OsfTestCase):
         res = archive_provider_for(self.new_component, self.user)
         assert res.region_id == self.new_component.get_addon('osfstorage').region_id
 
-    def test_archive_provider_for_excpetion(self):
+    def test_archive_provider_for_exception(self):
         with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=Exception('mocked error')):
             res = archive_provider_for(self.new_component, self.user)
             assert res.region_id == self.new_component.get_first_addon('osfstorage').region_id
@@ -46,5 +46,6 @@ class TestArchiveUtils(OsfTestCase):
     def test_link_archive_provider_exception(self):
         with mock.patch('osf.models.node.AbstractNode.get_addon', return_value=None):
             with mock.patch('osf.models.node.AbstractNode.add_addon', side_effect=Exception('mocked error')):
-                with mock.patch('osf.models.node.AbstractNode.get_first_addon', return_value=self.component_node_settings):
+                with mock.patch('osf.models.node.AbstractNode.get_first_addon',
+                                return_value=self.component_node_settings):
                     link_archive_provider(self.new_component, self.user)

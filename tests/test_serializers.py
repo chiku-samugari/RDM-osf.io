@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import mock
 import datetime as dt
 from nose.tools import *  # noqa (PEP8 asserts)
 
@@ -15,7 +14,7 @@ from osf_tests.factories import (
 )
 from osf.models import NodeRelation
 from osf.utils import permissions
-from tests.base import OsfTestCase, get_default_metaschema
+from tests.base import OsfTestCase
 
 from framework.auth import Auth
 from website.project.views.node import _view_project, _serialize_node_search, _get_children, _get_readable_descendants

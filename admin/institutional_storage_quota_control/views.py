@@ -1,22 +1,21 @@
 import os
-from operator import itemgetter
-from mimetypes import MimeTypes
-from django.db import connection
-
-from admin.institutions.views import QuotaUserStorageList
-from osf.models import Institution, OSFUser
-from osf.models.user_storage_quota import UserStorageQuota
-from admin.base import settings
 from django.core.exceptions import PermissionDenied
-from addons.osfstorage.models import Region
-from django.views.generic import ListView, View
-from django.shortcuts import redirect
-from admin.rdm.utils import RdmPermissionMixin
 from django.core.urlresolvers import reverse
+from django.db import connection
 from django.http import HttpResponse, Http404
+from django.shortcuts import redirect
+from django.views.generic import ListView, View
+from mimetypes import MimeTypes
+from operator import itemgetter
 from rest_framework import status as http_status
+
+from addons.osfstorage.models import Region
+from admin.base import settings
+from admin.institutions.views import QuotaUserStorageList
+from admin.rdm.utils import RdmPermissionMixin
 from admin.rdm_custom_storage_location import utils
 from framework.exceptions import HTTPError
+from osf.models import Institution, OSFUser, UserStorageQuota
 
 
 class IconView(View):
@@ -38,8 +37,7 @@ class IconView(View):
 
 class ProviderListByInstitution(RdmPermissionMixin, ListView):
     paginate_by = 25
-    template_name = 'institutional_storage_quota_control/' \
-                    'list_provider_of_institution.html'
+    template_name = 'institutional_storage_quota_control/list_provider_of_institution.html'
     raise_exception = True
     model = Institution
 
@@ -94,8 +92,10 @@ class ProviderListByInstitution(RdmPermissionMixin, ListView):
                 'name': region.name,
                 'provider': region.provider_full_name,
                 'icon_url_admin': reverse('institutional_storage_quota_control:icon',
-                                          kwargs={'addon_name': region.provider_short_name,
-                                                  'icon_filename': 'comicon.png'}),
+                                          kwargs={
+                                              'addon_name': region.provider_short_name,
+                                              'icon_filename': 'comicon.png'
+                                          }),
             })
 
         order_by = self.get_order_by()
@@ -129,8 +129,7 @@ class ProviderListByInstitution(RdmPermissionMixin, ListView):
 
 class InstitutionStorageList(RdmPermissionMixin, ListView):
     paginate_by = 25
-    template_name = 'institutional_storage_quota_control/' \
-                    'list_institution_storage.html'
+    template_name = 'institutional_storage_quota_control/list_institution_storage.html'
     ordering = 'name'
     raise_exception = True
     model = Institution
@@ -140,7 +139,6 @@ class InstitutionStorageList(RdmPermissionMixin, ListView):
 
         :param list institutions: List of institution
         :return list: List of merged institution
-
         """
         _merged_inst = []
         for inst in institutions:
@@ -172,32 +170,33 @@ class InstitutionStorageList(RdmPermissionMixin, ListView):
 
     def get_queryset(self):
         if self.is_super_admin:
-            query = 'select {} ' \
-                    'from osf_institution ' \
-                    'where addons_osfstorage_region._id = osf_institution._id'
-            return Region.objects.extra(select={'institution_id': query.format('id'),
-                                                'institution_name': query.format('name'),
-                                                'institution_logo_name': query.format(
-                                                    'logo_name'),
-                                                }).order_by('institution_name', self.ordering)
+            query = ('select {} '
+                     'from osf_institution '
+                     'where addons_osfstorage_region._id = osf_institution._id')
+            return Region.objects.extra(
+                select={
+                    'institution_id': query.format('id'),
+                    'institution_name': query.format('name'),
+                    'institution_logo_name': query.format('logo_name'),
+                }
+            ).order_by('institution_name', self.ordering)
         elif self.is_admin:
             user_id = self.request.user.id
-            query = 'select {} ' \
-                    'from osf_institution ' \
-                    'where addons_osfstorage_region._id = _id ' \
-                    'and id in (' \
-                    '    select institution_id ' \
-                    '    from osf_osfuser_affiliated_institutions ' \
-                    '    where osfuser_id = {}' \
-                    ')'
-            return Region.objects.extra(select={'institution_id': query.format('id', user_id),
-                                                'institution_name': query.format(
-                                                    'name',
-                                                    user_id),
-                                                'institution_logo_name': query.format(
-                                                    'logo_name',
-                                                    user_id),
-                                                })
+            query = ('select {} '
+                     'from osf_institution '
+                     'where addons_osfstorage_region._id = _id '
+                     'and id in ('
+                     '    select institution_id '
+                     '    from osf_osfuser_affiliated_institutions '
+                     '    where osfuser_id = {}'
+                     ')')
+            return Region.objects.extra(
+                select={
+                    'institution_id': query.format('id', user_id),
+                    'institution_name': query.format('name', user_id),
+                    'institution_logo_name': query.format('logo_name', user_id),
+                }
+            )
 
     def get_context_data(self, **kwargs):
         object_list = self.merge_data(self.object_list)
@@ -220,10 +219,10 @@ class UserListByInstitutionStorageID(RdmPermissionMixin, QuotaUserStorageList):
 
     def get_institution(self):
         region = self.get_region()
-        query = 'select name ' \
-                'from addons_osfstorage_region ' \
-                'where addons_osfstorage_region._id = osf_institution._id ' \
-                'and addons_osfstorage_region.id = {region_id}'.format(region_id=region.id)
+        query = ('select name '
+                 'from addons_osfstorage_region '
+                 'where addons_osfstorage_region._id = osf_institution._id '
+                 'and addons_osfstorage_region.id = {region_id}').format(region_id=region.id)
         institution = Institution.objects.filter(
             id=self.kwargs['institution_id']
         ).extra(

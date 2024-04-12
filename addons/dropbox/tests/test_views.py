@@ -5,7 +5,6 @@ import unittest
 from dropbox.exceptions import ApiError
 from nose.tools import assert_equal
 from tests.base import OsfTestCase
-from urllib3.exceptions import MaxRetryError
 
 import mock
 import pytest

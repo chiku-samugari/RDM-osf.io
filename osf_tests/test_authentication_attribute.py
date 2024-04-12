@@ -1,7 +1,8 @@
-from osf.models import AuthenticationAttribute
-from api.base import settings as api_settings
-from .factories import AuthenticationAttributeFactory
 import pytest
+
+from api.base import settings as api_settings
+from osf.models import AuthenticationAttribute
+from .factories import AuthenticationAttributeFactory
 
 
 @pytest.mark.django_db

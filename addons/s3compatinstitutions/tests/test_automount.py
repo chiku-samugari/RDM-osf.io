@@ -2,14 +2,17 @@
 import unittest
 import six
 
-from mock import patch, Mock, MagicMock
+from mock import patch, MagicMock
 import pytest
-from nose.tools import *  # noqa (PEP8 asserts)
-from tests.base import OsfTestCase
+from nose.tools import (
+    assert_true, assert_false,
+    assert_equal,
+)
+
+from addons.osfstorage.models import Region,NodeSettings as osfNodeSettings
 from admin.rdm_addons.utils import get_rdm_addon_option
 from framework.auth import Auth
-from addons.s3compatinstitutions.apps import s3compatinstitutions_root
-
+from osf.models import BaseFileNode
 from osf_tests.factories import (
     fake_email,
     AuthUserFactory,
@@ -19,10 +22,9 @@ from osf_tests.factories import (
     ProjectFactory,
     RegionFactory
 )
+from addons.s3compatinstitutions.apps import s3compatinstitutions_root
 from addons.s3compatinstitutions.models import NodeSettings
-from admin_tests.rdm_addons import factories as rdm_addon_factories
-from addons.osfstorage.models import Region,NodeSettings as osfNodeSettings
-from osf.models import BaseFileNode
+from tests.base import OsfTestCase
 
 USE_MOCK = True  # False for DEBUG
 
@@ -68,20 +70,19 @@ class TestS3Compatinstitutions(unittest.TestCase):
     def _new_project(self):
         if USE_MOCK:
             with self._patch1() as mock1, \
-                 patch( 'admin.institutions.views.Region.objects.filter') as mock2,\
-                 patch( 'admin.institutions.views.Region.objects.get') as mock3,\
-                 patch( 'addons.osfstorage.models.NodeSettings.objects.filter') as mock4:
+                    patch('admin.institutions.views.Region.objects.filter') as mock2, \
+                    patch('admin.institutions.views.Region.objects.get') as mock3, \
+                    patch('addons.osfstorage.models.NodeSettings.objects.filter') as mock4:
                 mock1.return_value = MagicMock()
                 mock1.list_objects.return_value = {'Contents': []}
                 region = RegionFactory()
-                region_filter = MagicMock ()
+                region_filter = MagicMock()
                 region_filter.order_by.return_value = [region]
                 mock2.return_value = region_filter
                 mock3.return_value = region
                 node = osfNodeSettings()
-                basefileNode= BaseFileNode()
-                node.root_node = basefileNode
-                node_filter = MagicMock ()
+                node.root_node = BaseFileNode()
+                node_filter = MagicMock()
                 node_filter.first.return_value = node
                 mock4.return_value = node_filter
                 # mock1.list_buckets.return_value = None
@@ -150,29 +151,32 @@ class TestS3Compatinstitutions(unittest.TestCase):
         # not changed
         assert_equal(result.folder_name, self._expected_folder_name)
 
-class TestAppS3Compatinstitutions(OsfTestCase):
-    def setUp(self):
-        super(TestAppS3Compatinstitutions, self).setUp()
-        self.user = AuthUserFactory()
-        self.user.save()
-        self.consolidated_auth = Auth(user=self.user)
-        self.project = ProjectFactory(creator=self.user)
-        self.auth = Auth(user=self.project.creator)
-        self.project.add_addon('s3compatinstitutions', auth=self.consolidated_auth)
-        self.node_settings = self.project.get_addon('s3compatinstitutions')
-        self.ADDON_SHORT_NAME = 's3compatinstitutions'
-        self.node_settings.save()
 
-    def test_nextcloudinstitutions_root(self):
+class TestAppS3CompatInstitutions(OsfTestCase):
+    def setUp(self):
+        super(TestAppS3CompatInstitutions, self).setUp()
+        self.ADDON_SHORT_NAME = 's3compatinstitutions'
+
+        self.user = AuthUserFactory()
+        self.auth = Auth(user=self.user)
+
+        self.project = ProjectFactory(creator=self.user)
+        self.project.add_addon('s3compatinstitutions', auth=self.auth)
+
+        self.node_settings = self.project.get_addon('s3compatinstitutions')
+
+    def test_s3compat_institutions_root(self):
         institution = InstitutionFactory(_id=123456)
         region = Region()
         region._id = institution._id
         region.waterbutler_settings__storage__provider = self.ADDON_SHORT_NAME
-        self.node_settings.addon_option = get_rdm_addon_option(institution.id, self.ADDON_SHORT_NAME).first()
-        root_node = BaseFileNode()
-        self.node_settings.region=region
-        self.node_settings.root_node=root_node
         region.save()
-        #mock_region_objects_filter.return_value.exists.return_value = True
+
+        self.node_settings.addon_option = get_rdm_addon_option(institution.id, self.ADDON_SHORT_NAME)
+        self.node_settings.region = region
+        self.node_settings.root_node = BaseFileNode()
+        self.node_settings.save()
+
         result = s3compatinstitutions_root(addon_config='', node_settings=self.node_settings, auth=self.auth)
+
         assert isinstance(result, list)

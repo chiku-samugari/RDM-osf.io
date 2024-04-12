@@ -2,7 +2,6 @@
 
 import os
 import datetime
-from rest_framework import status as http_status
 import time
 import functools
 
@@ -13,17 +12,19 @@ import jwt
 import mock
 import pytest
 from django.utils import timezone
-from django.contrib.auth.models import Permission
 from framework.auth import cas, signing
 from framework.auth.core import Auth
 from framework.exceptions import HTTPError
 from nose.tools import *  # noqa
-from osf_tests import factories
 from tests.base import OsfTestCase, get_default_metaschema
 from api_tests.utils import create_test_file
-from osf_tests.factories import (AuthUserFactory, ProjectFactory, RegionFactory, NodeFactory,
-                                 RegistrationFactory, DraftRegistrationFactory,
-                                 InstitutionFactory, PreprintFactory, )
+from osf_tests.factories import (
+    AuthUserFactory, ProjectFactory,
+    RegistrationFactory, DraftRegistrationFactory,
+    RegionFactory,
+    InstitutionFactory,
+    PreprintFactory,
+)
 from website import settings
 from api.base import settings as api_settings
 from addons.base import views
@@ -32,9 +33,10 @@ from addons.github.models import GithubFolder, GithubFile, GithubFileNode
 from addons.github.tests.factories import GitHubAccountFactory, GoogleDriveAccountFactory
 from addons.osfstorage.models import OsfStorageFileNode, OsfStorageFolder, NodeSettings
 from addons.osfstorage.tests.factories import FileVersionFactory
-from osf.models import NodeLog, Session, RegistrationSchema, QuickFilesNode, RdmFileTimestamptokenVerifyResult, RdmUserKey, AbstractNode
+from osf.models import NodeLog, Session, QuickFilesNode, RdmFileTimestamptokenVerifyResult, RdmUserKey
 from osf.models import files as file_models
-from osf.models.files import BaseFileNode, TrashedFileNode, FileVersion
+from osf.models.files import BaseFileNode, TrashedFileNode
+from osf.models.mixins import AddonModelMixin
 from osf.utils.permissions import WRITE, READ
 from website.project import new_private_link
 from website.project.views.node import _view_project as serialize_node
@@ -44,7 +46,6 @@ from website.util.timestamp import userkey_generation
 from dateutil.parser import parse as parse_date
 from framework import sentry
 from tests.test_timestamp import create_test_file
-from osf.models.mixins import AddonModelMixin
 
 
 class SetEnvironMiddleware(object):
@@ -120,7 +121,7 @@ class TestAddonAuth(OsfTestCase):
         node = ProjectFactory(is_public=False)
         url = self.build_url(action='render', nid=node._id)
         res = self.app.get(url, auth=self.user.auth, expect_errors=True)
-        #Fix assert result
+        # Fix assert result
         assert_equal(res.status_code, 400)
 
     def test_auth_export_action_returns_200(self):
@@ -132,7 +133,7 @@ class TestAddonAuth(OsfTestCase):
         node = ProjectFactory(is_public=False)
         url = self.build_url(action='export', nid=node._id)
         res = self.app.get(url, auth=self.user.auth, expect_errors=True)
-        #Fix assert result
+        # Fix assert result
         assert_equal(res.status_code, 400)
 
     def test_auth_missing_args(self):
@@ -157,7 +158,7 @@ class TestAddonAuth(OsfTestCase):
     def test_auth_cookie(self):
         url = self.build_url(cookie=self.cookie[::-1])
         res = self.app.get(url, expect_errors=True)
-        #Fix assert result
+        # Fix assert result
         assert_equal(res.status_code, 200)
 
     def test_auth_missing_addon(self):
@@ -170,12 +171,12 @@ class TestAddonAuth(OsfTestCase):
         mock_cas_client.return_value = mock.Mock(profile=mock.Mock(return_value=cas.CasResponse(authenticated=False)))
         url = self.build_url()
         res = self.app.get(url, headers={'Authorization': 'Bearer invalid_access_token'}, expect_errors=True)
-        #Fix assert result
+        # Fix assert result
         assert_equal(res.status_code, 200)
 
     def test_action_downloads_marks_version_as_seen(self):
         noncontrib = AuthUserFactory()
-        node = ProjectFactory(is_public=True,creator=self.user)
+        node = ProjectFactory(is_public=True, creator=self.user)
         test_file = create_test_file(node, self.user)
         url = self.build_url(nid=node._id, action='render', provider='osfstorage', path=test_file.path)
         res = self.app.get(url, auth=noncontrib.auth)
@@ -248,16 +249,14 @@ class TestAddonAuth(OsfTestCase):
         institution = InstitutionFactory()
         region = RegionFactory()
         region._id = institution._id
-        #user.affiliated_institutions.add(institution)
         user.save()
         region.save()
         url = self.build_url(action='download', provider='osfstorage', path='/', version=1)
-        #with pytest.raises(Exception):
-        res=self.app.get(url, auth=user.auth)
-        assert_equal(res.status_code,200)
+        res = self.app.get(url, auth=user.auth)
+        assert_equal(res.status_code, 200)
 
     def test_auth_download_not_allowed(self):
-        node = ProjectFactory(is_public=True,creator=self.user)
+        node = ProjectFactory(is_public=True, creator=self.user)
         addon = node.get_addon('osfstorage')
         addon.region.is_allowed = False
         addon.region.save()
@@ -365,7 +364,7 @@ class TestAddonLogs(OsfTestCase):
             'extra': {
                 'version': '1'
             }
-        },request_meta={'url': url},root_path=file_node._id)
+        }, request_meta={'url': url}, root_path=file_node._id)
         nlogs = self.node.logs.count()
 
         self.app.put_json(url, payload, headers={'Content-Type': 'application/json'})
@@ -404,7 +403,7 @@ class TestAddonLogs(OsfTestCase):
             'extra': {
                 'version': '1'
             }
-        },request_meta={'url': url},root_path=self.file._id)
+        }, request_meta={'url': url}, root_path=self.file._id)
         nlogs = self.node.logs.count()
         self.app.put_json(url, payload, headers={'Content-Type': 'application/json'})
         self.node.reload()
@@ -432,7 +431,7 @@ class TestAddonLogs(OsfTestCase):
             'extra': {
                 'version': '1'
             }
-        },request_meta={'url': url}, provider='osfstorage')
+        }, request_meta={'url': url}, provider='osfstorage')
         resp = self.app.put_json(url, payload, headers={'Content-Type': 'application/json'})
         assert resp.status_code == 200
 
@@ -509,9 +508,9 @@ class TestAddonLogs(OsfTestCase):
                 'path': '/' + self.file._id + '/' + 'new.txt',
                 'node': {'_id': self.node._id},
                 'kind': 'file',
-                'root_path':self.file._id,
+                'root_path': self.file._id,
                 'nid': self.node._id,
-                'dest_pạth':'/' + self.file._id + '/' + 'new.txt',
+                'dest_pạth': '/' + self.file._id + '/' + 'new.txt',
             },
             source={
                 'materialized': 'foo',
@@ -519,10 +518,10 @@ class TestAddonLogs(OsfTestCase):
                 'node': {'_id': self.node._id},
                 'name': 'new.txt',
                 'kind': 'file',
-                'root_path':self.file._id,
-                'nid':self.node._id,
-                'path':'foo',
-                'size':1,
+                'root_path': self.file._id,
+                'nid': self.node._id,
+                'path': 'foo',
+                'size': 1,
             },
             destination={
                 'path': 'foo',
@@ -531,10 +530,10 @@ class TestAddonLogs(OsfTestCase):
                 'node': {'_id': self.node._id},
                 'name': 'old.txt',
                 'kind': 'file',
-                'root_path':self.file._id,
-                'nid':self.node._id,
-                'dest_path':'foo',
-                'size':1,
+                'root_path': self.file._id,
+                'nid': self.node._id,
+                'dest_path': 'foo',
+                'size': 1,
             },
         )
         self.app.put_json(
@@ -574,7 +573,7 @@ class TestAddonLogs(OsfTestCase):
             'extra': {
                 'version': '1'
             }
-        },request_meta={'url': wb_log_url},root_path=file_node._id,), headers={'Content-Type': 'application/json'})
+        }, request_meta={'url': wb_log_url}, root_path=file_node._id, ), headers={'Content-Type': 'application/json'})
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
         assert_equal(1, files_query.count())
         created_file = files_query.get()
@@ -583,7 +582,7 @@ class TestAddonLogs(OsfTestCase):
         # Rename the file
         newfilename = 'file_ver2'
         self.app.put_json(wb_log_url, self.build_payload(
-            request_meta={'url': wb_log_url},root_path=file_node._id,
+            request_meta={'url': wb_log_url}, root_path=file_node._id,
             action='move',
             metadata={
                 'provider': 's3compatinstitutions',
@@ -592,9 +591,9 @@ class TestAddonLogs(OsfTestCase):
                 'path': '/' + self.file._id + '/' + 'new.txt',
                 'node': {'_id': self.node._id},
                 'kind': 'file',
-                'root_path':self.file._id,
+                'root_path': self.file._id,
                 'nid': self.node._id,
-                'dest_pạth':'/' + self.file._id + '/' + 'new.txt',
+                'dest_pạth': '/' + self.file._id + '/' + 'new.txt',
             },
             source={
                 'provider': 's3compatinstitutions',
@@ -603,9 +602,9 @@ class TestAddonLogs(OsfTestCase):
                 'path': '/' + filename,
                 'node': {'_id': self.node._id},
                 'kind': 'file',
-                'nid':self.node._id,
-                'root_path':file_node._id,
-                'size':1,
+                'nid': self.node._id,
+                'root_path': file_node._id,
+                'size': 1,
             },
             destination={
                 'provider': 's3compatinstitutions',
@@ -614,9 +613,9 @@ class TestAddonLogs(OsfTestCase):
                 'path': '/' + newfilename,
                 'node': {'_id': self.node._id},
                 'kind': 'file',
-                'nid':self.node._id,
-                'root_path':file_node._id,
-                'size':1,
+                'nid': self.node._id,
+                'root_path': file_node._id,
+                'size': 1,
             },
         ), headers={'Content-Type': 'application/json'})
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
@@ -654,7 +653,7 @@ class TestAddonLogs(OsfTestCase):
             'extra': {
                 'version': '1'
             },
-        }, request_meta={'url': wb_url}, root_path=file_node._id), headers={'Content-Type': 'application/json'},)
+        }, request_meta={'url': wb_url}, root_path=file_node._id), headers={'Content-Type': 'application/json'}, )
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
         assert_equal(1, files_query.count())
         created_file = files_query.get()
@@ -673,9 +672,9 @@ class TestAddonLogs(OsfTestCase):
                 'path': '/' + file_node._id + '/' + newfoldername,
                 'node': {'_id': self.node._id},
                 'kind': 'folder',
-                'root_path':file_node._id,
+                'root_path': file_node._id,
                 'nid': self.node._id,
-                'dest_pạth':'/' + file_node._id + '/' + newfoldername,
+                'dest_pạth': '/' + file_node._id + '/' + newfoldername,
             },
             source={
                 'provider': 's3compatinstitutions',
@@ -684,8 +683,8 @@ class TestAddonLogs(OsfTestCase):
                 'path': '/' + foldername,
                 'node': {'_id': self.node._id},
                 'kind': 'folder',
-                'root_path':file_node._id,
-                'nid':self.node._id,
+                'root_path': file_node._id,
+                'nid': self.node._id,
                 'size': 1,
             },
             destination={
@@ -695,8 +694,8 @@ class TestAddonLogs(OsfTestCase):
                 'path': file_node._id + '/' + newfoldername,
                 'node': {'_id': self.node._id},
                 'kind': 'folder',
-                'root_path':file_node._id,
-                'nid':self.node._id,
+                'root_path': file_node._id,
+                'nid': self.node._id,
                 'size': 1
             },
         ), headers={'Content-Type': 'application/json'})
@@ -731,7 +730,7 @@ class TestAddonLogs(OsfTestCase):
             'extra': {
                 'version': '1'
             }
-        },request_meta={'url': wb_log_url}, root_path=file_node._id,), headers={'Content-Type': 'application/json'})
+        }, request_meta={'url': wb_log_url}, root_path=file_node._id, ), headers={'Content-Type': 'application/json'})
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
         assert_equal(1, files_query.count())
         created_file = files_query.get()
@@ -750,9 +749,9 @@ class TestAddonLogs(OsfTestCase):
                 'path': '/' + file_node._id + '/' + filename,
                 'node': {'_id': self.node._id},
                 'kind': 'file',
-                'root_path':file_node._id,
+                'root_path': file_node._id,
                 'nid': self.node._id,
-                'dest_pạth':'/' + file_node._id + '/' + filename,
+                'dest_pạth': '/' + file_node._id + '/' + filename,
             },
             source={
                 'provider': 's3compatinstitutions',
@@ -761,9 +760,9 @@ class TestAddonLogs(OsfTestCase):
                 'path': '/' + filename,
                 'node': {'_id': self.node._id},
                 'kind': 'file',
-                'root_path':file_node._id,
+                'root_path': file_node._id,
                 'nid': self.node._id,
-                'size':1,
+                'size': 1,
             },
             destination={
                 'provider': 's3compatinstitutions',
@@ -773,8 +772,8 @@ class TestAddonLogs(OsfTestCase):
                 'node': {'_id': self.node._id},
                 'kind': 'file',
                 'nid': self.node._id,
-                'root_path':file_node._id,
-                'size':1,
+                'root_path': file_node._id,
+                'size': 1,
             },
         ), headers={'Content-Type': 'application/json'})
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
@@ -809,7 +808,7 @@ class TestAddonLogs(OsfTestCase):
             'extra': {
                 'version': '1'
             }
-        },request_meta={'url': wb_log_url},root_path=file_node._id,), headers={'Content-Type': 'application/json'})
+        }, request_meta={'url': wb_log_url}, root_path=file_node._id, ), headers={'Content-Type': 'application/json'})
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
         assert_equal(1, files_query.count())
         created_file = files_query.get()
@@ -826,9 +825,9 @@ class TestAddonLogs(OsfTestCase):
                 'path': '/' + file_node._id + '/' + movedfolderpath,
                 'node': {'_id': self.node._id},
                 'kind': 'file',
-                'root_path':file_node._id,
+                'root_path': file_node._id,
                 'nid': self.node._id,
-                'dest_pạth':'/' + file_node._id + '/' + movedfolderpath,
+                'dest_pạth': '/' + file_node._id + '/' + movedfolderpath,
             },
             source={
                 'provider': 's3compatinstitutions',
@@ -838,8 +837,8 @@ class TestAddonLogs(OsfTestCase):
                 'node': {'_id': self.node._id},
                 'kind': 'folder',
                 'nid': self.node._id,
-                'root_path':file_node._id,
-                'size':1,
+                'root_path': file_node._id,
+                'size': 1,
             },
             destination={
                 'provider': 's3compatinstitutions',
@@ -849,14 +848,14 @@ class TestAddonLogs(OsfTestCase):
                 'node': {'_id': self.node._id},
                 'kind': 'folder',
                 'nid': self.node._id,
-                'root_path':file_node._id,
-                'size':1
+                'root_path': file_node._id,
+                'size': 1
             },
         ), headers={'Content-Type': 'application/json'})
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
         assert_equal(1, files_query.count())
         renamed_file = files_query.get()
-        assert_equal('/' + file_node._id +'/' + movedfolderpath + filename, renamed_file.path)
+        assert_equal('/' + file_node._id + '/' + movedfolderpath + filename, renamed_file.path)
 
     @mock.patch('requests.get')
     @mock.patch('website.util.waterbutler.download_file')
@@ -883,7 +882,7 @@ class TestAddonLogs(OsfTestCase):
             'extra': {
                 'version': '1'
             }
-        },request_meta={'url': wb_log_url},root_path=file_node._id,), headers={'Content-Type': 'application/json'})
+        }, request_meta={'url': wb_log_url}, root_path=file_node._id, ), headers={'Content-Type': 'application/json'})
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
         assert_equal(1, files_query.count())
         created_file = files_query.get()
@@ -891,7 +890,7 @@ class TestAddonLogs(OsfTestCase):
 
         # Delete the file
         self.app.put_json(wb_log_url, self.build_payload(
-            request_meta={'url': wb_log_url},root_path=file_node._id,
+            request_meta={'url': wb_log_url}, root_path=file_node._id,
             action='delete',
             metadata={
                 'provider': 's3compatinstitutions',
@@ -908,7 +907,6 @@ class TestAddonLogs(OsfTestCase):
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
         assert_equal(1, files_query.count())
         removed_file = files_query.get()
-        #assert_equal(api_settings.FILE_NOT_EXISTS, removed_file.inspection_result_status)
         assert_equal(2, removed_file.inspection_result_status)
 
     @mock.patch('requests.get')
@@ -938,16 +936,15 @@ class TestAddonLogs(OsfTestCase):
             'extra': {
                 'version': '1'
             }
-        },request_meta={'url': wb_log_url},root_path=file_node._id,), headers={'Content-Type': 'application/json'})
+        }, request_meta={'url': wb_log_url}, root_path=file_node._id, ), headers={'Content-Type': 'application/json'})
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
         assert_equal(1, files_query.count())
         created_file = files_query.get()
         assert_equal('/' + file_node._id + '/' + folderpath + filename, created_file.path)
 
         # Remove the folder
-        movedfolderpath = 'trash_bin/{}/'.format(foldername)
         self.app.put_json(wb_log_url, self.build_payload(
-            request_meta={'url': wb_log_url},root_path=file_node._id,
+            request_meta={'url': wb_log_url}, root_path=file_node._id,
             action='delete',
             metadata={
                 'provider': 's3compatinstitutions',
@@ -964,7 +961,6 @@ class TestAddonLogs(OsfTestCase):
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
         assert_equal(1, files_query.count())
         removed_file = files_query.get()
-        #assert_equal(api_settings.FILE_NOT_EXISTS, removed_file.inspection_result_status)
         assert_equal(2, removed_file.inspection_result_status)
 
     @mock.patch('requests.get')
@@ -992,7 +988,7 @@ class TestAddonLogs(OsfTestCase):
             'extra': {
                 'version': '1'
             }
-        },request_meta={'url': wb_log_url},root_path=file_node._id,), headers={'Content-Type': 'application/json'})
+        }, request_meta={'url': wb_log_url}, root_path=file_node._id, ), headers={'Content-Type': 'application/json'})
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
         assert_equal(1, files_query.count())
         created_file = files_query.get()
@@ -1005,7 +1001,6 @@ class TestAddonLogs(OsfTestCase):
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
         assert_equal(1, files_query.count())
         removed_file = files_query.get()
-        #assert_equal(api_settings.TIME_STAMP_STORAGE_DISCONNECTED, removed_file.inspection_result_status)
         assert_equal(2, removed_file.inspection_result_status)
 
     def test_action_downloads_contrib(self):
@@ -1049,7 +1044,7 @@ class TestAddonLogs(OsfTestCase):
             'extra': {
                 'version': '1'
             }
-        },request_meta={'url': url},)
+        }, request_meta={'url': url}, )
         nlogs = self.node.logs.count()
         self.app.put_json(url, payload, headers={'Content-Type': 'application/json'})
         self.node.reload()
@@ -1061,12 +1056,13 @@ class TestAddonLogs(OsfTestCase):
         self.configure_osf_addon()
         path = 'pizza'
         url = self.node.api_url_for('create_waterbutler_log')
-        payload = self.build_payload(metadata={'materialized': path, 'kind': 'folder', 'path': path, 'size': 1000},request_meta={'url': url},root_path=self.file._id)
+        payload = self.build_payload(metadata={'materialized': path, 'kind': 'folder', 'path': path, 'size': 1000},
+                                     request_meta={'url': url}, root_path=self.file._id)
         nlogs = self.node.logs.count()
         self.app.put_json(url, payload, headers={'Content-Type': 'application/json'})
         self.node.reload()
         assert_equal(self.node.logs.count(), nlogs + 1)
-        assert('urls' not in self.node.logs.filter(action='osf_storage_file_added')[0].params)
+        assert ('urls' not in self.node.logs.filter(action='osf_storage_file_added')[0].params)
 
     def test_move_folder_osfstorage_log(self):
         user = AuthUserFactory()
@@ -1076,35 +1072,36 @@ class TestAddonLogs(OsfTestCase):
         file_node = create_test_file(node=project_1, user=user, filename='text001')
         path = 'pizza'
         url = self.node.api_url_for('create_waterbutler_log')
-        payload = self.build_payload(metadata={'materialized': path, 'kind': 'folder', 'path': path, 'size': 1000},
-                                     action='move',
-                                     source={
-                                         'name': 'text001',
-                                         'materialized': 'test1',
-                                         'provider': 'osfstorage',
-                                         'nid': project_1._id,
-                                         'old_root_id': file_node._id,
-                                         'path': '/' + project_1.get_addon('osfstorage').get_root()._id,
-                                         'kind': 'folder',
-                                         'node': {
-                                             '_id': project_1._id,
-                                             'url': project_1.url,
-                                             'title': project_1.title,
-                                         }
-                                     },
-                                     destination={
-                                         'name': 'text001',
-                                         'materialized': 'test1',
-                                         'provider': 'osfstorage',
-                                         'nid': project_2._id,
-                                         'path': '/' + project_2.get_addon('osfstorage').get_root()._id,
-                                         'kind': 'folder',
-                                         'node': {
-                                             '_id': project_2._id,
-                                             'url': project_2.url,
-                                             'title': project_2.title,
-                                         }
-                                     })
+        payload = self.build_payload(
+            metadata={'materialized': path, 'kind': 'folder', 'path': path, 'size': 1000},
+            action='move',
+            source={
+                'name': 'text001',
+                'materialized': 'test1',
+                'provider': 'osfstorage',
+                'nid': project_1._id,
+                'old_root_id': file_node._id,
+                'path': '/' + project_1.get_addon('osfstorage').get_root()._id,
+                'kind': 'folder',
+                'node': {
+                    '_id': project_1._id,
+                    'url': project_1.url,
+                    'title': project_1.title,
+                }
+            },
+            destination={
+                'name': 'text001',
+                'materialized': 'test1',
+                'provider': 'osfstorage',
+                'nid': project_2._id,
+                'path': '/' + project_2.get_addon('osfstorage').get_root()._id,
+                'kind': 'folder',
+                'node': {
+                    '_id': project_2._id,
+                    'url': project_2.url,
+                    'title': project_2.title,
+                }
+            })
         with pytest.raises(Exception):
             self.app.put_json(url, payload, headers={'Content-Type': 'application/json'})
             self.node.reload()
@@ -1254,9 +1251,9 @@ class TestAddonLogsDifferentProvider(OsfTestCase):
                 'path': '/' + movedfilepath,
                 'node': {'_id': self.node._id},
                 'kind': 'file',
-                'root_path':file_node._id,
+                'root_path': file_node._id,
                 'nid': self.node._id,
-                'dest_pạth':'/' + file_node._id + '/' + movedfilepath,
+                'dest_pạth': '/' + file_node._id + '/' + movedfilepath,
             },
             source={
                 'provider': dest_provider,
@@ -1265,7 +1262,7 @@ class TestAddonLogsDifferentProvider(OsfTestCase):
                 'path': '/' + filename,
                 'node': {'_id': self.node._id},
                 'kind': 'file',
-                'root_path':file_node._id,
+                'root_path': file_node._id,
                 'nid': self.node._id,
             },
             destination={
@@ -1275,10 +1272,10 @@ class TestAddonLogsDifferentProvider(OsfTestCase):
                 'path': '/' + movedfilepath,
                 'node': {'_id': self.node._id},
                 'kind': 'file',
-                'root_path':file_node._id,
+                'root_path': file_node._id,
                 'nid': self.node._id,
-                'dest_pạth':'/' + file_node._id + '/' + movedfilepath,
-                'size':1,
+                'dest_pạth': '/' + file_node._id + '/' + movedfilepath,
+                'size': 1,
             },
         ), headers={'Content-Type': 'application/json'})
         files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
@@ -1287,6 +1284,7 @@ class TestAddonLogsDifferentProvider(OsfTestCase):
         assert_equal(2, files_query.count())
         renamed_file = files_query.last()
         assert_equal('/' + file_node._id + '/' + movedfilepath, renamed_file.path)
+
 
 class TestCheckAuth(OsfTestCase):
 
@@ -1969,6 +1967,7 @@ class TestAddonFileViews(OsfTestCase):
         file_node.update(revision=None, user=None, data=data)
         mock_capture.assert_called_with(str('update() receives metatdata older than the newest entry in file history.'), extra={'session': {}})
 
+
 @pytest.mark.django_db
 class TestLegacyViews(OsfTestCase):
 
@@ -1998,7 +1997,8 @@ class TestLegacyViews(OsfTestCase):
         url = '/{0}/osffiles/{1}/'.format(self.project._id, self.file._id)
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node_addon]):
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon',
+                                side_effect=[self.user_addon, self.node_addon]):
                     res = self.app.get(
                         url,
                         auth=self.user.auth,
@@ -2020,7 +2020,8 @@ class TestLegacyViews(OsfTestCase):
         url = '/{0}/osffiles/{1}/download/'.format(self.project._id, self.file._id)
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node_addon]):
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon',
+                                side_effect=[self.user_addon, self.node_addon]):
                     res = self.app.get(
                         url,
                         auth=self.user.auth,
@@ -2045,7 +2046,8 @@ class TestLegacyViews(OsfTestCase):
         )
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node_addon]):
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon',
+                                side_effect=[self.user_addon, self.node_addon]):
                     res = self.app.get(
                         url,
                         auth=self.user.auth,
@@ -2068,7 +2070,8 @@ class TestLegacyViews(OsfTestCase):
         url = '/api/v1/project/{0}/osffiles/{1}/'.format(self.project._id, self.file._id)
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node_addon]):
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon',
+                                side_effect=[self.user_addon, self.node_addon]):
                     res = self.app.get(
                         url,
                         auth=self.user.auth,
@@ -2093,7 +2096,8 @@ class TestLegacyViews(OsfTestCase):
         )
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node_addon]):
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon',
+                                side_effect=[self.user_addon, self.node_addon]):
                     res = self.app.get(
                         url,
                         auth=self.user.auth,
@@ -2120,7 +2124,8 @@ class TestLegacyViews(OsfTestCase):
         )
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node_addon]):
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon',
+                                side_effect=[self.user_addon, self.node_addon]):
                     res = self.app.get(
                         url,
                         auth=self.user.auth,
@@ -2145,7 +2150,8 @@ class TestLegacyViews(OsfTestCase):
         )
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node_addon]):
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon',
+                                side_effect=[self.user_addon, self.node_addon]):
                     res = self.app.get(
                         url,
                         auth=self.user.auth,
@@ -2170,7 +2176,8 @@ class TestLegacyViews(OsfTestCase):
         )
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node_addon]):
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon',
+                                side_effect=[self.user_addon, self.node_addon]):
                     res = self.app.get(
                         url,
                         auth=self.user.auth,
@@ -2195,7 +2202,8 @@ class TestLegacyViews(OsfTestCase):
         )
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node_addon]):
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon',
+                                side_effect=[self.user_addon, self.node_addon]):
                     res = self.app.get(
                         url,
                         auth=self.user.auth,
@@ -2210,6 +2218,7 @@ class TestLegacyViews(OsfTestCase):
                         provider='mycooladdon',
                     )
                     assert_urls_equal(res.location, expected_url)
+
 
 class TestViewUtils(OsfTestCase):
 
@@ -2283,14 +2292,13 @@ class TestViewUtils(OsfTestCase):
         default_addons = [addon['short_name'] for addon in addon_dicts if addon['default']]
         assert not any('/{}/'.format(addon) in asset_paths for addon in default_addons)
 
-
     def test_get_first_addon(self):
         res = AddonModelMixin.get_first_addon(self.node, 'osfstorage')
         assert_is_instance(res, NodeSettings)
 
     def test_get_first_addon_not_correct_addon_name(self):
         res = AddonModelMixin.get_first_addon(self.node, 'not_correct_name')
-        assert res == None
+        assert res is None
 
     @mock.patch('osf.models.mixins.AddonModelMixin._settings_model')
     def test_get_first_addon_settings_model_is_none(self, mock_settings_model):

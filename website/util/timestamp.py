@@ -547,7 +547,6 @@ def add_token(uid, node, data):
 
     # Check access to provider
     root_file_node = BaseFileNode.objects.get(id=file_node.parent.id)
-    #root_file_nodes = waterbutler.get_node_info(cookie, node._id, data['provider'], '/'+root_file_node._id)
     if root_file_node is None:
         return None
 
@@ -583,9 +582,10 @@ def add_token(uid, node, data):
         logger.exception(err)
         raise
 
+
 def get_file_info(cookie, file_node, version):
-    logger.debug(f'file_node is{file_node}')
     headers = {'content-type': 'application/json'}
+
     identifier = None
     if version:
         identifier = version.identifier
@@ -597,7 +597,6 @@ def get_file_info(cookie, file_node, version):
     )
     if file_data_request.status_code == 200:
         file_data = file_data_request.json().get('data')
-        logger.debug(f'file_data is{file_data}')
         file_info = {
             'provider': file_node.provider,
             'file_id': file_node._id,
@@ -613,8 +612,8 @@ def get_file_info(cookie, file_node, version):
         return file_info
     return None
 
+
 def file_created_or_updated(node, metadata, user_id, created_flag):
-    logger.debug(f'metadata  is {metadata}')
     file_id = metadata.get('path').lstrip('/')
     if not settings.ENABLE_TIMESTAMP:
         return
@@ -638,10 +637,15 @@ def file_created_or_updated(node, metadata, user_id, created_flag):
         modified_at = None
     if metadata['provider'] == 'osf_storage':
         version = metadata['extra'].get('version')
+
+    _file_path = file_node.path
+    if metadata['provider'] == 'osfstorage':
+        _file_path = '/' + metadata.get('materialized').lstrip('/')
+
     file_info = {
         'file_id': file_id,
         'file_name': metadata.get('name'),
-        'file_path': '/' + metadata.get('materialized').lstrip('/') if metadata['provider'] == 'osfstorage' else file_node.path,
+        'file_path': _file_path,
         'size': metadata.get('size'),
         'created': created_at,
         'modified': modified_at,
@@ -661,27 +665,20 @@ def file_created_or_updated(node, metadata, user_id, created_flag):
     verify_data.upload_file_size = file_info['size']
     verify_data.save()
 
+
 def get_child_file_metadata(metadata, metadata_children, root_path):
     children = metadata.get('children', [])
     if children:
         for child in children:
             if child['kind'] == 'file':
-                logger.warning('metadata provider is ' + str(metadata.get('provider')))
-                logger.warning('metadata root_path is ' + str(metadata))
                 if metadata.get('provider') in ADDON_METHOD_PROVIDER:
                     child['path'] = root_path + '/' + child.get('path').lstrip('/')
-                logger.warning(f'child is {child}')
                 metadata_children.append(child)
             elif child.get('children'):
                 get_child_file_metadata(child, metadata_children, root_path)
 
+
 def file_node_moved(uid, project_id, src_provider, dest_provider, src_path, dest_path, metadata, src_metadata=None):
-    logger.debug(f'src_path is {src_path}')
-    logger.debug(f'dest_path is {dest_path}')
-    logger.debug(f'src_provider is {src_provider}')
-    logger.debug(f'dest_provider is {dest_provider}')
-    logger.debug(f'metadata is {metadata}')
-    logger.debug(f'src_metadata is {src_metadata}')
     if not settings.ENABLE_TIMESTAMP:
         return
     src_path = src_path if src_path[0] == '/' else '/' + src_path
@@ -697,12 +694,12 @@ def file_node_moved(uid, project_id, src_provider, dest_provider, src_path, dest
     ).all()
 
     if not (src_provider == 'osfstorage' and dest_provider == 'osfstorage'):
-        logger.warning(f'deleted files is {deleted_files}')
         for deleted_file in deleted_files:
             file_node_overwitten(project_id, target_object_id, dest_provider, dest_path)
 
     def is_folder(path):
         return path[-1:] == '/'
+
     if src_provider == dest_provider:
         if src_provider not in ADDON_METHOD_PROVIDER:
             moved_files = RdmFileTimestamptokenVerifyResult.objects.filter(
@@ -761,6 +758,7 @@ def file_node_moved(uid, project_id, src_provider, dest_provider, src_path, dest
                 node = AbstractNode.objects.get(pk=Guid.objects.filter(_id=metadata['node']['_id']).first().object_id)
                 file_created_or_updated(node, metadata, uid, True)
 
+    file_nodes = []
     if src_provider != 'osfstorage' and is_folder(src_path):
         file_nodes = BaseFileNode.objects.filter(target_object_id=target_object_id,
                                                  provider=src_provider,
@@ -768,7 +766,6 @@ def file_node_moved(uid, project_id, src_provider, dest_provider, src_path, dest
                                                  _materialized_path__startswith=src_path).all()
         for file_node in file_nodes:
             file_node._path = re.sub(r'^' + src_path, dest_path, file_node._path)
-            logger.debug(f'file path move is {file_node._path}')
             file_node._materialized_path = re.sub(r'^' + src_path, dest_path, file_node._path)
             children = metadata.get('children', None)
             if children is not None:
@@ -834,9 +831,9 @@ def file_node_moved(uid, project_id, src_provider, dest_provider, src_path, dest
                                                          provider=src_provider,
                                                          deleted_on__isnull=True,
                                                          _materialized_path=src_path).all()
-        logger.debug(f'file_nodes is {file_nodes}')
         if not file_nodes and dest_provider not in ADDON_METHOD_PROVIDER:
             file_nodes = BaseFileNode.objects.filter(_id=path).all()
+
         for file_node in file_nodes:
             if dest_provider in ADDON_METHOD_PROVIDER:
                 if not is_folder(src_path):
@@ -920,6 +917,8 @@ def move_file_node_update(file_node, src_provider, dest_provider, metadata=None)
                     break
     file_node.save()
     return file_node
+
+
 def get_linenumber():
     cf = currentframe()
     return cf.f_back.f_lineno
@@ -938,12 +937,12 @@ def provider_change_update_timestampverification(uid, file_node, src_provider, d
         return
     path = ''
     if file_node._materialized_path is not None and file_node._materialized_path != '':
-        logger.debug(f'file_node id is {file_node.id}')
         root_file_path = BaseFileNode.objects.get(id=file_node.parent_id)._id
+        path = file_node._materialized_path
+        if file_node._materialized_path[0] != '/':
+            path = '/' + file_node._materialized_path
         if dest_provider in ADDON_METHOD_PROVIDER:
-            path = '/' + root_file_path + file_node._materialized_path if file_node._materialized_path[0] == '/' else '/' + root_file_path + '/' + file_node._materialized_path
-        else:
-            path = file_node._materialized_path if file_node._materialized_path[0] == '/' else '/' + file_node._materialized_path
+            path = '/' + root_file_path + path
     if dest_provider == 'googledrive':
         path = file_node._materialized_path
     if src_provider != dest_provider:
@@ -962,7 +961,6 @@ def provider_change_update_timestampverification(uid, file_node, src_provider, d
         return res
 
 def file_node_overwitten(project_id, target_object_id, addon_name, src_path):
-    logger.warning('call file_node overide')
     src_path = src_path if src_path[0] == '/' else '/' + src_path
     RdmFileTimestamptokenVerifyResult.objects.filter(
         project_id=project_id,
@@ -1313,8 +1311,8 @@ class TimeStampTokenVerifyCheck:
                     file_info, verify_result_local,
                     project_id, userid)
 
-        assert (ret is not None)
-        assert (verify_result_title is not None)
+        assert(ret is not None)
+        assert(verify_result_title is not None)
 
         file_id = file_info['file_id']
         provider = file_info['provider']

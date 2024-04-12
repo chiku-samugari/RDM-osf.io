@@ -5,11 +5,15 @@ import mock
 from nose.tools import *  # noqa: F403
 
 from tests.base import OsfTestCase
-from osf_tests.factories import (UserFactory, ProjectFactory, NodeFactory,
-                             AuthFactory, PrivateLinkFactory, RegionFactory)
+from osf_tests.factories import (
+    UserFactory, ProjectFactory, NodeFactory,
+    AuthFactory, PrivateLinkFactory,
+    RegionFactory
+)
 from framework.auth import Auth
 from website.util import rubeus
 from website.util.rubeus import sort_by_name
+
 
 class TestRubeus(OsfTestCase):
 

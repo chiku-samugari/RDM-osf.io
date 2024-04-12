@@ -114,6 +114,7 @@ def handle_archive_fail(reason, src, dst, user, result):
     dst.root.sanction.save()
     dst.root.delete_registration_tree(save=True)
 
+
 def archive_provider_for(node, user):
     """A generic function to get the archive provider for some node, user pair.
 
@@ -128,6 +129,7 @@ def archive_provider_for(node, user):
         addon = node.get_first_addon(settings.ARCHIVE_PROVIDER)
     return addon
 
+
 def has_archive_provider(node, user):
     """A generic function for checking whether or not some node, user pair has
     an attached provider for archiving
@@ -137,6 +139,7 @@ def has_archive_provider(node, user):
     the code for use with archive providers other than OSF Storage)
     """
     return node.has_addon(settings.ARCHIVE_PROVIDER)
+
 
 def link_archive_provider(node, user):
     """A generic function for linking some node, user pair with the configured
@@ -156,6 +159,7 @@ def link_archive_provider(node, user):
     if hasattr(addon, 'on_add'):
         addon.on_add()
     node.save()
+
 
 def aggregate_file_tree_metadata(addon_short_name, fileobj_metadata, user):
     """Recursively traverse the addon's file tree and collect metadata in AggregateStatResult
@@ -204,6 +208,7 @@ def _do_get_file_map(file_tree):
             stack = stack + tree_node['children']
     return file_map
 
+
 def _memoize_get_file_map(func):
     cache = {}
 
@@ -219,6 +224,7 @@ def _memoize_get_file_map(func):
             cache[node._id] = _do_get_file_map(file_tree)
         return func(node, cache[node._id])
     return wrapper
+
 
 @_memoize_get_file_map
 def get_file_map(node, file_map):

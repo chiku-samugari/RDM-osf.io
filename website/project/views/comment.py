@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-import logging
+
 import markdown
 from django.utils import timezone
 from flask import request
 
 from api.caching.tasks import ban_url
+from api.base.settings.defaults import ADDON_METHOD_PROVIDER
 from osf.models import Guid
 from framework.postcommit_tasks.handlers import enqueue_postcommit_task
 from website import settings
@@ -16,9 +17,6 @@ from website.notifications.emails import notify, notify_mentions
 from website.project.decorators import must_be_contributor_or_public
 from osf.models import Node
 from website.project.signals import comment_added, mention_added
-from api.base.settings.defaults import ADDON_METHOD_PROVIDER
-
-logger = logging.getLogger(__name__)
 
 
 @file_updated.connect
@@ -56,7 +54,6 @@ def update_file_guid_referent(self, target, event_type, payload, user=None):
             update_comment_node(guid, source_node, destination_node)
 
         if source['provider'] != destination['provider'] or source['provider'] != 'osfstorage':
-            logger.warning(f'change file node here {obj}')
             old_file = BaseFileNode.load(obj.referent._id)
             obj.referent = create_new_file(obj, source, destination, destination_node)
             obj.save()

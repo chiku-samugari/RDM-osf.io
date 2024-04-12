@@ -1,36 +1,38 @@
 # -*- coding: utf-8 -*-
 
-import time
 from unittest import mock
 
+from rest_framework import status as http_status
+from future.moves.urllib.parse import urlparse, parse_qs
+
 import itsdangerous
-import mock
 import pytest
 import responses
-from addons.osfstorage.tests.utils import StorageTestCase
-from addons.osfstorage.tests import factories
-from future.moves.urllib.parse import urlparse, parse_qs
-from nose.tools import *  # noqa
-from nose.tools import (assert_equal, assert_false, assert_in, assert_is_none,
-                        assert_not_equal, assert_raises, assert_true)
-from rest_framework import status as http_status
+import time
 
 from addons.base.tests.base import OAuthAddonTestCaseMixin
 from addons.github.tests.factories import GitHubAccountFactory
 from addons.osfstorage.models import OsfStorageFileNode
-from admin.rdm_addons.utils import get_rdm_addon_option
+from addons.osfstorage.tests import factories
+from addons.osfstorage.tests.factories import OsfStorageAccountFactory
+from addons.osfstorage.tests.utils import StorageTestCase
 from api_tests.utils import create_test_file
 from framework.auth import signing
 from framework.auth.core import Auth
 from framework.exceptions import HTTPError
+from nose.tools import (assert_equal, assert_false, assert_in, assert_is_none,
+                        assert_not_equal, assert_raises, assert_true)
 from osf.models import Session
+from osf_tests.factories import (
+    AuthUserFactory, ProjectFactory, InstitutionFactory,
+    PreprintFactory,
+)
+from osf.utils import permissions
 from tests.base import OsfTestCase
 from tests.test_timestamp import create_test_file
 from website import settings
-from addons.osfstorage.tests.factories import OsfStorageAccountFactory
-from osf.utils import permissions
-from osf_tests.factories import AuthUserFactory, ProjectFactory, InstitutionFactory, PreprintFactory, RegionFactory, NodeFactory
 from website.util import api_url_for, web_url_for
+from admin.rdm_addons.utils import get_rdm_addon_option
 
 
 class OAuthAddonAuthViewsTestCaseMixin(OAuthAddonTestCaseMixin):
@@ -90,7 +92,6 @@ class OAuthAddonAuthViewsTestCaseMixin(OAuthAddonTestCaseMixin):
         assert_equal(res.status_code, http_status.HTTP_200_OK)
         name, args, kwargs = mock_callback.mock_calls[0]
         assert_equal(kwargs['user']._id, self.user._id)
-
 
     def test_delete_external_account(self):
         url = api_url_for(
@@ -474,8 +475,10 @@ class TestAddonsBaseView(StorageTestCase):
         file = create_test_file(self.node, self.user)
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node.get_addon('osfstorage')]):
-                    with mock.patch('addons.osfstorage.models.NodeSettings.get_root', side_effect=OsfStorageFileNode.DoesNotExist('mock error')):
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon',
+                                side_effect=[self.user_addon, self.node.get_addon('osfstorage')]):
+                    with mock.patch('addons.osfstorage.models.NodeSettings.get_root',
+                                    side_effect=OsfStorageFileNode.DoesNotExist('mock error')):
                         url = self.node.web_url_for(
                             'addon_view_or_download_file_legacy',
                             path=file._id,
@@ -487,7 +490,7 @@ class TestAddonsBaseView(StorageTestCase):
                             headers={'X-OSF-OTP': 'fake_otp'},
                             expect_errors=True
                         )
-                        assert resp.status_code == 404
+                        assert_equal(resp.status_code, http_status.HTTP_404_NOT_FOUND)
 
     @mock.patch('website.util.timestamp.requests')
     def test_addon_deleted_file(self, mock_requests):
@@ -519,7 +522,7 @@ class TestAddonsBaseView(StorageTestCase):
         redirect = self.app.get(url, auth=self.user.auth)
         redirect_two = redirect.follow(auth=self.user.auth)
         redirect_two.follow(auth=self.user.auth)
-        assert redirect.status_code == 302
+        assert_equal(redirect.status_code, http_status.HTTP_302_FOUND)
 
 
 class TestAddonLogsDifferentProvider(OsfTestCase):
@@ -649,7 +652,7 @@ class TestAddonLogsDifferentProvider(OsfTestCase):
                 'nid': self.node._id,
             },
         ), headers={'Content-Type': 'application/json'}, expect_errors=True)
-        assert res.status_code == 200
+        assert_equal(res.status_code, http_status.HTTP_200_OK)
 
 
 @pytest.mark.django_db
@@ -666,8 +669,10 @@ class TestAddonsBaseView(StorageTestCase):
         file = create_test_file(self.node, self.user)
         with mock.patch('addons.twofactor.models.UserSettings.verify_code', return_value=True):
             with mock.patch('addons.base.views.request', mock_request):
-                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon', side_effect=[self.user_addon, self.node.get_addon('osfstorage')]):
-                    with mock.patch('addons.osfstorage.models.NodeSettings.get_root', side_effect=OsfStorageFileNode.DoesNotExist('mock error')):
+                with mock.patch('osf.models.mixins.AddonModelMixin.get_addon',
+                                side_effect=[self.user_addon, self.node.get_addon('osfstorage')]):
+                    with mock.patch('addons.osfstorage.models.NodeSettings.get_root',
+                                    side_effect=OsfStorageFileNode.DoesNotExist('mock error')):
                         url = self.node.web_url_for(
                             'addon_view_or_download_file_legacy',
                             path=file._id,
@@ -679,7 +684,7 @@ class TestAddonsBaseView(StorageTestCase):
                             headers={'X-OSF-OTP': 'fake_otp'},
                             expect_errors=True
                         )
-                        assert resp.status_code == 404
+                        assert_equal(resp.status_code, http_status.HTTP_404_NOT_FOUND)
 
     def test_disable_addon_exception(self):
         mock_request = mock.MagicMock()
@@ -694,4 +699,4 @@ class TestAddonsBaseView(StorageTestCase):
                 },
                 auth=self.user.auth,
                 expect_errors=True)
-            assert resp.status_code == 400
+            assert_equal(resp.status_code, http_status.HTTP_400_BAD_REQUEST)

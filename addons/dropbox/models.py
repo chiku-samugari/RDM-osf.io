@@ -206,7 +206,7 @@ class NodeSettings(BaseOAuthNodeSettings, BaseStorageAddon):
             raise exceptions.AddonError('Folder is not configured')
         return {
             'nid': self.owner._id,
-            'folder': self.folder
+            'folder': self.folder,
         }
 
     def create_waterbutler_log(self, auth, action, metadata):

@@ -17,8 +17,10 @@ def add_region_and_root_id_value(apps, schema_editor):
                 dropbox.root_node_id = osfnodesettings.root_node_id
                 dropbox.save()
 
+
 def noop(*args):
     pass
+
 
 class Migration(migrations.Migration):
 

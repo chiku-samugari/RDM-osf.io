@@ -1,18 +1,20 @@
 # -*- coding: utf-8 -*-
 from nose.tools import *  # noqa:
 import mock  # noqa
+import pytest
 import unittest
+
+from django.core.exceptions import MultipleObjectsReturned
+from django.test import RequestFactory
 from rest_framework import fields
 from rest_framework.exceptions import ValidationError
 from api.base import utils as api_utils
-from framework.status import push_status_message
-from api.base.utils import get_object_or_error
-from tests.base import OsfTestCase
-from django.test import RequestFactory
-from osf_tests.factories import AuthUserFactory, RegionFactory
-from django.core.exceptions import MultipleObjectsReturned
+
 from addons.osfstorage.models import Region
-import pytest
+from api.base.utils import get_object_or_error
+from framework.status import push_status_message
+from osf_tests.factories import AuthUserFactory, RegionFactory
+from tests.base import OsfTestCase
 
 
 class TestTruthyFalsy:

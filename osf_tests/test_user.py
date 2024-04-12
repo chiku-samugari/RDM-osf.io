@@ -104,15 +104,16 @@ class TestOSFUser:
         assert user.given_name == impute_names_model(name)['given_name']
 
     def test_representative_affiliated_institution(self):
+        institution = InstitutionFactory()
         name, email = fake.name(), fake_email()
         user = OSFUser.create(
             username=email, password='foobar', fullname=name
         )
-        user.save()
-        institution = InstitutionFactory()
         user.affiliated_institutions.add(institution)
         user.save()
+
         res = user.representative_affiliated_institution
+
         assert res._id == institution._id
 
     def test_create_unconfirmed(self):

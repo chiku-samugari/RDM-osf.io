@@ -61,7 +61,6 @@ def get_root_institutional_storage(file_id):
 
     :param str file_id: _id of file or folder
     :return BaseFileNode: Root folder of institutional storage
-
     """
     from osf.models import BaseFileNode
     try:

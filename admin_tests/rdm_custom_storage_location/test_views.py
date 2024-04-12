@@ -1,19 +1,21 @@
 from django.test import RequestFactory
 from django.http import Http404, HttpResponse
 import json
-from nose import tools as nt
 import mock
-from framework.exceptions import HTTPError
+from nose import tools as nt
+
 from admin_tests.utilities import setup_user_view
 from admin.rdm_custom_storage_location import views
 from addons.osfstorage.models import Region
-from osf.models import AuthenticationAttribute
 from api.base import settings as api_settings
+from framework.exceptions import HTTPError
+from osf.models import AuthenticationAttribute
 from tests.base import AdminTestCase
 from osf_tests.factories import (
     AuthUserFactory,
     RegionFactory,
-    InstitutionFactory, AuthenticationAttributeFactory,
+    InstitutionFactory,
+    AuthenticationAttributeFactory,
 )
 
 
@@ -78,7 +80,8 @@ class TestInstitutionDefaultStorage(AdminTestCase):
         for addon in res.context_data['providers']:
             nt.assert_true(type(addon).__name__ in self.addon_type_dict)
         nt.assert_equal(res.context_data['region'][0], self.us)
-        nt.assert_equal(res.context_data['selected_provider_short_name'], res.context_data['region'][0].waterbutler_settings['storage']['provider'])
+        nt.assert_equal(res.context_data['selected_provider_short_name'],
+                        res.context_data['region'][0].waterbutler_settings['storage']['provider'])
 
 
 class TestIconView(AdminTestCase):
@@ -217,8 +220,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 's3', 'storage_name': 'test_storage_name',
-                        'new_storage_name': 'test_new_storage_name'}),
+            json.dumps({
+                'provider_short_name': 's3', 'storage_name': 'test_storage_name',
+                'new_storage_name': 'test_new_storage_name'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -236,10 +241,12 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 's3compat', 'storage_name': 'test_storage_name',
-                        'new_storage_name': 'test_new_storage_name',
-                        's3compat_endpoint_url': 'https://fake_end_point',
-                        's3compat_server_side_encryption': 'False', }),
+            json.dumps({
+                'provider_short_name': 's3compat', 'storage_name': 'test_storage_name',
+                'new_storage_name': 'test_new_storage_name',
+                's3compat_endpoint_url': 'https://fake_end_point',
+                's3compat_server_side_encryption': 'False',
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -257,9 +264,11 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 's3compatb3', 'storage_name': 'test_storage_name',
-                        'new_storage_name': 'test_new_storage_name',
-                        's3compatb3_endpoint_url': 'https://fake_end_point', }),
+            json.dumps({
+                'provider_short_name': 's3compatb3', 'storage_name': 'test_storage_name',
+                'new_storage_name': 'test_new_storage_name',
+                's3compatb3_endpoint_url': 'https://fake_end_point',
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -277,9 +286,11 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 's3compatinstitutions', 'storage_name': 'test_storage_name',
-                        'new_storage_name': 'test_new_storage_name',
-                        's3compatinstitutions_endpoint_url': 'https://fake_end_point', }),
+            json.dumps({
+                'provider_short_name': 's3compatinstitutions', 'storage_name': 'test_storage_name',
+                'new_storage_name': 'test_new_storage_name',
+                's3compatinstitutions_endpoint_url': 'https://fake_end_point',
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -297,8 +308,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 'ociinstitutions', 'storage_name': 'test_storage_name',
-                        'ociinstitutions_endpoint_url': 'https://fake_end_point'}),
+            json.dumps({
+                'provider_short_name': 'ociinstitutions', 'storage_name': 'test_storage_name',
+                'ociinstitutions_endpoint_url': 'https://fake_end_point'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -316,8 +329,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 'swift', 'storage_name': 'test_storage_name',
-                        'new_storage_name': 'test_new_storage_name'}),
+            json.dumps({
+                'provider_short_name': 'swift', 'storage_name': 'test_storage_name',
+                'new_storage_name': 'test_new_storage_name'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -335,8 +350,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 'osfstorage', 'storage_name': 'test_storage_name',
-                        'new_storage_name': 'test_new_storage_name'}),
+            json.dumps({
+                'provider_short_name': 'osfstorage', 'storage_name': 'test_storage_name',
+                'new_storage_name': 'test_new_storage_name'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -354,8 +371,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 'googledrive', 'storage_name': 'test_storage_name',
-                        'new_storage_name': 'test_new_storage_name'}),
+            json.dumps({
+                'provider_short_name': 'googledrive', 'storage_name': 'test_storage_name',
+                'new_storage_name': 'test_new_storage_name'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -373,8 +392,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 'owncloud', 'storage_name': 'test_storage_name',
-                        'owncloud_host': 'https://fake_end_point'}),
+            json.dumps({
+                'provider_short_name': 'owncloud', 'storage_name': 'test_storage_name',
+                'owncloud_host': 'https://fake_end_point'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -392,8 +413,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 'nextcloud', 'storage_name': 'test_storage_name',
-                        'nextcloud_host': 'https://fake_end_point'}),
+            json.dumps({
+                'provider_short_name': 'nextcloud', 'storage_name': 'test_storage_name',
+                'nextcloud_host': 'https://fake_end_point'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -411,8 +434,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 'nextcloudinstitutions', 'storage_name': 'test_storage_name',
-                        'nextcloudinstitutions_host': 'https://fake_end_point'}),
+            json.dumps({
+                'provider_short_name': 'nextcloudinstitutions', 'storage_name': 'test_storage_name',
+                'nextcloudinstitutions_host': 'https://fake_end_point'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -430,8 +455,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 'box', 'storage_name': 'test_storage_name',
-                        'new_storage_name': 'test_new_storage_name'}),
+            json.dumps({
+                'provider_short_name': 'box', 'storage_name': 'test_storage_name',
+                'new_storage_name': 'test_new_storage_name'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -449,8 +476,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 'dropboxbusiness', 'storage_name': 'test_storage_name',
-                        'new_storage_name': 'test_new_storage_name'}),
+            json.dumps({
+                'provider_short_name': 'dropboxbusiness', 'storage_name': 'test_storage_name',
+                'new_storage_name': 'test_new_storage_name'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -468,8 +497,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 'onedrivebusiness', 'storage_name': 'test_storage_name',
-                        'new_storage_name': 'test_new_storage_name'}),
+            json.dumps({
+                'provider_short_name': 'onedrivebusiness', 'storage_name': 'test_storage_name',
+                'new_storage_name': 'test_new_storage_name'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -487,8 +518,10 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_credentials',
-            json.dumps({'provider_short_name': 'invalid_provider', 'storage_name': 'test_storage_name',
-                        'new_storage_name': 'test_new_storage_name'}),
+            json.dumps({
+                'provider_short_name': 'invalid_provider', 'storage_name': 'test_storage_name',
+                'new_storage_name': 'test_new_storage_name'
+            }),
             content_type='application/json'
         )
         self.request.is_ajax()
@@ -726,6 +759,7 @@ class TestChangeAuthenticationAttributeView(AdminTestCase):
             self.view.post(self.request)
         res = e.exception
         assert res.code == 400
+
 
 class TestAddAttributeFormView(AdminTestCase):
 
@@ -1035,11 +1069,13 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
     def test_save_institutional_storage_allow_expression_invalid(self):
         self.request = RequestFactory().post(
             'custom_storage_location:save_institutional_storage',
-            json.dumps({'region_id': self.region.id,
-                        'allow': True,
-                        'readonly': False,
-                        'allow_expression': '1|2',
-                        'readonly_expression': ''}),
+            json.dumps({
+                'region_id': self.region.id,
+                'allow': True,
+                'readonly': False,
+                'allow_expression': '1|2',
+                'readonly_expression': ''
+            }),
             content_type='application/json'
         )
 
@@ -1051,11 +1087,13 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
     def test_save_institutional_storage_readonly_expression_invalid(self):
         self.request = RequestFactory().post(
             'custom_storage_location:save_institutional_storage',
-            json.dumps({'region_id': self.region.id,
-                        'allow': True,
-                        'readonly': False,
-                        'allow_expression': '',
-                        'readonly_expression': '(1&3&2)||3'}),
+            json.dumps({
+                'region_id': self.region.id,
+                'allow': True,
+                'readonly': False,
+                'allow_expression': '',
+                'readonly_expression': '(1&3&2)||3'
+            }),
             content_type='application/json'
         )
 
@@ -1067,11 +1105,13 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
     def test_save_institutional_storage_index_number_in_allow_expression_not_found(self):
         self.request = RequestFactory().post(
             'custom_storage_location:save_institutional_storage',
-            json.dumps({'region_id': self.region.id,
-                        'allow': True,
-                        'readonly': False,
-                        'allow_expression': '2||5',
-                        'readonly_expression': ''}),
+            json.dumps({
+                'region_id': self.region.id,
+                'allow': True,
+                'readonly': False,
+                'allow_expression': '2||5',
+                'readonly_expression': ''
+            }),
             content_type='application/json'
         )
 
@@ -1083,11 +1123,13 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
     def test_save_institutional_storage_index_number_in_readonly_expression_not_found(self):
         self.request = RequestFactory().post(
             'custom_storage_location:save_institutional_storage',
-            json.dumps({'region_id': self.region.id,
-                        'allow': True,
-                        'readonly': False,
-                        'allow_expression': '',
-                        'readonly_expression': '(2&&3)||4'}),
+            json.dumps({
+                'region_id': self.region.id,
+                'allow': True,
+                'readonly': False,
+                'allow_expression': '',
+                'readonly_expression': '(2&&3)||4'
+            }),
             content_type='application/json'
         )
 
@@ -1099,11 +1141,13 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
     def test_save_institutional_storage_region_not_found(self):
         self.request = RequestFactory().post(
             'custom_storage_location:save_institutional_storage',
-            json.dumps({'region_id': self.region.id + 1,
-                        'allow': True,
-                        'readonly': False,
-                        'allow_expression': '',
-                        'readonly_expression': ''}),
+            json.dumps({
+                'region_id': self.region.id + 1,
+                'allow': True,
+                'readonly': False,
+                'allow_expression': '',
+                'readonly_expression': ''
+            }),
             content_type='application/json'
         )
 
@@ -1131,12 +1175,14 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
         readonly_expression_test = '!1'
         self.request = RequestFactory().post(
             'custom_storage_location:save_institutional_storage',
-            json.dumps({'region_id': region.id,
-                        'allow': allow_test,
-                        'readonly': readonly_test,
-                        'allow_expression': allow_expression_test,
-                        'readonly_expression': readonly_expression_test,
-                        'storage_name': storage_name_test}),
+            json.dumps({
+                'region_id': region.id,
+                'allow': allow_test,
+                'readonly': readonly_test,
+                'allow_expression': allow_expression_test,
+                'readonly_expression': readonly_expression_test,
+                'storage_name': storage_name_test
+            }),
             content_type='application/json'
         )
 
@@ -1156,12 +1202,14 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
         region_test.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_institutional_storage',
-            json.dumps({'region_id': self.region.id,
-                        'allow': True,
-                        'readonly': False,
-                        'allow_expression': '',
-                        'readonly_expression': '',
-                        'storage_name': region_test.name}),
+            json.dumps({
+                'region_id': self.region.id,
+                'allow': True,
+                'readonly': False,
+                'allow_expression': '',
+                'readonly_expression': '',
+                'storage_name': region_test.name
+            }),
             content_type='application/json'
         )
 

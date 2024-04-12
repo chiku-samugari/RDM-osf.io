@@ -1,9 +1,10 @@
 from dateutil.parser import parse as parse_date
 import pytest
 from future.moves.urllib.parse import urlparse
+from rest_framework import exceptions
 
 from api.base.settings.defaults import API_BASE
-from api.nodes.serializers import NodeSerializer
+from api.nodes.serializers import NodeSerializer, RegionRelationshipField
 from api.sparse.serializers import SparseNodeSerializer, SparseRegistrationSerializer
 from api.registrations.serializers import RegistrationSerializer
 from framework.auth import Auth
@@ -19,8 +20,6 @@ from osf_tests.factories import (
 from tests.base import assert_datetime_equal
 from tests.utils import make_drf_request_with_version
 from api.base import settings as api_settings
-from api.nodes.serializers import RegionRelationshipField
-from rest_framework import exceptions
 
 
 @pytest.fixture()

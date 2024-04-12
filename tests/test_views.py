@@ -12,9 +12,9 @@ import shutil
 import tempfile
 import time
 import unittest
-from future.moves.urllib.parse import quote,unquote
+from future.moves.urllib.parse import quote, unquote
 import uuid
-from website.project.views.file import update_custom_storage_icon_url
+
 from flask import request
 import mock
 import pytest
@@ -44,7 +44,7 @@ from framework.exceptions import HTTPError, TemplateHTTPError
 from framework.transactions.handlers import no_auto_transaction
 from website import mailchimp_utils, mails, settings, language
 from addons.osfstorage import settings as osfstorage_settings
-from osf.models import AbstractNode, NodeLog, QuickFilesNode
+from osf.models import AbstractNode, NodeLog, QuickFilesNode, ProjectStorageType
 from website.profile.utils import add_contributor_json, serialize_unregistered
 from website.profile.views import update_osf_help_mails_subscription, _profile_view, append_idp_attr_common
 from website.project.decorators import check_can_access
@@ -60,6 +60,7 @@ from website.project.views.contributor import (
 from website import views as website_view
 from website.profile import views as website_profile_view
 from website.project.views.node import _should_show_wiki_widget, _view_project, abbrev_authors
+from website.project.views.file import update_custom_storage_icon_url
 from website.util import api_url_for, web_url_for
 from website.util import rubeus
 from website.util.metrics import OsfSourceTags, OsfClaimedTags, provider_source_tag, provider_claimed_tag
@@ -109,8 +110,6 @@ from osf_tests.factories import (
 )
 from osf.models.node import set_project_storage_type
 from addons.osfstorage.models import NodeSettings
-from osf.models.project_storage_type import ProjectStorageType
-
 
 @mock_app.route('/errorexc')
 def error_exc():
@@ -4918,9 +4917,9 @@ class TestConfigureMailingListViews(OsfTestCase):
         super(TestConfigureMailingListViews, cls).tearDownClass()
         settings.ENABLE_EMAIL_SUBSCRIPTIONS = cls._original_enable_email_subscriptions
 
+
 # TODO: Move to OSF Storage
 class TestFileViews(OsfTestCase):
-
     def setUp(self):
         super(TestFileViews, self).setUp()
         self.user = AuthUserFactory()
@@ -4946,23 +4945,69 @@ class TestFileViews(OsfTestCase):
         assert_equal(len(data), len(expected))
 
     def test_update_custom_storage_icon_url_noderegion_is_united_tates(self):
-        fake_child = {'provider': 'osfstorage', 'addonFullname': 'NII Storage', 'name': 'NII Storage', 'iconUrl': '/static/addons/osfstorage/comicon.png',
-         'kind': 'folder', 'extra': None, 'buttons': None, 'isAddonRoot': True, 'permissions': {'view': True, 'edit': True},
-         'accept': {'maxSize': 5120, 'acceptedFiles': True},
-         'urls': {'fetch': '/api/v1/project/tkqvs/osfstorage/hgrid/', 'upload': '/api/v1/project/tkqvs/osfstorage/'}, 'isPointer': False,
-         'nodeId': 'tkqvs', 'nodeUrl': '/tkqvs/', 'nodeApiUrl': '/api/v1/project/tkqvs/', 'path': '642400ffe3ff270298cfa6df/',
-         'nodeRegion': 'United States', 'waterbutlerURL': 'http://localhost:7777'}
+        fake_child = {
+            'provider': 'osfstorage',
+            'addonFullname': 'NII Storage',
+            'name': 'NII Storage',
+            'iconUrl': '/static/addons/osfstorage/comicon.png',
+            'kind': 'folder',
+            'extra': None,
+            'buttons': None,
+            'isAddonRoot': True,
+            'permissions': {
+                'view': True,
+                'edit': True
+            },
+            'accept': {
+                'maxSize': 5120,
+                'acceptedFiles': True
+            },
+            'urls': {
+                'fetch': '/api/v1/project/tkqvs/osfstorage/hgrid/',
+                'upload': '/api/v1/project/tkqvs/osfstorage/'
+            },
+            'isPointer': False,
+            'nodeId': 'tkqvs',
+            'nodeUrl': '/tkqvs/',
+            'nodeApiUrl': '/api/v1/project/tkqvs/',
+            'path': '642400ffe3ff270298cfa6df/',
+            'nodeRegion': 'United States',
+            'waterbutlerURL': 'http://localhost:7777'
+        }
 
         res = update_custom_storage_icon_url(fake_child)
         assert_is_none(res)
 
     def testupdate_custom_storage_icon_url(self):
-        fake_child = {'provider': 'osfstorage', 'addonFullname': 'NII Storage', 'name': 'NII Storage', 'iconUrl': '/static/addons/osfstorage/comicon.png',
-         'kind': 'folder', 'extra': None, 'buttons': None, 'isAddonRoot': True, 'permissions': {'view': True, 'edit': True},
-         'accept': {'maxSize': 5120, 'acceptedFiles': True},
-         'urls': {'fetch': '/api/v1/project/tkqvs/osfstorage/hgrid/', 'upload': '/api/v1/project/tkqvs/osfstorage/'}, 'isPointer': False,
-         'nodeId': 'tkqvs', 'nodeUrl': '/tkqvs/', 'nodeApiUrl': '/api/v1/project/tkqvs/', 'path': '642400ffe3ff270298cfa6df/',
-         'nodeRegion': 'not United States', 'waterbutlerURL': 'http://localhost:7777'}
+        fake_child = {
+            'provider': 'osfstorage',
+            'addonFullname': 'NII Storage',
+            'name': 'NII Storage',
+            'iconUrl': '/static/addons/osfstorage/comicon.png',
+            'kind': 'folder',
+            'extra': None,
+            'buttons': None,
+            'isAddonRoot': True,
+            'permissions': {
+                'view': True,
+                'edit': True
+            },
+            'accept': {
+                'maxSize': 5120,
+                'acceptedFiles': True
+            },
+            'urls': {
+                'fetch': '/api/v1/project/tkqvs/osfstorage/hgrid/',
+                'upload': '/api/v1/project/tkqvs/osfstorage/'
+            },
+            'isPointer': False,
+            'nodeId': 'tkqvs',
+            'nodeUrl': '/tkqvs/',
+            'nodeApiUrl': '/api/v1/project/tkqvs/',
+            'path': '642400ffe3ff270298cfa6df/',
+            'nodeRegion': 'not United States',
+            'waterbutlerURL': 'http://localhost:7777'
+        }
 
         res = update_custom_storage_icon_url(fake_child)
         assert_is_none(res)
@@ -4974,7 +5019,11 @@ class TestFileViews(OsfTestCase):
         nodeSettings.region = new_region
         nodeSettings.save()
         ProjectStorageType.objects.update_or_create(
-            node_id=self.project.id, defaults={'node_id': self.project.id, 'storage_type': ProjectStorageType.NII_STORAGE}
+            node_id=self.project.id,
+            defaults={
+                'node_id': self.project.id,
+                'storage_type': ProjectStorageType.NII_STORAGE
+            }
         )
         url = self.project.api_url_for('grid_data')
         res = self.app.get(url, auth=self.user.auth).maybe_follow()
@@ -5615,8 +5664,6 @@ class TestResolveGuid(OsfTestCase):
             res.request.path,
             '/{}/'.format(preprint._id)
         )
-
-
 
     def test_preprint_provider_with_osf_domain(self):
         provider = PreprintProviderFactory(_id='osftest', domain='https://rdm.nii.ac.jp/')

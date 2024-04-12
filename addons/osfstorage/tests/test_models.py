@@ -1,13 +1,21 @@
 from __future__ import unicode_literals
 
-import mock
-import unittest  # noqa
+from unittest import mock
+
+import unittest
 
 import pytest
 import pytz
 from django.utils import timezone
-from nose.tools import *  # noqa
-from unittest import mock
+from nose.tools import (
+    assert_true, assert_false,
+    assert_equal, assert_equals,
+    assert_is, assert_is_not,
+    assert_not_equal,
+    assert_in,
+    assert_raises,
+)
+
 from framework.auth import Auth
 from addons.osfstorage.models import OsfStorageFile, OsfStorageFileNode, OsfStorageFolder
 from osf.models import BaseFileNode
@@ -17,6 +25,7 @@ from osf.utils.permissions import WRITE, ADMIN
 from osf_tests.factories import ProjectFactory, UserFactory, PreprintFactory, RegionFactory, NodeFactory
 
 from addons.osfstorage.tests import factories
+from addons.osfstorage.tests.factories import OsfStorageNodeSettingsFactory
 from addons.osfstorage.tests.utils import StorageTestCase
 from addons.osfstorage.listeners import delete_files_task
 
@@ -26,7 +35,6 @@ from osf import models
 from addons.osfstorage import utils
 from addons.osfstorage import settings
 from website.files.exceptions import FileNodeCheckedOutError, FileNodeIsPrimaryFile
-from addons.osfstorage.tests.factories import OsfStorageNodeSettingsFactory
 
 
 @pytest.mark.django_db
@@ -1075,7 +1083,6 @@ class TestOsfStorageCheckout(StorageTestCase):
         osf_storage_node_setting.reload()
         assert_equal(node.logs.count(), nlog + 1)
         assert_equal(node.logs.latest().params['path'], metadata['materialized'])
-
 
 
 @pytest.mark.django_db

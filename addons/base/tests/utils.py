@@ -1,19 +1,15 @@
+from unittest import mock
+
 import pytest
 from addons.base.utils import get_mfr_url, get_root_institutional_storage
 from nose.tools import assert_equal
 
-from addons.osfstorage.tests.utils import StorageTestCase
-from tests.base import OsfTestCase
-from osf_tests.factories import ProjectFactory, UserFactory, RegionFactory, CommentFactory, AuthUserFactory
-from website.settings import MFR_SERVER_URL
 from osf.models import BaseFileNode
+from tests.base import OsfTestCase
 from tests.test_websitefiles import TestFolder, TestFile
-from framework.exceptions import HTTPError
-from unittest import mock
+from osf_tests.factories import ProjectFactory, UserFactory, CommentFactory, AuthUserFactory
+from website.settings import MFR_SERVER_URL
 
-from tests.test_websitefiles import TestFolder, TestFile
-from framework.exceptions import HTTPError
-from unittest import mock
 
 class MockFolder(dict, object):
 
@@ -66,9 +62,9 @@ class TestAddonsBaseUtils(OsfTestCase):
         user = UserFactory()
         project = ProjectFactory(creator=user)
         comment = CommentFactory()
-        assert get_mfr_url(project, 'github') == MFR_SERVER_URL
-        assert get_mfr_url(project, 'osfstorage') == project.osfstorage_region.mfr_url
-        assert get_mfr_url(comment, 'osfstorage') == MFR_SERVER_URL
+        assert_equal(get_mfr_url(project, 'github'), MFR_SERVER_URL)
+        assert_equal(get_mfr_url(project, 'osfstorage'), project.osfstorage_region.mfr_url)
+        assert_equal(get_mfr_url(comment, 'osfstorage'), MFR_SERVER_URL)
 
     @mock.patch('osf.models.files.BaseFileNode.objects.get')
     def test_get_root_institutional_storage_exception(self, mock_base_file_node_objects_get):
@@ -80,5 +76,5 @@ class TestAddonsBaseUtils(OsfTestCase):
     def test_get_root_institutional_storage(self):
         with mock.patch('osf.models.files.BaseFileNode.objects.get', side_effect=[self.file_child, self.parent]):
             res = get_root_institutional_storage(self.file_child.id)
-            assert res.name == self.parent.name
-            assert res.target == self.parent.target
+            assert_equal(res.name, self.parent.name)
+            assert_equal(res.target, self.parent.target)
