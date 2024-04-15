@@ -22,21 +22,22 @@ def make_user(username, fullname):
 
 
 def make_payload(
-    institution,
-    username,
-    fullname='Fake User',
-    given_name='',
-    family_name='',
-    middle_names='',
-    department='',
-    jaGivenName='',
-    jaSurname='',
-    jaFullname='',
-    jaDisplayName='',
-    jaMiddleNames='',
-    jaOrganizationalUnitName='',
-    organizationalUnit='',
-    organizationName='',
+        institution,
+        username,
+        fullname='Fake User',
+        given_name='',
+        family_name='',
+        middle_names='',
+        department='',
+        jaGivenName='',
+        jaSurname='',
+        jaFullname='',
+        jaDisplayName='',
+        jaMiddleNames='',
+        jaOrganizationalUnitName='',
+        organizationalUnit='',
+        organizationName='',
+        entitlement='',
 ):
     data = {
         'provider': {
@@ -58,7 +59,8 @@ def make_payload(
                 'jaOrganizationalUnitName': jaOrganizationalUnitName,
                 'organizationalUnitName': organizationalUnit,
                 'organizationName': organizationName,
-            },
+                'entitlement': entitlement,
+            }
         }
     }
 
@@ -451,3 +453,46 @@ class TestInstitutionAuth:
         user = OSFUser.objects.filter(username='tmp_eppn_' + username).first()
         assert user
         assert user.jobs[0]['department'] == organizationnameunit
+
+    def test_authenticate_turn_datasteward_on(self, app, institution, url_auth_institution):
+        username = 'user_datasteward@osf.edu'
+        entitlement = 'GakuNinRDMDataSteward'
+        res = app.post(
+            url_auth_institution,
+            make_payload(institution, username, entitlement=entitlement)
+        )
+        assert res.status_code == 204
+        user = OSFUser.objects.filter(username=username).first()
+        assert user
+        assert user.is_data_steward is True
+
+    def test_authenticate_turn_datasteward_off(self, app, institution, url_auth_institution):
+        username = 'user_datasteward@osf.edu'
+        entitlement = ''
+        res = app.post(
+            url_auth_institution,
+            make_payload(institution, username, entitlement=entitlement)
+        )
+        assert res.status_code == 204
+        user = OSFUser.objects.filter(username=username).first()
+        assert user
+        assert user.is_data_steward is False
+
+    async def test_authenticate_enable_datasteward_addon(self, app, url_auth_institution, institution):
+        username = 'datasteward@osf.edu'
+        user = make_user(username, 'addon datasteward')
+        user.save()
+
+        settings = user.get_or_add_addon('datasteward')
+        if not settings.enabled:
+            settings.enabled = True
+            settings.save()
+            user.save()
+
+        with capture_signals() as mock_signals:
+            res = await app.post(url_auth_institution, make_payload(institution, username, entitlement='GakuNinRDMDataSteward'))
+        assert res.status_code == 204
+        assert not mock_signals.signals_sent()
+
+        user.reload()
+        assert user.is_data_steward is True

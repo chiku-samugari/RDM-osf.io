@@ -10,6 +10,7 @@ from osf_tests.factories import ProjectFactory
 from framework.auth import Auth
 from ..models import NodeSettings, FileMetadata
 from .factories import NodeSettingsFactory
+from .utils import remove_fields
 
 
 pytestmark = pytest.mark.django_db
@@ -19,6 +20,8 @@ class TestNodeSettings(unittest.TestCase):
 
     def setUp(self):
         super(TestNodeSettings, self).setUp()
+        self.mock_fetch_metadata_asset_files = mock.patch('addons.metadata.models.fetch_metadata_asset_files')
+        self.mock_fetch_metadata_asset_files.start()
         self.node = ProjectFactory()
         self.user = self.node.creator
 
@@ -29,6 +32,7 @@ class TestNodeSettings(unittest.TestCase):
         super(TestNodeSettings, self).tearDown()
         self.node.delete()
         self.user.delete()
+        self.mock_fetch_metadata_asset_files.stop()
 
     @mock.patch('website.search.search.update_file_metadata')
     def test_set_invalid_file_metadata(self, mock_update_file_metadata):
@@ -143,7 +147,10 @@ class TestNodeSettings(unittest.TestCase):
             ],
         }
         assert_equal(
-            self.node_settings.get_file_metadata_for_path('osfstorage/'),
+            remove_fields(
+                self.node_settings.get_file_metadata_for_path('osfstorage/'),
+                fields=['modified', 'created'],
+            ),
             metadata
         )
         assert_equal(self.node_settings.get_file_metadatas(), [metadata])
@@ -186,7 +193,10 @@ class TestNodeSettings(unittest.TestCase):
             ],
         }
         assert_equal(
-            self.node_settings.get_file_metadata_for_path('osfstorage/'),
+            remove_fields(
+                self.node_settings.get_file_metadata_for_path('osfstorage/'),
+                fields=['modified', 'created'],
+            ),
             metadata
         )
         assert_equal(metadatas, [metadata])
@@ -244,9 +254,14 @@ class TestNodeSettings(unittest.TestCase):
             ],
         }
         assert_equal(
-            self.node_settings.get_file_metadata_for_path('osfstorage/'),
-            metadata
+            remove_fields(
+                self.node_settings.get_file_metadata_for_path('osfstorage/'),
+                fields=['modified', 'created'],
+            ),
+            metadata,
         )
+        assert_true('modified' in self.node_settings.get_file_metadata_for_path('osfstorage/'))
+        assert_true('created' in self.node_settings.get_file_metadata_for_path('osfstorage/'))
         assert_equal(metadatas, [metadata])
         last_log = self.node.logs.latest()
         assert_equal(last_log.action, 'metadata_file_updated')

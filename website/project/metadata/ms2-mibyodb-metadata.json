@@ -1,0 +1,613 @@
+{
+  "name": "ムーンショット目標2未病データベース-メタデータ",
+  "version": 1,
+  "description": "ムーンショット型研究開発制度における研究プロジェクトの成果報告用のメタデータ入力画面です。GakuNin RDMをお使いの方は、登録することで資金配分機関へデータ提出するフォーマットでダウンロードできます。|This is the metadata input form for reporting the progress of a research project in the Moonshot R&D Program. You may download the file in the format that can be submitted to the funding agencies by registering this form.",
+  "pages": [
+    {
+      "id": "page1",
+      "level": "レベル1|Level1",
+      "title": "メタデータ登録|Metadata Registration",
+      "description": "ムーンショット型研究開発制度における研究プロジェクトの成果報告用のメタデータ入力画面です。GakuNin RDMをお使いの方は、登録することで資金配分機関へデータ提出するフォーマットでダウンロードできます。|This is the metadata input form for reporting the progress of a research project in the Moonshot R&D Program. You may download the file in the format that can be submitted to the funding agencies by registering this form.",
+      "questions": [
+        {
+          "qid": "title",
+          "nav": "データの名称",
+          "title": "データの名称（解析結果・解析ツールの名称） |Title ",
+          "type": "string",
+          "format": "text",
+          "required": true,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・GakuNin RDM上の〇〇PJ共有領域内に作成したコンポーネントの名称に合わせて記入して下さい。|（※）Notes for Filling Out・Please fill in according to the names of the components created within the 〇〇PJ shared area on GakuNin RDM."
+        },
+        {
+          "qid": "date-issued-in-metadata-jp",
+          "nav": "メタデータ掲載日・メタデータ掲載更新日",
+          "title": "メタデータ掲載日（日本語）|Date (Issued) in Metadata（Japanese）",
+          "type": "string",
+          "format": "text",
+          "required": true,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "help": "e.g. 2021-08-01"
+        },
+        {
+          "qid": "date-issued-in-metadata-en",
+          "nav": "メタデータ掲載日・メタデータ掲載更新日",
+          "title": "メタデータ掲載日（英語）|Date (Issued) in Metadata（English）",
+          "type": "string",
+          "format": "text",
+          "required": true,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "help": "e.g. 2021-08-01"
+        },
+        {
+          "qid": "date-updated-in-metadata-jp",
+          "nav": "メタデータ掲載日・メタデータ掲載更新日",
+          "title": "メタデータ掲載更新日（日本語）|Date (Updated) in Metadata（Japanese）",
+          "type": "string",
+          "format": "text",
+          "required": true,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "help": "e.g. 2022-06-20"
+        },
+        {
+          "qid": "date-updated-in-metadata-en",
+          "nav": "メタデータ掲載日・メタデータ掲載更新日",
+          "title": "メタデータ掲載更新日 （英語）|Date (Updated) in Metadata（English）",
+          "type": "string",
+          "format": "text",
+          "required": true,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "help": "e.g. 2022-06-20"
+        },
+        {
+          "qid": "data-research-field",
+          "nav": "データの分野",
+          "title": "データの分野|Research field",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+              {
+                "text": "Biology",
+                "tooltip": "生物学|Biology|0"
+              },
+              {
+                "text": "Medicine",
+                "tooltip": "医学|Medicine|1"
+              }
+          ],
+          "required": true,
+          "help":  "e.g. 生物学、医学|e.g. Biology、Medicine"
+        },
+        {
+          "qid": "data-policy-cite-ja",
+          "nav": "データの提供・公開（解析結果・解析ツールの提供・公開）",
+          "title": "管理対象データの利活用・提供方針 (解析結果・解析ツールの利活用・提供方針)|Data utilization and provision policy (Utilization and provision policy of Analytical results or Analytical tools) ",
+          "type": "string",
+          "format": "text",
+          "required": true,
+          "help": "e.g. クレジット表記を条件とする, 利用前に協議/許諾/連絡が必要, 発表前に連絡が必要. |e.g. Credit attribution required, Consultation/permission/contact necessary before use, Contact required before publication."
+        },
+        {
+          "qid": "data-policy-license",
+          "nav": "データの提供・公開（解析結果・解析ツールの提供・公開）",
+          "title": "ライセンス（数理解析ツールをデポジットした場合）|License (In case of Analytical tools)",
+          "required": true,
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "help": "e.g. 無し/CC BY 4.0./Public Domain |e.g. No/CC BY 4.0./Public Domain ",
+          "options": [
+            {
+              "text": "No",
+              "tooltip": "無し|No|0"
+            },
+            {
+              "text": "CC BY 4.0",
+              "tooltip": "CC BY 4.0|CC BY 4.0|1"
+            },
+            {
+              "text": "Public Domain",
+              "tooltip": "Public Domain|Public Domain|2"
+            }
+          ]
+        },
+        {
+          "qid": "data-policy-free",
+          "nav": "データの提供・公開（解析結果・解析ツールの提供・公開）",
+          "title": "有償・無償 |Paid or Free ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "help": "e.g. 有償/無償|e.g. Paid/Free",
+          "options": [
+              {
+                "text": "Paid",
+                "tooltip": "有償|Paid|0"
+              },
+              {
+                "text": "free",
+                "tooltip": "無償|free|1"
+              }
+          ],
+          "required": true
+        },
+        {
+          "qid": "Availability-of-commercial-use",
+          "nav": "データの提供・公開（解析結果・解析ツールの提供・公開）",
+          "title": "商用利用の可否  |Availability of commercial use  ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+              {
+                "text": "No",
+                "tooltip": "否|No|0"
+              },
+              {
+                "text": "Yes",
+                "tooltip": "可|Yes|1"
+              }
+          ],
+          "required": true,
+          "help": "e.g. 可/否|e.g. Yes/No"
+        },
+        {
+          "qid": "access-rights",
+          "nav": "データの提供・公開",
+          "title": "アクセス権|Access rights",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "open access",
+              "tooltip": "公開|open access|0"
+            },
+            {
+              "text": "restricted access",
+              "tooltip": "共有|restricted access|0"
+            },
+            {
+              "text": "metadata only access",
+              "tooltip": "非共有・非公開|metadata only access|0"
+            },
+            {
+              "text": "embargoed access",
+              "tooltip": "公開期間猶予|embargoed access|0"
+            }
+          ],
+          "required": true,
+          "help": "e.g. 公開/共有/非公開・非共有/公開期間猶予|e.g. Open access/Restricted access/Metadata only access/Embargoed access"
+        },
+        {
+          "qid": "available-date",
+          "nav": "データの提供・公開",
+          "title": "公開予定日 (アクセス権が「公開」でない場合)|Scheduled release date (If access rights are not \"public\")",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "help": "e.g. 2026-04-01|e.g., 2026-04-01"
+        },
+        {
+          "qid": "repo-information",
+          "nav": "リポジトリ",
+          "title": "リポジトリ情報 |Repository information ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "GakuNin RDM",
+              "tooltip": "GakuNin RDM|GakuNin RDM|0"
+            }
+          ],
+          "required": true,
+          "help": "e.g. GakuNin RDM|e.g. GakuNin RDM"
+        },
+        {
+          "qid": "repo-url-doi-link",
+          "nav": "リポジトリ",
+          "title": "リポジトリURL・DOIリンク|Repository URL/ DOI link",
+          "type": "string",
+          "format": "text",
+          "options": "https://    doi://",
+          "pattern": "[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b([-a-zA-Z0-9()@:%_\\+.~#?&//=]*)$",
+          "help": "e.g. https://    doi://"
+        },
+        {
+          "qid": "Name-of-data-creator",
+          "nav": "データ作成者（解析結果・解析ツール作成者）",
+          "title": "データ作成者  氏名|Name of data creator",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "Taro Todai",
+              "tooltip": "東大太郎|Taro Todai|0"
+            }
+          ],
+          "required": true,
+          "space_normalization": true,
+          "help": "e.g. 東大太郎|e.g. Taro Todai"
+        },
+        {
+          "qid": "Belonging-of-data-creator",
+          "nav": "データ作成者（解析結果・解析ツール作成者）",
+          "title": "データ作成者  所属|Belonging of data creator",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "The University of Tokyo",
+              "tooltip": "東京大学|The University of Tokyo|0"
+            }
+          ],
+          "required": true,
+          "space_normalization": true,
+          "help": "e.g. 東京大学|e.g. The University of Tokyo"
+        },
+        {
+          "qid": "Contact-of-data-creator",
+          "nav": "データ作成者（解析結果・解析ツール作成者）",
+          "title": "データ作成者  連絡先|Contact of data creator",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "help": "e.g. xxxxx@yyyy.ac.jp|e.g. xxxxx@yyyy.ac.jp",
+          "options": [
+            {
+              "text": "xxxxx@yyyy.ac.jp",
+              "tooltip": "xxxxx@yyyy.ac.jp|xxxxx@yyyy.ac.jp|0"
+            }
+          ],
+          "required": true,
+          "space_normalization": true
+        },
+        {
+          "qid": "Name-of-data-manager ",
+          "nav": "データ管理者（解析結果・解析ツール管理者）",
+          "title": "データ管理者  氏名|Name of data manager",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "Taro Todai",
+              "tooltip": "東大太郎|Taro Todai|0"
+            }
+          ],
+          "required": true,
+          "space_normalization": true,
+          "help": "e.g. 東大太郎|e.g. Taro Todai"
+        },
+        {
+          "qid": "Belonging-of-data-manager ",
+          "nav": "データ管理者（解析結果・解析ツール管理者）",
+          "title": "データ管理者  所属|Belonging of data manager ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "The University of Tokyo",
+              "tooltip": "東京大学|The University of Tokyo|0"
+            }
+          ],
+          "required": true,
+          "space_normalization": true,
+          "help": "e.g. 東京大学|e.g. The University of Tokyo"
+        },
+        {
+          "qid": "Contact-of-data-manager ",
+          "nav": "データ管理者（解析結果・解析ツール管理者）",
+          "title": "データ管理者  連絡先|Contact of data manager ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "xxxxx@yyyy.ac.jp",
+              "tooltip": "xxxxx@yyyy.ac.jp|xxxxx@yyyy.ac.jp|0"
+            }
+          ],
+          "required": true,
+          "space_normalization": true,
+          "help": "e.g. xxxxx@yyyy.ac.jp|e.g. xxxxx@yyyy.ac.jp"
+        },
+        {
+          "qid": "target-type-of-data",
+          "nav": "取得データの対象種別",
+          "title": "取得データの対象種別|Target type of acquired data",
+          "type": "string",
+          "format": "text",
+          "required": true,
+          "help": "e.g. ヒト、マウス（動物の場合）、培養細胞（その他）|e.g. Human, mouse (for animals), cultured cells (other)"
+        },
+        {
+          "qid": "ethics-review-board",
+          "nav": "倫理審査委員会承認 ",
+          "title": "倫理審査委員会承認|Ethics Review Committee Approval ",
+          "type": "string",
+          "format": "text",
+          "required": true,
+          "space_normalization": true,
+          "help": "e.g. ○○委員会/不要|e.g. ○○Comittee/Unnecessary"
+        },
+        {
+          "qid": "informed-consent",
+          "nav": "インフォームドコンセント",
+          "title": "インフォームドコンセント 有・無・不要 |informed consent Yes, No, or Unnecessary ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "No",
+              "tooltip": "無|No|0"
+            },
+            {
+              "text": "Yes",
+              "tooltip": "有|Yes|1"
+            },
+            {
+              "text": "Unnecessary",
+              "tooltip": "不要|Unnecessary|2"
+            }
+          ],
+          "required": true,
+          "help": "e.g. 有/無/不要|e.g. Yes/No/UNnecessry"
+        },
+        {
+          "qid": "Consent-to-third-party-provision",
+          "nav": "インフォームドコンセント",
+          "title": "（有の場合）第三者提供の同意 |（Yes）Consent for provision to a third party ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "No",
+              "tooltip": "無|No|0"
+            },
+            {
+              "text": "|Yes",
+              "tooltip": "有|Yes|1"
+            }
+          ],
+          "required": false,
+          "help": "e.g. 有/無|e.g. Yes/No"
+        },
+        {
+          "qid": "overseas-offer",
+          "nav": "インフォームドコンセント",
+          "title": "（有の場合）海外提供 |（Yes）Overseas Offerings ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "No",
+              "tooltip": "無|No|0"
+            },
+            {
+              "text": "Yes",
+              "tooltip": "有|Yes|1"
+            }
+          ],
+          "required": false,
+          "help": "e.g. 有/無|e.g. Yes/No"
+        },
+        {
+          "qid": "industrial-use",
+          "nav": "インフォームドコンセント",
+          "title": "（有の場合）産業利用等 |（Yes）Industrial use, etc. ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "No",
+              "tooltip": "無|No|0"
+            },
+            {
+              "text": "Yes",
+              "tooltip": "有|Yes|1"
+            }
+          ],
+          "required": false,
+          "help": "e.g. 有/無|e.g. Yes/No"
+        },
+        {
+          "qid": "in-case-of-nothing",
+          "nav": "インフォームドコンセント",
+          "title": "（無の場合） |（No） ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "Opt-out procedure",
+              "tooltip": "オプトアウト手続き|Opt-out procedure|0"
+            },
+            {
+              "text": "Agree not to",
+              "tooltip": "同意不要|Agree not to|1"
+            }
+          ],
+          "required": false,
+          "help": "e.g. オプトアウト手続き/同意不要|e.g. Opt-out procedure/Agree not to"
+        },
+        {
+          "qid": "anonymous-processing",
+          "nav": "匿名加工の有無",
+          "title": "匿名加工の有無 有無|Anonymous processing Yes or No ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "No",
+              "tooltip": "無|No|0"
+            },
+            {
+              "text": "Yes",
+              "tooltip": "有|Yes|1"
+            }
+          ],
+          "required": true,
+          "help": "e.g. 有/無|e.g. Yes/No"
+        },
+        {
+          "qid": "conflict of interest",
+          "nav": "利益相反の有無",
+          "title": "利益相反の有無 有無|conflict of interest Yes or No ",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "Yes",
+              "tooltip": "有|Yes|0"
+            },
+            {
+              "text": "No",
+              "tooltip": "無|No|1"
+            }
+          ],
+          "required": true,
+          "help": "e.g. 有/無|e.g. Yes/No"
+        },
+        {
+          "qid": "conflict-of-interest-possession",
+          "nav": "利益相反の有無（有の場合）",
+          "title": "利益相反の有無（有の場合）|conflict of interest （Yes） ",
+          "type": "string",
+          "format": "text",
+          "space_normalization": true,
+          "required": false,
+          "help": "e.g. 企業名|e.g. Company's name"
+        },
+        {
+          "qid": "Remarks-3",
+          "nav": "備考",
+          "title": "備考|Remarks",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true,
+          "required": true
+        },
+        {
+          "qid": "purpose-of-experiment",
+          "nav": "データの説明",
+          "title": "実験の目的（解析結果・解析ツールの目的）|Purpose of experiment（Purpose of Analytical results or Analytical tools)",
+          "type": "string",
+          "format": "text",
+          "space_normalization": true,
+          "required": true
+        },
+        {
+          "qid": "description-of-experimental-condition",
+          "nav": "データの説明",
+          "title": "実験状況などの説明（解析結果・解析ツールの背景説明）|Description of experimental condition（Description of  Analytical results or Analytical tools)",
+          "type": "string",
+          "format": "text",
+          "space_normalization": true,
+          "required": true
+        },
+        {
+          "qid": "keyword",
+          "nav": "データの説明",
+          "title": "キーワード|Keywords",
+          "type": "string",
+          "format": "text",
+          "space_normalization": true,
+          "required": true
+        },
+        {
+          "qid": "modernity-metadata-possession",
+          "nav": "データの説明",
+          "title": "他のデータベースで特定のモダリティ用に作成したメタデータファイルの有無|The presence of metadata files created for a specific modality in other databases",
+          "type": "choose",
+          "format": "e-rad-award-funder",
+          "options": [
+            {
+              "text": "Yes",
+              "tooltip": "有|Yes|0"
+            },
+            {
+              "text": "No",
+              "tooltip": "無|No|1"
+            }
+          ],
+          "space_normalization": true,
+          "required": true,
+          "help": "e.g. 有/無|e.g. Yes/No"
+        },
+        {
+          "qid": "metadata-filename1",
+          "nav": "データの説明",
+          "title": "（有りの場合）メタデータファイル名（複数可） |（Yes）Metadata file name(s) (multiple possible)",
+          "type": "string",
+          "format": "text",
+          "space_normalization": true,
+          "required": false
+        },
+        {
+          "qid": "metadata-filename2",
+          "nav": "データの説明",
+          "title": "（有りの場合）メタデータファイル名（複数可） |（Yes）Metadata file name(s) (multiple possible)",
+          "type": "string",
+          "format": "text",
+          "space_normalization": true,
+          "required": false
+        },
+        {
+          "qid": "metadata-filename3",
+          "nav": "データの説明",
+          "title": "（有りの場合）メタデータファイル名（複数可）|（Yes）Metadata file name(s) (multiple possible)",
+          "type": "string",
+          "format": "text",
+          "space_normalization": true,
+          "required": false
+        },
+        {
+          "qid": "metadata-filename4",
+          "nav": "データの説明",
+          "title": "（有りの場合）メタデータファイル名（複数可）|（Yes）Metadata file name(s) (multiple possible)",
+          "type": "string",
+          "format": "text",
+          "space_normalization": true,
+          "required": false
+        },
+        {
+          "qid": "metadata-filename5",
+          "nav": "データの説明",
+          "title": "（有りの場合）メタデータファイル名（複数可） |（Yes）Metadata file name(s) (multiple possible)",
+          "type": "string",
+          "format": "text",
+          "space_normalization": true,
+          "required": false
+        },
+        {
+          "qid": "metadata-filename6",
+          "nav": "データの説明",
+          "title": "（有りの場合）メタデータファイル名（複数可）|（Yes）Metadata file name(s) (multiple possible)",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true,
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "page2",
+      "level": "レベル1|Level1",
+      "title": "ファイルメタデータ|file metadata",
+      "description": "ムーンショット型研究開発制度における研究プロジェクトの成果報告用のメタデータ入力画面です。GakuNin RDMをお使いの方は、登録することで資金配分機関へデータ提出するフォーマットでダウンロードできます。|This is the metadata input form for reporting the progress of a research project in the Moonshot R&D Program. You may download the file in the format that can be submitted to the funding agencies by registering this form.",
+      "questions": [
+        {
+          "qid": "grdm-files",
+          "nav": "登録データ一覧",
+          "title": "登録データ一覧|Registered Data List",
+          "type": "string",
+          "format": "file-metadata",
+          "required": true,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:notice-2024-03",
+          "nav": "お知らせ",
+          "title": "お知らせ：ファイルメタデータは後日リリース予定となります |Notice：File metadata will be released at a later date ",
+          "type": "string",
+          "format": "text",
+          "required": false
+        }
+      ]
+    }
+  ]
+}

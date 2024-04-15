@@ -1427,6 +1427,68 @@ function _createFolder(event, dismissCallback, helpText) {
         }
     });
 }
+
+function _createFile(event, dismissCallback, helpText, extension) {
+    var tb = this;
+    helpText('');
+    var val = $.trim(tb.select('#createFileInput').val());
+    var parent = tb.multiselected()[0];
+    if (!parent.open) {
+        tb.updateFolder(null, parent);
+    }
+    if (val.length < 1) {
+        helpText(gettext('Please enter a file name.'));
+        return;
+    }
+    if (val.indexOf('/') !== -1) {
+        helpText(gettext('File name contains illegal characters.'));
+        return;
+    }
+
+    var fname;
+    if (val.match('.(txt|docx|xlsx|pptx)$')) {
+        fname = val.slice(0, val.lastIndexOf('.')) + '.' + extension;
+    } else {
+        fname = val + '.' + extension;
+    }
+
+    var options = {name: fname};
+    if ((parent.data.provider === 'github') || (parent.data.provider === 'gitlab')) {
+        // extra.branch = parent.data.branch;
+        options.branch = parent.data.branch;
+    }
+
+    m.request({
+        method: 'PUT',
+        background: true,
+        config: $osf.setXHRAuthorization,
+        headers: { 'Content-Length': 0 },
+        // url: waterbutler.buildUploadUrl(path, parent.data.provider, parent.data.nodeId, options, extra)
+        url: waterbutler.buildTreeBeardUpload(parent, options)
+    }).then(function(item) {
+        item = tb.options.lazyLoadPreprocess.call(this, item).data;
+        inheritFromParent({data: item}, parent, ['branch']);
+        item = tb.createItem(item, parent.id);
+        orderFolder.call(tb, parent);
+        item.notify.update(gettext('New file created!'), 'success', undefined, 1000);
+        if (extension.match('(txt|docx|xlsx|pptx)')) {
+            var edit_url = window.contextVars.osfURL + window.contextVars.currentUser.id + '/editonlyoffice' +item.data.path;
+            window.open(edit_url, 'OnlyofficeEditor');
+        }
+        if(dismissCallback) {
+            dismissCallback();
+        }
+    }, function(data) {
+        if (data && data.code === 409) {
+            helpText(data.message);
+            m.redraw();
+        } else {
+            helpText(gettext('File creation failed.'));
+        }
+    });
+}
+
+
 /**
  * Deletes the item, only appears for items
  * @param event DOM event object for click
@@ -1815,6 +1877,10 @@ function _fangornTitleColumnHelper(tb, item, col, nameTitle, toUrl, classNameOpt
     if (item.data.isAddonRoot && item.connected === false) {
         return _connectCheckTemplate.call(this, item);
     }
+    // GRDM-36019 Package Export/Import
+    if (item.data.unavailable && (item.data.name || '').match(/is not configured$/)) {
+        return _connectCheckTemplate.call(this, item);
+    }
     if (item.kind === 'file' && item.data.permissions.view) {
         var attrs = {};
         if (tb.options.links) {
@@ -1898,6 +1964,10 @@ function _fangornModifiedColumn(item, col) {
  * @private
  */
 function _connectCheckTemplate(item){
+    // GRDM-36019 Package Export/Import
+    if (item.data.unavailable && (item.data.name || '').match(/is not configured$/)) {
+        return _addonConfigureTemplate.call(this, item);
+    }
     var tb = this;
     return m('span.text-danger', [
         m('span', item.data.name),
@@ -1911,6 +1981,23 @@ function _connectCheckTemplate(item){
                 }
             }
         }, [m('i.fa.fa-refresh'), ' Retry'])
+    ]);
+}
+
+/**
+ * Returns a reusable template for column titles when there is no connection
+ * GRDM-36019 Package Export/Import
+ * @param {Object} item A Treebeard _item object for the row involved. Node information is inside item.data
+ * @this Treebeard.controller
+ * @private
+ */
+function _addonConfigureTemplate(item){
+    var tb = this;
+    return m('span.text-warning', [
+        m('span', item.data.name),
+        m('a.btn.btn-xs.btn-default.m-l-xs', {
+            href: 'addons/'
+        }, [m('i.fa.fa-cog'), ' Configure'])
     ]);
 }
 
@@ -2230,7 +2317,8 @@ var toolbarModes = {
     'FILTER' : 'filter',
     'ADDFOLDER' : 'addFolder',
     'RENAME' : 'rename',
-    'ADDPROJECT' : 'addProject'
+    'ADDPROJECT' : 'addProject',
+    'ADDFILE' : 'addFile'
 };
 
 
@@ -2338,7 +2426,14 @@ var FGItemButtons = {
                         },
                         icon: 'fa fa-plus',
                         className: 'text-success'
-                    }, gettext('Create Folder')));
+                    }, gettext('Create Folder')),
+                    m.component(FGButton, {
+                        onclick: function () {
+                            mode(toolbarModes.ADDFILE);
+                        },
+                        icon: 'fa fa-plus',
+                        className: 'text-success'
+                    }, gettext('Create File')));
                 if (item.data.path) {
                     rowButtons.push(
                         m.component(FGButton, {
@@ -2486,6 +2581,9 @@ var FGToolbar = {
         self.nameData = m.prop('');
         self.renameId = m.prop('');
         self.renameData = m.prop('');
+        self.createFile = function(event){
+            _createFile.call(self.tb, event, self.dismissToolbar, self.helpText);
+        };
     },
     view : function(ctrl) {
         var templates = {};
@@ -2571,6 +2669,61 @@ var FGToolbar = {
                                 },
                                 icon: 'fa fa-pencil',
                                 className: 'text-info'
+                            }),
+                            dismissIcon
+                        ]
+                    )
+                )
+            ];
+            templates[toolbarModes.ADDFILE] = [
+                m('.col-xs-9', [
+                    m.component(FGInput, {
+                        oninput: m.withAttr('value', ctrl.nameData),
+                        //onkeypress: function (event) {
+                        //    if (ctrl.tb.pressedKey === ENTER_KEY) {
+                        //        ctrl.createFile.call(ctrl.tb, event, ctrl.dismissToolbar);
+                        //    }
+                        //},
+                        id: 'createFileInput',
+                        value: ctrl.nameData(),
+                        helpTextId: 'createFileHelp',
+                        placeholder: gettext('New file name'),
+                    }, ctrl.helpText())
+                ]),
+                m('.col-xs-3.tb-buttons-col',
+                    m('.fangorn-toolbar.pull-right',
+                        // [
+                        //     m.component(FGButton, {
+                        //         onclick: ctrl.createFile,
+                        //         icon: 'fa fa-plus',
+                        //         className: 'text-success'
+                        //     }),
+                        //     dismissIcon
+                        // ]
+                        [
+                            m.component(FGButton, {
+                                onclick: function(event){ _createFile.call(ctrl.tb, event, ctrl.dismissToolbar, ctrl.helpText, 'txt'); },
+                                //icon: 'fa fa-plus',
+                                icon: 'file-extension _txt',
+                                className: 'text-success'
+                            }),
+                            m.component(FGButton, {
+                                onclick: function(event){ _createFile.call(ctrl.tb, event, ctrl.dismissToolbar, ctrl.helpText, 'docx'); },
+                                //icon: 'fa fa-plus',
+                                icon: 'file-extension _docx',
+                                className: 'text-success'
+                            }),
+                            m.component(FGButton, {
+                                onclick: function(event){ _createFile.call(ctrl.tb, event, ctrl.dismissToolbar, ctrl.helpText, 'xlsx'); },
+                                //icon: 'fa fa-plus',
+                                icon: 'file-extension _xlsx',
+                                className: 'text-success'
+                            }),
+                            m.component(FGButton, {
+                                onclick: function(event){ _createFile.call(ctrl.tb, event, ctrl.dismissToolbar, ctrl.helpText, 'pptx'); },
+                                //icon: 'fa fa-plus',
+                                icon: 'file-extension _pub',
+                                className: 'text-success'
                             }),
                             dismissIcon
                         ]
@@ -3139,6 +3292,7 @@ function allowedToMove(folder, item, mustBeIntra) {
         item.data.permissions.edit &&
         (!mustBeIntra || (item.data.provider === folder.data.provider && item.data.nodeId === folder.data.nodeId)) &&
         !(item.data.provider === 'figshare' && item.data.extra && item.data.extra.status === 'public') &&
+        (folder.data.provider !== 'weko') &&
         (READ_ONLY_ADDONS.indexOf(item.data.provider) === -1) && (READ_ONLY_ADDONS.indexOf(folder.data.provider) === -1)
     );
 }
@@ -3252,6 +3406,9 @@ function fetchData(tree) {
                                 self.options.lazyLoadError.call(self, tree);
                             } else {
                                 if (self.options.lazyLoadPreprocess) {
+                                    if(!value.hasOwnProperty('next_token')){
+                                        tree.next_token = null;
+                                    }
                                     value = self.options.lazyLoadPreprocess.call(self, value);
                                 }
                                 if (!$.isArray(value)) {
@@ -3586,6 +3743,7 @@ Fangorn.ButtonEvents = {
     _removeEvent : _removeEvent,
     createFolder : _createFolder,
     _gotoFileEvent : gotoFileEvent,
+    createFile : _createFile,
 };
 
 Fangorn.DefaultColumns = {

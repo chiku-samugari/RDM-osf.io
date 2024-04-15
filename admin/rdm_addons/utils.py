@@ -19,7 +19,7 @@ def get_institusion_settings_template(config):
     base_path = os.path.join('rdm_addons', 'addons')
 
     if short_name in ['dataverse', 'owncloud', 's3', 'iqbrims',
-                      'dropboxbusiness']:
+                      'dropboxbusiness', 'weko']:
         return os.path.join(base_path, '{}_institution_settings.html'.format(short_name))
     return os.path.join(base_path, 'institution_settings_default.html')
 
@@ -32,7 +32,7 @@ def get_addon_template_config(config, user):
         'institution_settings_template': get_institusion_settings_template(config),
         'is_enabled': user_addon is not None,
         'addon_icon_url': reverse('addons:icon', args=[config.short_name, config.icon]),
-        'is_supported_force_to_use': config.short_name not in UNSUPPORTED_FORCE_TO_USE_ADDONS,
+        'is_supported_force_to_use': config.short_name not in [*UNSUPPORTED_FORCE_TO_USE_ADDONS, 'datasteward'],
     }
     ret.update(user_addon.to_json(user) if user_addon else {})
     return ret

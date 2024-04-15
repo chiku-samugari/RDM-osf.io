@@ -496,6 +496,7 @@ class CeleryConfig:
         'scripts.analytics.run_keen_snapshots',
         'scripts.analytics.run_keen_events',
         'scripts.clear_sessions',
+        'scripts.cleanup_task_results',
         'osf.management.commands.check_crossref_dois',
         'osf.management.commands.migrate_pagecounter_data',
         'osf.management.commands.migrate_deleted_date',
@@ -598,6 +599,7 @@ class CeleryConfig:
         'scripts.approve_embargo_terminations',
         'scripts.triggered_mails',
         'scripts.clear_sessions',
+        'scripts.cleanup_task_results',
         'scripts.send_queued_mails',
         'scripts.analytics.run_keen_summaries',
         'scripts.analytics.run_keen_snapshots',
@@ -683,6 +685,11 @@ class CeleryConfig:
             },
             'clear_sessions': {
                 'task': 'scripts.clear_sessions',
+                'schedule': crontab(minute=0, hour=5),  # Daily 12 a.m
+                'kwargs': {'dry_run': False},
+            },
+            'cleanup_task_results': {
+                'task': 'scripts.cleanup_task_results',
                 'schedule': crontab(minute=0, hour=5),  # Daily 12 a.m
                 'kwargs': {'dry_run': False},
             },
@@ -2165,6 +2172,18 @@ BABEL_DOMAIN = 'messages'
 BABEL_LANGUAGES = {'en': 'English', 'ja': '日本語', 'ja_jp': '日本語'}
 BABEL_DEFAULT_LOCALE = 'ja'
 
-# IAL2&AAL2 parameters(R-2023-55)
+# WOPI settings.
+# Session timer (seconds). Default is 24 hour.
+WOPI_TOKEN_TTL = 24 * 60 * 60
+
+# WOPI_CLIENT_ONLYOFFICE is ONLYOFFICE online editor's host and port FROM web server.
+# WOPI_CLIENT_COLLABORA  is Collabora online editor's host and port.
+WOPI_CLIENT_ONLYOFFICE = 'http://grdm-server.grdm.test:8002'
+WOPI_CLIENT_COLLABORA = 'http://grdm-server.grdm.test:9980'
+
+# WOPI_SRC_HOST is web server's host and port which can access FROM WOPI CLIENT.
+WOPI_SRC_HOST = 'http://grdm-server.grdm.test:5000'
+
+# Default values for IAL2 & AAL2 parameters(R-2023-55)
 OSF_IAL2_STR = 'https://www\.gakunin\.jp/profile/IAL2'
 OSF_AAL2_STR = 'https://www\.gakunin\.jp/profile/AAL2'
