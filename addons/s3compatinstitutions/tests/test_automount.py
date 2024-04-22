@@ -172,7 +172,7 @@ class TestAppS3CompatInstitutions(OsfTestCase):
         region.waterbutler_settings__storage__provider = self.ADDON_SHORT_NAME
         region.save()
 
-        self.node_settings.addon_option = get_rdm_addon_option(institution.id, self.ADDON_SHORT_NAME)
+        self.node_settings.addon_option = get_rdm_addon_option(institution.id, self.ADDON_SHORT_NAME).first()
         self.node_settings.region = region
         self.node_settings.root_node = BaseFileNode()
         self.node_settings.save()

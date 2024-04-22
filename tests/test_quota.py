@@ -1050,7 +1050,7 @@ class TestSaveUsedQuota(OsfTestCase):
             user=self.project_creator
         )
         assert_equal(user_quota.used, 5500)
-        mock_logger.error.assert_called_with('FileNode not found, cannot update used quota!')
+        mock_logger.warning.assert_called_with('FileNode not found, cannot update used quota!')
 
     @mock.patch('website.util.quota.logging')
     def test_delete_file_without_fileinfo(self, mock_logging):

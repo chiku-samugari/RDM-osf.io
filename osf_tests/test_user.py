@@ -109,8 +109,8 @@ class TestOSFUser:
         user = OSFUser.create(
             username=email, password='foobar', fullname=name
         )
-        user.affiliated_institutions.add(institution)
         user.save()
+        user.affiliated_institutions.add(institution)
 
         res = user.representative_affiliated_institution
 
