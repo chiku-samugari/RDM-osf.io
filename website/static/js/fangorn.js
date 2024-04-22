@@ -1257,7 +1257,7 @@ function _uploadFolderEvent(event, item, mode, col) {
 
         function processDataSequentially(asyncFunction, remainingData) {
             // Call function sequentially by promise then chaining
-            return new Promise((resolve, reject) => {
+            return new Promise(function(resolve, reject) {
                 function iterateFunctionCall(remainingData) {
                     if (remainingData.length === 0) {
                         return resolve();
@@ -1289,7 +1289,7 @@ function _uploadFolderEvent(event, item, mode, col) {
 
         function _addFolder(folderParts) {
             // Add a folder part
-            return new Promise((resolve, reject) => {
+            return new Promise(function(resolve, reject) {
                 // Get only first item, the list will slice the iterated item after promise
                 var folderName = folderParts[0];
                 var newFolderPath = parentPath + folderName + '/';
