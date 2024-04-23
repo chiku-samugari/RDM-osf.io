@@ -33,7 +33,7 @@ class RdmAdminRequiredMixin(UserPassesTestMixin, RdmPermissionMixin):
     raise_exception = True
 
     def test_func(self):
-        """check user authentication"""
+        """check user permissions"""
         # login check
         if not self.is_authenticated:
             return False

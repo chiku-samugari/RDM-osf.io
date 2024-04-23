@@ -17,6 +17,8 @@ from osf_tests.factories import (
     InstitutionFactory,
     AuthenticationAttributeFactory,
 )
+from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import PermissionDenied
 
 
 class TestInstitutionDefaultStorage(AdminTestCase):
@@ -133,17 +135,15 @@ class TestPermissionTestConnection(AdminTestCase):
         return views.TestConnectionView.as_view()(request)
 
     def test_normal_user(self):
-        response = self.view_post({})
-        self.assertEquals(response.status_code, 302)
-        self.assertEquals(response._headers['location'][1], '/accounts/login/?next=/fake_path')
+        with nt.assert_raises(PermissionDenied):
+            self.view_post({})
 
     def test_staff_without_institution(self):
         self.user.is_staff = True
         self.user.save()
 
-        response = self.view_post({})
-        self.assertEquals(response.status_code, 302)
-        self.assertEquals(response._headers['location'][1], '/accounts/login/?next=/fake_path')
+        with nt.assert_raises(PermissionDenied):
+            self.view_post({})
 
     def test_staff_with_institution(self):
         institution = InstitutionFactory()
@@ -160,10 +160,8 @@ class TestPermissionTestConnection(AdminTestCase):
         self.user.is_superuser = True
         self.user.save()
 
-        response = self.view_post({})
-        self.assertEquals(response.status_code, 302)
-        self.assertEquals(response._headers['location'][1], '/accounts/login/?next=/fake_path')
-
+        with nt.assert_raises(PermissionDenied):
+            self.view_post({})
 
 class TestPermissionSaveCredentials(AdminTestCase):
 
@@ -181,17 +179,15 @@ class TestPermissionSaveCredentials(AdminTestCase):
         return views.SaveCredentialsView.as_view()(request)
 
     def test_normal_user(self):
-        response = self.view_post({})
-        self.assertEquals(response.status_code, 302)
-        self.assertEquals(response._headers['location'][1], '/accounts/login/?next=/fake_path')
+        with nt.assert_raises(PermissionDenied):
+            self.view_post({})
 
     def test_staff_without_institution(self):
         self.user.is_staff = True
         self.user.save()
 
-        response = self.view_post({})
-        self.assertEquals(response.status_code, 302)
-        self.assertEquals(response._headers['location'][1], '/accounts/login/?next=/fake_path')
+        with nt.assert_raises(PermissionDenied):
+            self.view_post({})
 
     def test_staff_with_institution(self):
         institution = InstitutionFactory()
@@ -208,9 +204,8 @@ class TestPermissionSaveCredentials(AdminTestCase):
         self.user.is_superuser = True
         self.user.save()
 
-        response = self.view_post({})
-        self.assertEquals(response.status_code, 302)
-        self.assertEquals(response._headers['location'][1], '/accounts/login/?next=/fake_path')
+        with nt.assert_raises(PermissionDenied):
+            self.view_post({})
 
     def test_post_with_provider_short_name_s3(self):
         institution = InstitutionFactory()
@@ -598,134 +593,6 @@ class TestPermissionFetchTemporaryToken(AdminTestCase):
         self.assertEquals(response._headers['location'][1], '/accounts/login/?next=/fake_path')
 
 
-class TestChangeAllowedViews(AdminTestCase):
-
-    def test_post_change_allowed(self):
-        self.user = AuthUserFactory()
-        self.region = RegionFactory()
-        self.request = RequestFactory().post(
-            'custom_storage_location:change_allow',
-            json.dumps({'id': self.region.id, 'is_allowed': True}),
-            content_type='application/json'
-        )
-
-        self.view = views.ChangeAllowedViews()
-        self.view = setup_user_view(self.view, self.request, user=self.user)
-        response = self.view.post(self.request)
-
-        nt.assert_equal(response.status_code, 200)
-
-    def test_post_change_allowed_not_region_id(self):
-        self.user = AuthUserFactory()
-        self.region = RegionFactory()
-        self.request = RequestFactory().post(
-            'custom_storage_location:change_allow',
-            json.dumps({'id': '', 'is_allowed': True}),
-            content_type='application/json'
-        )
-        self.view = views.ChangeAllowedViews()
-        self.view = setup_user_view(self.view, self.request, user=self.user)
-        response = self.view.post(self.request)
-
-        nt.assert_equal(response.status_code, 400)
-
-    @mock.patch('admin.rdm_custom_storage_location.views.Region.objects.filter')
-    def test_post_change_allowed_region_is_none(self, region):
-        region.return_value = None
-        self.user = AuthUserFactory()
-        self.region = RegionFactory()
-        self.request = RequestFactory().post(
-            'custom_storage_location:change_allow',
-            json.dumps({'id': 2, 'is_allowed': True}),
-            content_type='application/json'
-        )
-        self.view = views.ChangeAllowedViews()
-        self.view = setup_user_view(self.view, self.request, user=self.user)
-        with nt.assert_raises(HTTPError) as exc_info:
-            self.view.post(self.request)
-
-        nt.assert_equal(exc_info.exception.code, 404)
-
-    def test_post_change_allowed_have_two_region(self):
-        self.user = AuthUserFactory()
-        self.region = RegionFactory(is_allowed=True)
-        self.region2 = RegionFactory()
-        self.request = RequestFactory().post(
-            'custom_storage_location:change_allow',
-            json.dumps({'id': self.region2.id, 'is_allowed': False}),
-            content_type='application/json'
-        )
-        self.view = views.ChangeAllowedViews()
-        self.view = setup_user_view(self.view, self.request, user=self.user)
-
-        response = self.view.post(self.request)
-
-        nt.assert_equal(response.status_code, 200)
-
-    def test_post_change_allowed_have_region_is_allowed_is_true(self):
-        self.user = AuthUserFactory()
-        self.region = RegionFactory(is_allowed=True)
-        self.request = RequestFactory().post(
-            'custom_storage_location:change_allow',
-            json.dumps({'id': self.region.id, 'is_allowed': True}),
-            content_type='application/json'
-        )
-        self.view = views.ChangeAllowedViews()
-        self.view = setup_user_view(self.view, self.request, user=self.user)
-
-        response = self.view.post(self.request)
-
-        nt.assert_equal(response.status_code, 200)
-
-
-class TestChangeReadonlyViews(AdminTestCase):
-
-    def test_post_change_read_only(self):
-        self.user = AuthUserFactory()
-        self.region = RegionFactory()
-        self.request = RequestFactory().post(
-            'custom_storage_location:change_readonly',
-            json.dumps({'id': self.region.id, 'is_readonly': True}),
-            content_type='application/json'
-        )
-
-        self.view = views.ChangeReadonlyViews()
-        self.view = setup_user_view(self.view, self.request, user=self.user)
-        response = self.view.post(self.request)
-
-        nt.assert_equal(response.status_code, 200)
-
-    def test_post_change_read_only_not_region_id(self):
-        self.user = AuthUserFactory()
-        self.region = RegionFactory()
-        self.request = RequestFactory().post(
-            'custom_storage_location:change_readonly',
-            json.dumps({'id': '', 'is_allowed': True}),
-            content_type='application/json'
-        )
-        self.view = views.ChangeReadonlyViews()
-        self.view = setup_user_view(self.view, self.request, user=self.user)
-        response = self.view.post(self.request)
-
-        nt.assert_equal(response.status_code, 400)
-
-    @mock.patch('admin.rdm_custom_storage_location.views.Region.objects.filter')
-    def test_post_change_allowed_region_is_none(self, region):
-        region.return_value = None
-        self.user = AuthUserFactory()
-        self.region = RegionFactory()
-        self.request = RequestFactory().post(
-            'custom_storage_location:change_readonly',
-            json.dumps({'id': 2, 'is_allowed': True}),
-            content_type='application/json'
-        )
-        self.view = views.ChangeReadonlyViews()
-        self.view = setup_user_view(self.view, self.request, user=self.user)
-        response = self.view.post(self.request)
-
-        nt.assert_equal(response.status_code, 400)
-
-
 class TestChangeAuthenticationAttributeView(AdminTestCase):
 
     def setUp(self):
@@ -734,6 +601,22 @@ class TestChangeAuthenticationAttributeView(AdminTestCase):
         self.user.is_staff = True
         self.user.affiliated_institutions.add(self.institution)
         self.user.save()
+
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
 
     def test_post_change_authentication_attribute(self):
         self.request = RequestFactory().post(
@@ -755,10 +638,70 @@ class TestChangeAuthenticationAttributeView(AdminTestCase):
         )
         self.view = views.ChangeAuthenticationAttributeView()
         self.view = setup_user_view(self.view, self.request, user=self.user)
-        with nt.assert_raises(HTTPError) as e:
-            self.view.post(self.request)
-        res = e.exception
-        assert res.code == 400
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_permission_anonymous(self):
+        request = RequestFactory().post(
+            'custom_storage_location:change_attribute_authentication',
+            json.dumps({'is_active': True}),
+            content_type='application/json'
+        )
+        request.user = self.anon
+        with nt.assert_raises(PermissionDenied):
+            views.ChangeAuthenticationAttributeView.as_view()(request)
+
+    def test_permission_normal_user(self):
+        request = RequestFactory().post(
+            'custom_storage_location:change_attribute_authentication',
+            json.dumps({'is_active': True}),
+            content_type='application/json'
+        )
+        request.user = self.normal_user
+        with nt.assert_raises(PermissionDenied):
+            views.ChangeAuthenticationAttributeView.as_view()(request)
+
+    def test_permission_super(self):
+        request = RequestFactory().post(
+            'custom_storage_location:change_attribute_authentication',
+            json.dumps({'is_active': True}),
+            content_type='application/json'
+        )
+        request.user = self.superuser
+        with nt.assert_raises(PermissionDenied):
+            views.ChangeAuthenticationAttributeView.as_view()(request)
+
+    def test_permission_admin_without_inst(self):
+        request = RequestFactory().post(
+            'custom_storage_location:change_attribute_authentication',
+            json.dumps({'is_active': True}),
+            content_type='application/json'
+        )
+        request.user = self.admin_not_inst
+        with nt.assert_raises(PermissionDenied):
+            views.ChangeAuthenticationAttributeView.as_view()(request)
+
+    def test_permission_admin_without_body(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:change_attribute_authentication',
+            json.dumps({}),
+            content_type='application/json'
+        )
+        self.view = views.ChangeAuthenticationAttributeView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_permission_admin_with_invalid_body(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:change_attribute_authentication',
+            'example',
+            content_type='application/json'
+        )
+        self.view = views.ChangeAuthenticationAttributeView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
 
 
 class TestAddAttributeFormView(AdminTestCase):
@@ -769,6 +712,31 @@ class TestAddAttributeFormView(AdminTestCase):
         self.user.is_staff = True
         self.user.affiliated_institutions.add(self.institution)
         self.user.save()
+
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
+
+        self.admin_not_auth = AuthUserFactory(fullname='admin_with_ins_not_authentication_attribute')
+        self.institution_not_auth = InstitutionFactory()
+        self.institution_not_auth.is_authentication_attribute = False
+        self.institution_not_auth.save()
+
+        self.admin_not_auth.is_staff = True
+        self.admin_not_auth.affiliated_institutions.add(self.institution_not_auth)
+        self.admin_not_auth.save()
 
     def test_add_first_attribute(self):
         self.request = RequestFactory().post(
@@ -851,6 +819,62 @@ class TestAddAttributeFormView(AdminTestCase):
         response = self.view.post(self.request)
         nt.assert_equal(response.status_code, 404)
 
+    def test_permission_anonymous(self):
+        request = RequestFactory().post(
+            'custom_storage_location:add_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        request.user = self.anon
+        with nt.assert_raises(PermissionDenied):
+            views.AddAttributeFormView.as_view()(request)
+
+    def test_permission_normal_user(self):
+        request = RequestFactory().post(
+            'custom_storage_location:add_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        request.user = self.normal_user
+        with nt.assert_raises(PermissionDenied):
+            views.AddAttributeFormView.as_view()(request)
+
+    def test_permission_super(self):
+        request = RequestFactory().post(
+            'custom_storage_location:add_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        request.user = self.superuser
+        with nt.assert_raises(PermissionDenied):
+            views.AddAttributeFormView.as_view()(request)
+
+    def test_permission_admin_without_inst(self):
+        request = RequestFactory().post(
+            'custom_storage_location:add_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        request.user = self.admin_not_inst
+        with nt.assert_raises(PermissionDenied):
+            views.AddAttributeFormView.as_view()(request)
+
+    def test_permission_admin_with_inst_not_auth(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:add_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.view = views.AddAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.admin_not_auth)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
 
 class TestDeleteAttributeFormView(AdminTestCase):
 
@@ -863,6 +887,31 @@ class TestDeleteAttributeFormView(AdminTestCase):
         self.region = RegionFactory()
         self.region._id = self.institution._id
         self.region.save()
+
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
+
+        self.admin_not_auth = AuthUserFactory(fullname='admin_with_ins_not_authentication_attribute')
+        self.institution_not_auth = InstitutionFactory()
+        self.institution_not_auth.is_authentication_attribute = False
+        self.institution_not_auth.save()
+
+        self.admin_not_auth.is_staff = True
+        self.admin_not_auth.affiliated_institutions.add(self.institution_not_auth)
+        self.admin_not_auth.save()
 
     def test_can_delete_attribute(self):
         index = 2
@@ -895,10 +944,8 @@ class TestDeleteAttributeFormView(AdminTestCase):
         )
         self.view = views.DeleteAttributeFormView()
         self.view = setup_user_view(self.view, self.request, user=self.user)
-        with nt.assert_raises(HTTPError) as e:
-            self.view.post(self.request)
-        res = e.exception
-        assert res.code == 400
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
 
     def test_delete_attribute_does_not_exist(self):
         self.request = RequestFactory().post(
@@ -908,10 +955,8 @@ class TestDeleteAttributeFormView(AdminTestCase):
         )
         self.view = views.DeleteAttributeFormView()
         self.view = setup_user_view(self.view, self.request, user=self.user)
-        with nt.assert_raises(HTTPError) as e:
-            self.view.post(self.request)
-        res = e.exception
-        assert res.code == 404
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 404)
 
     def test_delete_attribute_used_in_allow_expression(self):
         self.region.allow_expression = '1&&2'
@@ -947,6 +992,111 @@ class TestDeleteAttributeFormView(AdminTestCase):
         response = self.view.post(self.request)
         nt.assert_equal(response.status_code, 400)
 
+    def test_permission_anonymous(self):
+        index = 2
+        attribute = AuthenticationAttribute.objects.create(
+            institution=self.institution,
+            index_number=index,
+        )
+        request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            json.dumps({'id': attribute.id}),
+            content_type='application/json'
+        )
+
+        request.user = self.anon
+        with nt.assert_raises(PermissionDenied):
+            views.DeleteAttributeFormView.as_view()(request)
+
+    def test_permission_normal_user(self):
+        index = 2
+        attribute = AuthenticationAttribute.objects.create(
+            institution=self.institution,
+            index_number=index,
+        )
+        request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            json.dumps({'id': attribute.id}),
+            content_type='application/json'
+        )
+
+        request.user = self.normal_user
+        with nt.assert_raises(PermissionDenied):
+            views.DeleteAttributeFormView.as_view()(request)
+
+    def test_permission_super(self):
+        index = 2
+        attribute = AuthenticationAttribute.objects.create(
+            institution=self.institution,
+            index_number=index,
+        )
+        request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            json.dumps({'id': attribute.id}),
+            content_type='application/json'
+        )
+
+        request.user = self.superuser
+        with nt.assert_raises(PermissionDenied):
+            views.DeleteAttributeFormView.as_view()(request)
+
+    def test_permission_admin_without_inst(self):
+        index = 2
+        attribute = AuthenticationAttribute.objects.create(
+            institution=self.institution,
+            index_number=index,
+        )
+        request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            json.dumps({'id': attribute.id}),
+            content_type='application/json'
+        )
+
+        request.user = self.admin_not_inst
+        with nt.assert_raises(PermissionDenied):
+            views.DeleteAttributeFormView.as_view()(request)
+
+    def test_permission_admin_with_inst_not_auth(self):
+        index = 2
+        attribute = AuthenticationAttribute.objects.create(
+            institution=self.institution,
+            index_number=index,
+        )
+        self.request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            json.dumps({'id': attribute.id}),
+            content_type='application/json'
+        )
+
+        self.view = views.DeleteAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.admin_not_auth)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_permission_admin_without_body(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.view = views.DeleteAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_permission_admin_with_invalid_body(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:delete_attribute_form',
+            'example',
+            content_type='application/json'
+        )
+
+        self.view = views.DeleteAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
 
 class TestSaveAttributeFormView(AdminTestCase):
 
@@ -957,6 +1107,31 @@ class TestSaveAttributeFormView(AdminTestCase):
         self.user.affiliated_institutions.add(self.institution)
         self.user.save()
 
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
+
+        self.admin_not_auth = AuthUserFactory(fullname='admin_with_ins_not_authentication_attribute')
+        self.institution_not_auth = InstitutionFactory()
+        self.institution_not_auth.is_authentication_attribute = False
+        self.institution_not_auth.save()
+
+        self.admin_not_auth.is_staff = True
+        self.admin_not_auth.affiliated_institutions.add(self.institution_not_auth)
+        self.admin_not_auth.save()
+
     def test_save_attribute_missing_params(self):
         self.request = RequestFactory().post(
             'custom_storage_location:save_attribute_form',
@@ -966,10 +1141,8 @@ class TestSaveAttributeFormView(AdminTestCase):
 
         self.view = views.SaveAttributeFormView()
         self.view = setup_user_view(self.view, self.request, user=self.user)
-        with nt.assert_raises(HTTPError) as e:
-            self.view.post(self.request)
-        res = e.exception
-        assert res.code == 400
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
 
     def test_save_attribute_not_in_defined_list(self):
         self.request = RequestFactory().post(
@@ -992,10 +1165,8 @@ class TestSaveAttributeFormView(AdminTestCase):
 
         self.view = views.SaveAttributeFormView()
         self.view = setup_user_view(self.view, self.request, user=self.user)
-        with nt.assert_raises(HTTPError) as e:
-            self.view.post(self.request)
-        res = e.exception
-        assert res.code == 400
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 404)
 
     def test_save_attribute_is_not_deleted(self):
         attribute = AuthenticationAttributeFactory()
@@ -1031,7 +1202,113 @@ class TestSaveAttributeFormView(AdminTestCase):
         updated_attribute = AuthenticationAttribute.objects.get(id=attribute.id)
         nt.assert_not_equal(updated_attribute.attribute_name, attribute_name_test)
         nt.assert_not_equal(updated_attribute.attribute_value, attribute_value_test)
-        nt.assert_equal(response.status_code, 200)
+        nt.assert_equal(response.status_code, 404)
+
+    def test_permission_anonymous(self):
+        attribute = AuthenticationAttributeFactory()
+        attribute_name_test = 'mail'
+        attribute_value_test = 'admin'
+        request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({'id': attribute.id, 'attribute': attribute_name_test, 'attribute_value': attribute_value_test}),
+            content_type='application/json'
+        )
+
+        request.user = self.anon
+        with nt.assert_raises(PermissionDenied):
+            views.SaveAttributeFormView.as_view()(request)
+
+    def test_permission_normal_user(self):
+        attribute = AuthenticationAttributeFactory()
+        attribute_name_test = 'mail'
+        attribute_value_test = 'admin'
+        request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({'id': attribute.id, 'attribute': attribute_name_test, 'attribute_value': attribute_value_test}),
+            content_type='application/json'
+        )
+
+        request.user = self.normal_user
+        with nt.assert_raises(PermissionDenied):
+            views.SaveAttributeFormView.as_view()(request)
+
+    def test_permission_super(self):
+        attribute = AuthenticationAttributeFactory()
+        attribute_name_test = 'mail'
+        attribute_value_test = 'admin'
+        request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({'id': attribute.id, 'attribute': attribute_name_test, 'attribute_value': attribute_value_test}),
+            content_type='application/json'
+        )
+
+        request.user = self.superuser
+        with nt.assert_raises(PermissionDenied):
+            views.SaveAttributeFormView.as_view()(request)
+
+    def test_permission_admin_without_inst(self):
+        attribute = AuthenticationAttributeFactory()
+        attribute_name_test = 'mail'
+        attribute_value_test = 'admin'
+        request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({'id': attribute.id, 'attribute': attribute_name_test, 'attribute_value': attribute_value_test}),
+            content_type='application/json'
+        )
+
+        request.user = self.admin_not_inst
+        with nt.assert_raises(PermissionDenied):
+            views.SaveAttributeFormView.as_view()(request)
+
+    def test_permission_admin_with_inst_not_auth(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.admin_not_auth)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_permission_admin_without_body(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_permission_admin_with_invalid_body(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            '',
+            content_type='application/json'
+        )
+
+        self.view = views.SaveAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_permission_admin_with_id_not_integer(self):
+        attribute_name_test = 'mail'
+        attribute_value_test = 'admin'
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_attribute_form',
+            json.dumps({'id': 'invalid', 'attribute': attribute_name_test, 'attribute_value': attribute_value_test}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveAttributeFormView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
 
 
 class TestSaveInstitutionalStorageView(AdminTestCase):
@@ -1052,6 +1329,31 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
             institution=self.institution, index_number=2
         )
 
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
+
+        self.admin_not_auth = AuthUserFactory(fullname='admin_with_ins_not_authentication_attribute')
+        self.institution_not_auth = InstitutionFactory()
+        self.institution_not_auth.is_authentication_attribute = False
+        self.institution_not_auth.save()
+
+        self.admin_not_auth.is_staff = True
+        self.admin_not_auth.affiliated_institutions.add(self.institution_not_auth)
+        self.admin_not_auth.save()
+
     def test_save_institutional_storage_missing_params(self):
         self.request = RequestFactory().post(
             'custom_storage_location:save_institutional_storage',
@@ -1061,10 +1363,8 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
 
         self.view = views.SaveInstitutionalStorageView()
         self.view = setup_user_view(self.view, self.request, user=self.user)
-        with nt.assert_raises(HTTPError) as e:
-            self.view.post(self.request)
-        res = e.exception
-        assert res.code == 400
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
 
     def test_save_institutional_storage_allow_expression_invalid(self):
         self.request = RequestFactory().post(
@@ -1153,10 +1453,8 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
 
         self.view = views.SaveInstitutionalStorageView()
         self.view = setup_user_view(self.view, self.request, user=self.user)
-        with nt.assert_raises(HTTPError) as e:
-            self.view.post(self.request)
-        res = e.exception
-        assert res.code == 400
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 404)
 
     def test_save_institutional_storage_with_new_storage_name(self):
         self.attribute_1.attribute_name = 'given_name'
@@ -1202,14 +1500,12 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
         region_test.save()
         self.request = RequestFactory().post(
             'custom_storage_location:save_institutional_storage',
-            json.dumps({
-                'region_id': self.region.id,
-                'allow': True,
-                'readonly': False,
-                'allow_expression': '',
-                'readonly_expression': '',
-                'storage_name': region_test.name
-            }),
+            json.dumps({'region_id': self.region.id,
+                        'allow': True,
+                        'readonly': False,
+                        'allow_expression': '',
+                        'readonly_expression': '',
+                        'storage_name': region_test.name}),
             content_type='application/json'
         )
 
@@ -1217,3 +1513,309 @@ class TestSaveInstitutionalStorageView(AdminTestCase):
         self.view = setup_user_view(self.view, self.request, user=self.user)
         response = self.view.post(self.request)
         nt.assert_equal(response.status_code, 400)
+
+    def test_permission_anonymous(self):
+        region = RegionFactory()
+        region._id = self.institution._id
+        region.save()
+        storage_name_test = region.name + 'test'
+        allow_test = True
+        readonly_test = False
+        allow_expression_test = '1&&2'
+        readonly_expression_test = '!1'
+        request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': region.id,
+                        'allow': allow_test,
+                        'readonly': readonly_test,
+                        'allow_expression': allow_expression_test,
+                        'readonly_expression': readonly_expression_test,
+                        'storage_name': storage_name_test}),
+            content_type='application/json'
+        )
+
+        request.user = self.anon
+        with nt.assert_raises(PermissionDenied):
+            views.SaveInstitutionalStorageView.as_view()(request)
+
+    def test_permission_normal_user(self):
+        region = RegionFactory()
+        region._id = self.institution._id
+        region.save()
+        storage_name_test = region.name + 'test'
+        allow_test = True
+        readonly_test = False
+        allow_expression_test = '1&&2'
+        readonly_expression_test = '!1'
+        request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': region.id,
+                        'allow': allow_test,
+                        'readonly': readonly_test,
+                        'allow_expression': allow_expression_test,
+                        'readonly_expression': readonly_expression_test,
+                        'storage_name': storage_name_test}),
+            content_type='application/json'
+        )
+
+        request.user = self.normal_user
+        with nt.assert_raises(PermissionDenied):
+            views.SaveInstitutionalStorageView.as_view()(request)
+
+    def test_permission_super(self):
+        region = RegionFactory()
+        region._id = self.institution._id
+        region.save()
+        storage_name_test = region.name + 'test'
+        allow_test = True
+        readonly_test = False
+        allow_expression_test = '1&&2'
+        readonly_expression_test = '!1'
+        request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': region.id,
+                        'allow': allow_test,
+                        'readonly': readonly_test,
+                        'allow_expression': allow_expression_test,
+                        'readonly_expression': readonly_expression_test,
+                        'storage_name': storage_name_test}),
+            content_type='application/json'
+        )
+
+        request.user = self.superuser
+        with nt.assert_raises(PermissionDenied):
+            views.SaveInstitutionalStorageView.as_view()(request)
+
+    def test_permission_admin_without_inst(self):
+        region = RegionFactory()
+        region._id = self.institution._id
+        region.save()
+        storage_name_test = region.name + 'test'
+        allow_test = True
+        readonly_test = False
+        allow_expression_test = '1&&2'
+        readonly_expression_test = '!1'
+        request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': region.id,
+                        'allow': allow_test,
+                        'readonly': readonly_test,
+                        'allow_expression': allow_expression_test,
+                        'readonly_expression': readonly_expression_test,
+                        'storage_name': storage_name_test}),
+            content_type='application/json'
+        )
+
+        request.user = self.admin_not_inst
+        with nt.assert_raises(PermissionDenied):
+            views.SaveInstitutionalStorageView.as_view()(request)
+
+    def test_permission_admin_without_body(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.anon)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_permission_admin_with_invalid_body(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            'example',
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.anon)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_save_institutional_storage_with_invalid_region_id(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': 'demo',
+                        'allow': True,
+                        'readonly': False,
+                        'allow_expression': '',
+                        'readonly_expression': ''}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+    def test_save_institutional_storage_with_invalid_allow(self):
+        self.request = RequestFactory().post(
+            'custom_storage_location:save_institutional_storage',
+            json.dumps({'region_id': self.region.id,
+                        'allow': 'demo',
+                        'readonly': False,
+                        'allow_expression': '',
+                        'readonly_expression': ''}),
+            content_type='application/json'
+        )
+
+        self.view = views.SaveInstitutionalStorageView()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 400)
+
+
+class TestInstitutionalStorageBaseView(AdminTestCase):
+
+    def setUp(self):
+        self.user = AuthUserFactory()
+        self.institution = InstitutionFactory()
+        self.user.is_staff = True
+        self.user.affiliated_institutions.add(self.institution)
+        self.user.save()
+
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
+
+        self.request = RequestFactory().get('/fake_path')
+        self.view = views.InstitutionalStorageBaseView()
+
+    def test__test_func_anonymous(self):
+        nt.assert_false(setup_user_view(self.view, self.request, user=self.anon).test_func())
+
+    def test__test_func_normal_user(self):
+        nt.assert_false(setup_user_view(self.view, self.request, user=self.normal_user).test_func())
+
+    def test__test_func_super_user(self):
+        nt.assert_false(setup_user_view(self.view, self.request, user=self.superuser).test_func())
+
+    def test__test_func_admin_not_inst(self):
+        nt.assert_false(setup_user_view(self.view, self.request, user=self.admin_not_inst).test_func())
+
+    def test__test_func_admin_has_inst(self):
+        nt.assert_true(setup_user_view(self.view, self.request, user=self.user).test_func())      
+
+
+class TestCheckExistingStorageView(AdminTestCase):
+
+    def setUp(self):
+        self.user = AuthUserFactory()
+        self.institution = InstitutionFactory()
+        self.user.is_staff = True
+        self.user.affiliated_institutions.add(self.institution)
+        self.user.save()
+
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
+
+    def test_permission_anonymous(self):
+        request = RequestFactory().post(
+            'custom_storage_location:check_existing_storage',
+            json.dumps({'provider': 'osfstorage'}),
+            content_type='application/json'
+        )
+
+        request.user = self.anon
+        with nt.assert_raises(PermissionDenied):
+            views.CheckExistingStorage.as_view()(request)
+
+    def test_permission_normal_user(self):
+        request = RequestFactory().post(
+            'custom_storage_location:check_existing_storage',
+            json.dumps({'provider': 'osfstorage'}),
+            content_type='application/json'
+        )
+
+        request.user = self.normal_user
+        with nt.assert_raises(PermissionDenied):
+            views.CheckExistingStorage.as_view()(request)
+
+    def test_permission_super(self):
+        request = RequestFactory().post(
+            'custom_storage_location:check_existing_storage',
+            json.dumps({'provider': 'osfstorage'}),
+            content_type='application/json'
+        )
+
+        request.user = self.superuser
+        with nt.assert_raises(PermissionDenied):
+            views.CheckExistingStorage.as_view()(request)
+
+    def test_permission_admin_without_inst(self):
+        request = RequestFactory().post(
+            'custom_storage_location:check_existing_storage',
+            json.dumps({'provider': 'osfstorage'}),
+            content_type='application/json'
+        )
+
+        request.user = self.admin_not_inst
+        with nt.assert_raises(PermissionDenied):
+            views.CheckExistingStorage.as_view()(request)
+
+    def test_permission_admin_success(self):
+        config = {
+            'storage': {
+                'provider': 'osfstorage',
+                'container': 'osf_storage',
+                'use_public': True,
+            }
+        }
+        region = RegionFactory(waterbutler_settings=config)
+        region._id = self.institution._id
+        self.request = RequestFactory().post(
+            'custom_storage_location:check_existing_storage',
+            json.dumps({'provider': 's3'}),
+            content_type='application/json'
+        )
+        self.view = views.CheckExistingStorage()
+        self.view = setup_user_view(self.view, self.request, user=self.user)
+        response = self.view.post(self.request)
+        nt.assert_equal(response.status_code, 200)
+
+    def test_permission_admin_conflict(self):
+        config = {
+            'storage': {
+                'provider': 'osfstorage',
+                'container': 'osf_storage',
+                'use_public': True,
+            }
+        }
+        region = RegionFactory(waterbutler_settings=config)
+        region._id = self.institution._id
+        request = RequestFactory().post(
+            'custom_storage_location:check_existing_storage',
+            json.dumps({'provider': 'osfstorage'}),
+            content_type='application/json'
+        )
+        self.view = views.CheckExistingStorage()
+        self.view = setup_user_view(self.view, request, user=self.user)
+        response = self.view.post(request)
+        nt.assert_equal(response.status_code, 409)

@@ -25,6 +25,8 @@ from admin_tests.utilities import setup_form_view, setup_user_view, setup_view
 from admin.institutions import views
 from admin.institutions.forms import InstitutionForm
 from admin.base.forms import ImportFileForm
+from django.contrib.auth.models import AnonymousUser
+from django.http import HttpResponseBadRequest
 
 
 class TestInstitutionList(AdminTestCase):
@@ -561,6 +563,34 @@ class TestUpdateQuotaUserListByInstitutionID(AdminTestCase):
                 request, institution_id=self.institution.id
             )
 
+    def test_view_not_exist_institution(self):
+        request = RequestFactory().post(
+            reverse(
+                'institutions'
+                ':update_quota_institution_user_list',
+                kwargs={'institution_id': 0}),
+            {'maxQuota': 20})
+        request.user = self.user1
+
+        with nt.assert_raises(Http404):
+            views.UpdateQuotaUserListByInstitutionID.as_view()(
+                request, institution_id=0
+            )
+
+    @mock.patch('admin.institutions.views.render_bad_request_response')
+    def test_view_invalid_max_quota(self, mock_render):
+        mock_render.return_value = HttpResponseBadRequest(content='fake')
+        request = RequestFactory().post(
+            reverse(
+                'institutions'
+                ':update_quota_institution_user_list',
+                kwargs={'institution_id': self.institution.id}),
+            {'maxQuota': 'abc'})
+        request.user = self.user1
+
+        response = views.UpdateQuotaUserListByInstitutionID.as_view()(request, institution_id=self.institution.id)  
+        self.assertEqual(response.status_code, 400)
+
 
 class TestQuotaUserList(AdminTestCase):
     def setUp(self):
@@ -746,6 +776,21 @@ class TestUserListByInstitutionID(AdminTestCase):
 
         nt.assert_equal(len(res), 0)
 
+    def test_search_institution_not_exist(self):
+        request = RequestFactory().get(
+            reverse('institutions:institution_user_list',
+                    kwargs={'institution_id': 0}),
+            {
+                'guid': self.user2._id
+            }
+        )
+        request.user = self.user
+        view = views.UserListByInstitutionID()
+        view = setup_view(view, request,
+                          institution_id=0)
+        with nt.assert_raises(Http404):
+            view.get_user_list()
+
 
 class TestExportFileTSV(AdminTestCase):
     def setUp(self):
@@ -859,12 +904,41 @@ class TestRecalculateQuotaOfUsersInInstitution(AdminTestCase):
         )
         self.view = views.RecalculateQuotaOfUsersInInstitution()
         self.view.request = self.request
+        self.view.kwargs = {'region_id': self.region.id}
+
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
+
+        self.institution1_admin = AuthUserFactory(fullname='admin001_inst01')
+        self.institution1_admin.is_staff = True
+        self.institution1_admin.affiliated_institutions.add(self.institution1)
+        self.institution1_admin.save()
+
+        self.institution2_admin = AuthUserFactory(fullname='admin001_inst02')
+        self.institution2_admin.is_staff = True
+        self.institution2_admin.affiliated_institutions.add(self.institution2)
+        self.institution2_admin.save()
 
     @mock.patch('admin.institutions.views.Region.objects')
     @mock.patch('website.util.quota.recalculate_used_of_user_by_region')
     def test_dispatch_method_with_institution_exists_in_Region(
             self, mock_recalculate_used_of_user_by_region_method, mock_region):
-        mock_region.filter.return_value.exists.return_value = True
+        mock_region.filter.return_value.first.return_value = self.region
+        self.view.region_id = self.region.id
+        self.view.region = self.region
         response = self.view.dispatch(request=self.request, region_id=self.region.id)
 
         nt.assert_equal(response.status_code, 302)
@@ -875,25 +949,51 @@ class TestRecalculateQuotaOfUsersInInstitution(AdminTestCase):
     @mock.patch('website.util.quota.recalculate_used_of_user_by_region')
     def test_dispatch_method_with_institution_not_exists_in_Region(
             self, mock_recalculate_used_of_user_by_region_method, mock_region):
-        mock_region.filter.return_value.exists.return_value = False
+        mock_region.filter.return_value.first.return_value = None
+        self.view.region_id = self.region.id
         response = self.view.dispatch(request=self.request, region_id=self.region.id)
         nt.assert_equal(response.status_code, 302)
         nt.assert_equal(response.url, self.url)
         mock_recalculate_used_of_user_by_region_method.assert_not_called()
 
+    def test__test_func_anonymous(self):
+        self.request.user = self.anon
+        self.view.request = self.request
+        nt.assert_false(self.view.test_func())
+
+    def test__test_func_normal_user(self):
+        self.request.user = self.normal_user
+        self.view.request = self.request
+        nt.assert_false(self.view.test_func())
+
+    def test__test_func_super(self):
+        self.request.user = self.superuser
+        self.view.request = self.request
+        nt.assert_false(self.view.test_func())
+
+    def test__test_func_admin_without_inst(self):
+        self.request.user = self.admin_not_inst
+        self.view.request = self.request
+        nt.assert_false(self.view.test_func())
+
+    @mock.patch('admin.institutions.views.Region.objects')  
+    def test__test_func_admin_without_permission(self, mock_region):
+        mock_region.filter.return_value.first.return_value = self.region
+        self.request.user = self.institution2_admin
+        self.view.request = self.request
+        nt.assert_false(self.view.test_func())
+
     @mock.patch('admin.institutions.views.Region.objects')
-    @mock.patch('website.util.quota.recalculate_used_of_user_by_region')
-    def test_dispatch_method_with_user_is_not_admin(
-            self, mock_recalculate_used_of_user_by_region_method, mock_region):
-        self.user.is_staff = False
-        self.user.affiliated_institutions.remove(self.institution1)
-        self.user.save()
-        self.request.user = self.user
-        mock_region.filter.return_value.exists.return_value = False
-        response = self.view.dispatch(request=self.request, region_id=self.region.id)
-        nt.assert_equal(response.status_code, 302)
-        nt.assert_equal(response.url, self.url)
-        mock_recalculate_used_of_user_by_region_method.assert_not_called()
+    def test__test_func_admin_has_permission(self, mock_region):
+        self.request.user = self.institution1_admin
+        self.view.request = self.request
+        # case without region
+        mock_region.filter.return_value.first.return_value = None
+        nt.assert_true(self.view.test_func())
+
+        # case with region
+        mock_region.filter.return_value.first.return_value = self.region
+        nt.assert_true(self.view.test_func())
 
 
 class TestInstitutionalStorage(AdminTestCase):
@@ -945,6 +1045,22 @@ class TestInstitutionalStorage(AdminTestCase):
 
         self.new_list.append(self.region)
         self.new_list.append(self.region2)
+
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
 
     def view_get(self, url_params):
         request = RequestFactory().get('/fake_path?{}'.format(url_params))
@@ -1008,6 +1124,60 @@ class TestInstitutionalStorage(AdminTestCase):
         nt.assert_is_instance(res, dict)
         nt.assert_equal(res['list_storage'][0]['name'], self.new_list[1].name)
 
+    def test_permission_anonymous(self):
+        request = RequestFactory().get('/fake_path')
+        request.user = self.anon
+        view = setup_view(
+            views.InstitutionalStorage(),
+            request,
+            user=self.anon,
+            institution_id=self.institution.id
+        )
+        nt.assert_false(view.test_func())
+
+    def test_permission_normal_user(self):
+        request = RequestFactory().get('/fake_path')
+        request.user = self.normal_user
+        view = setup_view(
+            views.InstitutionalStorage(),
+            request,
+            user=self.normal_user,
+            institution_id=self.institution.id
+        )
+        nt.assert_false(view.test_func())
+
+    def test_permission_super(self):
+        request = RequestFactory().get('/fake_path')
+        request.user = self.superuser
+        view = setup_view(
+            views.InstitutionalStorage(),
+            request,
+            user=self.superuser,
+            institution_id=self.institution.id
+        )
+        nt.assert_false(view.test_func())
+
+    def test_permission_admin_without_inst(self):
+        request = RequestFactory().get('/fake_path')
+        request.user = self.admin_not_inst
+        view = setup_view(
+            views.InstitutionalStorage(),
+            request,
+            user=self.admin_not_inst,
+            institution_id=self.institution.id
+        )
+        nt.assert_false(view.test_func())
+
+    def test_permission_admin_with_inst(self):
+        request = RequestFactory().get('/fake_path')
+        request.user = self.user
+        view = setup_view(
+            views.InstitutionalStorage(),
+            request,
+            user=self.user,
+            institution_id=self.institution.id
+        )
+        nt.assert_true(view.test_func())
 
 class TestQuotaUserStorageList(AdminTestCase):
     def setUp(self):
@@ -1172,11 +1342,45 @@ class TestStatisticalStatusDefaultInstitutionalStorage(AdminTestCase):
             institution_id=self.institution.id
         )
 
+        self.institution1 = InstitutionFactory()
+        self.institution2 = InstitutionFactory()
+        self.region1 = RegionFactory(_id=self.institution1._id, name='Storage')
+        self.view.kwargs = {'region_id': self.region1.id}
+
+        self.anon = AnonymousUser()
+
+        self.normal_user = AuthUserFactory(fullname='normal_user')
+        self.normal_user.is_staff = False
+        self.normal_user.is_superuser = False
+        self.normal_user.save()
+
+        self.superuser = AuthUserFactory(fullname='superuser')
+        self.superuser.is_staff = True
+        self.superuser.is_superuser = True
+        self.superuser.save()
+
+        self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
+        self.admin_not_inst.is_staff = True
+        self.admin_not_inst.save()
+
+        self.institution1_admin = AuthUserFactory(fullname='admin001_inst01')
+        self.institution1_admin.is_staff = True
+        self.institution1_admin.affiliated_institutions.add(self.institution1)
+        self.institution1_admin.save()
+
+        self.institution2_admin = AuthUserFactory(fullname='admin001_inst02')
+        self.institution2_admin.is_staff = True
+        self.institution2_admin.affiliated_institutions.add(self.institution2)
+        self.institution2_admin.save()
+
     def test_admin_login(self):
+        self.region = RegionFactory(_id=self.institution._id, name='Storage')
         self.request.user.is_active = True
         self.request.user.is_registered = True
         self.request.user.is_superuser = False
         self.request.user.is_staff = True
+        self.request.user.affiliated_institutions.add(self.institution)
+        self.view.kwargs = {'region_id': self.region.id}
         nt.assert_true(self.view.test_func())
 
     def get_institution(self):
@@ -1226,7 +1430,75 @@ class TestStatisticalStatusDefaultInstitutionalStorage(AdminTestCase):
             institution_id=self.institution.id,
             region_id=region.id
         )
+        view.region_id = region.id
         res = view.get_region()
 
         nt.assert_equal(res.id, region.id)
         nt.assert_equal(res.name, region.name)
+
+    def test_permission_anonymous(self):
+        self.request.user = self.anon
+        view = setup_view(
+            views.StatisticalStatusDefaultInstitutionalStorage(),
+            self.request,
+            user=self.anon,
+            institution_id=self.institution.id,
+            region_id=self.region1.id
+        )
+        nt.assert_false(view.test_func())
+
+    def test_permission_normal_user(self):
+        self.request.user = self.normal_user
+        view = setup_view(
+            views.StatisticalStatusDefaultInstitutionalStorage(),
+            self.request,
+            user=self.normal_user,
+            institution_id=self.institution.id,
+            region_id=self.region1.id
+        )
+        nt.assert_false(view.test_func())
+
+    def test_permission_super(self):
+        self.request.user = self.superuser
+        view = setup_view(
+            views.StatisticalStatusDefaultInstitutionalStorage(),
+            self.request,
+            user=self.superuser,
+            institution_id=self.institution.id,
+            region_id=self.region1.id
+        )
+        nt.assert_false(view.test_func())
+
+    def test_permission_admin_without_inst(self):
+        self.request.user = self.admin_not_inst
+        view = setup_view(
+            views.StatisticalStatusDefaultInstitutionalStorage(),
+            self.request,
+            user=self.admin_not_inst,
+            institution_id=self.institution.id,
+            region_id=self.region1.id
+        )
+        nt.assert_false(view.test_func())
+
+    def test_permission_admin_without_permission(self):
+        self.request.user = self.institution2_admin
+        view = setup_view(
+            views.StatisticalStatusDefaultInstitutionalStorage(),
+            self.request,
+            user=self.institution2_admin,
+            institution_id=self.institution1.id,
+            region_id=self.region1.id
+        )
+        nt.assert_false(view.test_func())
+
+    def test_region_not_exist(self):
+        self.request.user = self.institution2_admin
+        view = setup_view(
+            views.StatisticalStatusDefaultInstitutionalStorage(),
+            self.request,
+            user=self.institution2_admin,
+            institution_id=self.institution1.id,
+            region_id=0
+        )
+        with nt.assert_raises(Http404):
+            view.test_func()

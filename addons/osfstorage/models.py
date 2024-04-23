@@ -567,6 +567,10 @@ class Region(models.Model):
             return self.addon.full_name
         return None
 
+    @property
+    def institution(self):
+        from osf.models import Institution
+        return Institution.load(self._id)
 
 class UserSettings(BaseUserSettings):
     default_region = models.ForeignKey(Region, null=True, on_delete=models.CASCADE)
