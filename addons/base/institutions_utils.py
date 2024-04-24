@@ -204,44 +204,41 @@ class InstitutionsStorageAddon(BaseStorageAddon):
         institution = Institution.objects.get(id=institution_id)
         regions = Region.objects.filter(_id=institution._id, waterbutler_settings__storage__provider=addon_name).order_by('id')
         idx = 0
-        # rdm_options = RdmAddonOption.objects.filter(institution_id=institution_id).order_by('id')
-        # rdm_option_indexs = []
-        # index = 0
-        # for rdm_option in rdm_options:
-        #     if rdm_option.provider == addon_name:
-        #         rdm_option_indexs.append(index)
-        #     index = index + 1
+        if len(regions) > 0:
+            for addon_option in addon_options:
+                # For each addon option will create a addon node setting
+                region = regions[idx]
+                idx = idx + 1
+                auth = Auth(node.creator)
+                is_attribute_allowed = check_authentication_attribute(auth.user,
+                                                                      region.allow_expression,
+                                                                      region.is_allowed)
+                if addon_option.is_allowed and is_attribute_allowed:
+                    provider = cls.cls_provider_switch(addon_option)
+                    client = cls.get_client(provider)
 
-        for addon_option in addon_options:
-            # For each addon option will create a addon node setting
-            region = regions[idx]
-            idx = idx + 1
-            if addon_option.is_allowed and region.is_allowed:
-                provider = cls.cls_provider_switch(addon_option)
-                client = cls.get_client(provider)
+                    base_folder = cls.cls_base_folder(addon_option)
+                    cls.can_access(client, base_folder)
 
-                base_folder = cls.cls_base_folder(addon_option)
-                cls.can_access(client, base_folder)
-
-                folder_name = cls.cls_folder_name_from_node(node)
-                # create_folder() may raise
-                cls.create_folder(client, base_folder, folder_name)
-                try:
-                    osfstorage_nodesetting = NodeSettings.objects.filter(owner_id=node.get_root().id, is_deleted=False, region_id=region.id).first()
-                    addon = node.add_addon(addon_name, auth=Auth(node.creator),
-                                        log=True, region_id=region.id)
-                    addon.set_addon_option(addon_option)
-                    addon.set_folder_id(folder_name)
-                    addon.set_region_id(region.id)
-                    addon.set_root_node_id(osfstorage_nodesetting.root_node.id)
-                    addon.save()
-                    addons.append(addon)
-                except Exception:
+                    folder_name = cls.cls_folder_name_from_node(node)
+                    # create_folder() may raise
+                    cls.create_folder(client, base_folder, folder_name)
                     try:
-                        cls.remove_folder(client, base_folder, folder_name)
+                        osfstorage_nodesetting = NodeSettings.objects.filter(owner_id=node.get_root().id, is_deleted=False, region_id=region.id).first()
+                        addon = node.add_addon(addon_name, auth=Auth(node.creator),
+                                            log=True, region_id=region.id)
+                        addon.set_addon_option(addon_option)
+                        addon.set_folder_id(folder_name)
+                        addon.set_region_id(region.id)
+                        addon.set_root_node_id(osfstorage_nodesetting.root_node.id)
+                        addon.save()
+                        addons.append(addon)
                     except Exception:
-                        logger.exception(u'cannot remove unnecessary folder: ({})/{}, {}'.format(addon_name, base_folder, folder_name))
-                    raise
+                        try:
+                            cls.remove_folder(client, base_folder, folder_name)
+                        except Exception:
+                            logger.exception(u'cannot remove unnecessary folder: ({})/{}, {}'.format(addon_name, base_folder, folder_name))
+                        raise
         return addons
 
     @classmethod

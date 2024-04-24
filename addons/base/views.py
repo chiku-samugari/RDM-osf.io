@@ -703,18 +703,19 @@ def create_waterbutler_log(payload, **kwargs):
                     metadata['dest_size'] = payload['destination']['size']
                 if src_provider in ADDON_METHOD_PROVIDER and dest_provider in ADDON_METHOD_PROVIDER:
                     metadata['dest_path'] = payload['destination']['root_path'] + '/' + metadata.get('path').lstrip('/')
-                    metadata['src_path'] = metadata['path']
-                    metadata['path'] = payload['root_path'] + '/' + payload['source']['path'].lstrip('/')
+                    metadata['src_path'] = payload['source']['root_path'] + '/' + payload['source']['path'].lstrip('/')
+                    metadata['path'] = metadata['dest_path']
                 elif src_provider in ADDON_METHOD_PROVIDER:
-                    metadata['dest_path'] = '/' + metadata.get('path').lstrip('/')
-                    metadata['src_path'] = metadata['path']
-                    metadata['path'] = payload['root_path'] + '/' + payload['source']['path'].lstrip('/')
+                    metadata['dest_path'] = metadata.get('path').lstrip('/')
+                    metadata['src_path'] = payload['root_path'] + '/' + payload['source']['path'].lstrip('/')
+                    metadata['path'] = metadata['dest_path']
                 elif dest_provider in ADDON_METHOD_PROVIDER:
                     metadata['dest_path'] = payload['destination']['root_path'] + '/' + metadata.get('path').lstrip('/')
-                    metadata['src_path'] = metadata['path']
+                    metadata['src_path'] = payload['source']['path'].lstrip('/')
                     metadata['path'] = metadata['dest_path']
                 else:
-                    metadata['src_path'] = metadata['path']
+                    metadata['dest_path'] = metadata.get('path').lstrip('/')
+                    metadata['src_path'] = payload['source']['path'].lstrip('/')
 
             elif action in (NodeLog.FILE_COPIED):
                 file_node_copied = True
@@ -778,103 +779,87 @@ def create_waterbutler_log(payload, **kwargs):
             # [GRDM-13530, 15698, 17045, 17065]
             # (MultipleObjectsReturned may occur when creation of
             #  BaseFileNode is called in long transaction.)
-            logger.debug(f'prepare_file_node metadata is {metadata}')
-            logger.debug(f'prepare_file_node action is {action}')
-            logger.debug(f'prepare_file_node root_folder_id is {root_folder_id}')
-            logger.debug(f'prepare_file_node dest_root_folder_id is {dest_root_folder_id}')
-            logger.debug(f'prepare_file_node dest_provider is {dest_provider}')
-            file_node = None
+            file_node = BaseFileNode.resolve_class(
+                provider, BaseFileNode.FILE
+            ).get_or_create(node, '/' + metadata.get('path').lstrip('/'))
+            if file_node and metadata.get('kind') == 'file':
+                # Update parent_id by destination root node id
+                if root_folder_id and provider in ADDON_METHOD_PROVIDER:
+                    file_node.parent_id = root_folder_id
+                    file_node.save()
+                func_hash = getattr(file_node, 'get_hash_for_timestamp', None)
+                if func_hash:
+                    extras = {}
+                    # collect new metadata from waterbutler
+                    # and update external hashes of the file_node
+                    # to update timestamp by file hash
+                    file_node.touch(
+                        request.headers.get('Authorization'),
+                        **dict(
+                            extras,
+                            cookie=user.get_or_create_cookie().decode()
+                        )
+                    )
+
+    def prepare_move(provider, root_folder_id=None, dest_root_folder_id=None, dest_provider=None):
+        with transaction.atomic():
+            # to reduce possibility of MultipleObjectsReturned.
+            # [GRDM-13530, 15698, 17045, 17065]
+            # (MultipleObjectsReturned may occur when creation of
+            #  BaseFileNode is called in long transaction.)
+            # Move to addon or bulkmount
             if metadata.get('kind') == 'file':
-                # Move or create from addon
-                if provider in ADDON_METHOD_PROVIDER:
-                    if provider == 'onedrivebusiness' and dest_provider is not None and dest_provider not in ADDON_METHOD_PROVIDER:
-                        file_node = BaseFileNode.objects.filter(target_object_id=node.id, provider=provider, deleted_on__isnull=True, _materialized_path='/' + src_path.lstrip('/'), parent_id=root_folder_id).last()
-                    else:
-                        file_node = BaseFileNode.resolve_class(
-                            provider, BaseFileNode.FILE
-                        ).get_or_create(node, '/' + metadata.get('path').lstrip('/'), parent_id=root_folder_id)
+                if dest_provider in ADDON_METHOD_PROVIDER:
+                    file_node = BaseFileNode.resolve_class(
+                        dest_provider, BaseFileNode.FILE
+                    ).get_or_create(node, '/' + metadata['dest_path'].lstrip('/'), parent_id=dest_root_folder_id)
                 else:
-                    # Move to addon or bulkmount
-                    if dest_provider in ADDON_METHOD_PROVIDER:
-                        file_node = BaseFileNode.resolve_class(
-                            dest_provider, BaseFileNode.FILE
-                        ).get_or_create(node, '/' + metadata['dest_path'].lstrip('/'), parent_id=dest_root_folder_id)
-                    else:
-                        file_node = BaseFileNode.resolve_class(
-                            provider, BaseFileNode.FILE
-                        ).get_or_create(node, '/' + metadata.get('path').lstrip('/'))
-                if file_node:
-                    logger.debug(f'file node is {file_node.id}')
+                    file_node = BaseFileNode.resolve_class(
+                        dest_provider, BaseFileNode.FILE
+                    ).get_or_create(node, '/' + metadata['dest_path'].lstrip('/'))
+                if file_node: 
                     # Update parent_id by destination root node id
-                    if dest_root_folder_id and provider in ADDON_METHOD_PROVIDER:
+                    if dest_root_folder_id and dest_provider in ADDON_METHOD_PROVIDER:
                         file_node.parent_id = dest_root_folder_id
                         file_node.save()
-                    if dest_provider:
-                        # Update dest_materialized of base file node
-                        if metadata['dest_materialized']:
-                            file_node._materialized_path = '/' + metadata['dest_materialized'].lstrip('/')
-                        # If move to bulkmount reset path
-                        if dest_provider not in ADDON_METHOD_PROVIDER:
-                            osf_file_node = BaseFileNode.objects.filter(name=file_node.name, parent_id=dest_root_folder_id).last()
-                            if osf_file_node:
-                                fileinfo = FileInfo.objects.filter(file_id=osf_file_node.id).last()
-                                if fileinfo is None:
-                                    FileInfo.objects.create(file=osf_file_node, file_size=metadata.get('dest_size'))
-                            metadata['path'] = metadata['src_path']
-                        if dest_provider in ADDON_METHOD_PROVIDER:
-                            # Update base file node type
-                            cls = BaseFileNode.resolve_class(dest_provider, BaseFileNode.FILE)
-                            file_node.recast(cls._typedmodels_type)
-                            file_node._path = '/' + metadata.get('dest_path').lstrip('/')
-                            file_node.provider = dest_provider
-                            file_node._meta.model._provider = dest_provider
-                            file_node.save()
-                            fileinfo = FileInfo.objects.filter(file_id=file_node.id).last()
-                            if fileinfo is None:
-                                FileInfo.objects.create(file=file_node, file_size=metadata.get('dest_size'))
-                        if provider == 'onedrivebusiness' and metadata['src_materialized']:
-                            # If source provider is onedrivebusiness will remove old base filenode
-                            logger.debug('materialized_path is ' + str(metadata['src_materialized']))
-                            old_file_nodes = BaseFileNode.objects.filter(target_object_id=node.id,
-                                                                 provider=provider,
-                                                                 deleted_on__isnull=True,
-                                                                 _materialized_path='/' + metadata['src_materialized'].lstrip('/'),
-                                                                 parent_id=root_folder_id).all()
-                            if old_file_nodes:
-                                for old_file_node in old_file_nodes:
-                                    logger.debug(f'old_file_node id is {old_file_node.id}')
-                                    old_file_node.delete()
-
                     func_hash = getattr(file_node, 'get_hash_for_timestamp', None)
-                    #if provider != 'osfstorage' and action in (NodeLog.FILE_MOVED, NodeLog.FILE_RENAMED):
-                    #    file_node.path ='/' + metadata.get('dest_path')
                     if func_hash:
-                        logger.warning('func hash here')
                         extras = {}
                         # collect new metadata from waterbutler
                         # and update external hashes of the file_node
                         # to update timestamp by file hash
-                        if dest_provider in ADDON_METHOD_PROVIDER and action in (NodeLog.FILE_MOVED, NodeLog.FILE_RENAMED):
-                            metadata['path'] = metadata.get('dest_path')
-                            file_node.touch(
-                                request.headers.get('Authorization'),
-                                **dict(
-                                    extras,
-                                    cookie=user.get_or_create_cookie().decode()
-                                ),
-                                parent_id=dest_root_folder_id,
-                                dest_path='/' + metadata.get('dest_path')
+                        file_node.touch(
+                            request.headers.get('Authorization'),
+                            **dict(
+                                extras,
+                                cookie=user.get_or_create_cookie().decode()
                             )
+                        )
+                    # If move to bulkmount reset path
+                    fileinfo = FileInfo.objects.filter(file_id=file_node.id).last()
+                    if fileinfo is None:
+                        FileInfo.objects.create(file=file_node, file_size=metadata.get('dest_size'))
+                    if provider in ADDON_METHOD_PROVIDER:
+                        check_path = '/' + metadata['src_path'].lstrip('/')
+                        logger.warning(f'check_path is {check_path}')
+                        if provider == 'onedrivebusiness' and metadata['src_materialized']:
+                            # If source provider is onedrivebusiness will remove old base filenode
+                            logger.debug('materialized_path is ' + str(metadata['src_materialized']))
+                            old_file_nodes = BaseFileNode.objects.filter(target_object_id=node.id,
+                                                                    provider=provider,
+                                                                    deleted_on__isnull=True,
+                                                                    _materialized_path='/' + metadata['src_materialized'].lstrip('/'),
+                                                                parent_id=root_folder_id).all()
                         else:
-                            file_node.touch(
-                                request.headers.get('Authorization'),
-                                **dict(
-                                    extras,
-                                    cookie=user.get_or_create_cookie().decode()
-                                ),
-                                parent_id=root_folder_id
-                            )
-
+                            old_file_nodes = BaseFileNode.objects.filter(target_object_id=node.id,
+                                                                            provider=provider,
+                                                                            deleted_on__isnull=True,
+                                                                            _path='/' + metadata['src_path'].lstrip('/'),
+                                                                            parent_id=root_folder_id).all()
+                        if old_file_nodes:
+                            for old_file_node in old_file_nodes:
+                                logger.debug(f'old_file_node id is {old_file_node.id}')
+                                old_file_node.delete()
             elif metadata.get('kind') == 'folder' and dest_provider in ADDON_METHOD_PROVIDER:
                 if provider in ADDON_METHOD_PROVIDER:
                     old_file_nodes = BaseFileNode.objects.filter(target_object_id=node.id,
@@ -904,7 +889,19 @@ def create_waterbutler_log(payload, **kwargs):
                         elif child.get('children'):
                             create_child_file_node(child, dest_root_folder_id)
             else:
-                create_child_fileinfo(metadata)
+                if provider in ADDON_METHOD_PROVIDER:
+                    logger.warning(f'src_path for move folder is {src_path}')
+                    old_file_nodes = BaseFileNode.objects.filter(target_object_id=node.id,
+                                                             provider=provider,
+                                                             deleted_on__isnull=True,
+                                                             _materialized_path__startswith='/' + src_path.lstrip('/'),
+                                                             parent_id=root_folder_id).all()
+                    if old_file_nodes:
+                        for old_file_node in old_file_nodes:
+                            logger.debug(f'old_file_node id is {old_file_node.id}')
+                            old_file_node.delete()
+                if dest_provider == 'osfstorage':
+                    create_child_fileinfo(metadata)
 
     def prepare_copy(dest_provider, dest_root_folder_id):
         with transaction.atomic():
@@ -985,7 +982,7 @@ def create_waterbutler_log(payload, **kwargs):
                                               created_flag)
 
     elif file_node_moved:
-        prepare_file_node(src_provider, root_folder_id=root_folder_id, dest_root_folder_id=dest_root_id, dest_provider=dest_provider)
+        prepare_move(src_provider, root_folder_id=root_folder_id, dest_root_folder_id=dest_root_id, dest_provider=dest_provider)
         with transaction.atomic():  # long transaction
             timestamp.file_node_moved(auth.user.id, node._id,
                                       src_provider, dest_provider,

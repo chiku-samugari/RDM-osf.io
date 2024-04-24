@@ -124,7 +124,9 @@ def update_used_quota(self, target, user, event_type, payload):
     # Case move/copy
     if not provider and payload.get('destination'):
         provider = payload['destination']['provider']
-    if provider not in ENABLE_QUOTA_PROVIDERS:
+    if payload.get('source'):
+        src_provider = payload['source']['provider']
+    if (provider and src_provider) not in ENABLE_QUOTA_PROVIDERS :
         return
     kind = data.get('kind')
     # Case move
