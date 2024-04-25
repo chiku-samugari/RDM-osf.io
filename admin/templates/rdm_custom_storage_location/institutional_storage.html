@@ -59,10 +59,9 @@
         white-space: nowrap;
     }
 
-    .right-button-element {
-        display: flex;
-        justify-content: right;
-    }
+        .right-button-element {
+            text-align: right;
+        }
 
     .right-button-element .btn-default {
         margin-right: 10px;
@@ -89,7 +88,7 @@
             </div>
             <div class="row form-inline storage-name">
                 <div class="form-group">
-                    <label for="providers" style="width:80px;">{% trans "Provider" %}:</label>
+                    <label for="storage_name" style="width:80px;">{% trans "Provider" %}:</label>
                     <select id="providers" name="options" class="form-control">
                         {% for provider_item in providers %}
                             <option value="{{ provider_item.short_name }}">{{ provider_item.full_name }}</option>

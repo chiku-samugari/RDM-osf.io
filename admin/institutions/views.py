@@ -468,7 +468,7 @@ class RecalculateQuota(RdmPermissionMixin, RedirectView):
             for institution in institutions_list:
                 user_list = OSFUser.objects.filter(affiliated_institutions=institution)
                 for user in user_list:
-                    quota.recalculate_used_of_user_by_region(user._id)
+                    quota.recalculate_used_of_user_by_region(user.id)
 
         return redirect('institutions:institution_list')
 
@@ -501,7 +501,7 @@ class RecalculateQuotaOfUsersInInstitution(RdmPermissionMixin, UserPassesTestMix
         # If region not exist, will ignore in recalculate_used_of_user_by_region method
         if self.region:
             for user in OSFUser.objects.filter(affiliated_institutions=institution.id):
-                quota.recalculate_used_of_user_by_region(user._id, self.region_id)
+                quota.recalculate_used_of_user_by_region(user.id, self.region_id)
 
         return redirect('institutions:statistical_status_default_storage', region_id=self.region_id)
 

@@ -131,7 +131,7 @@ def build_addon_root(node_settings, name, permissions=None,
     ret.update(kwargs)
 
     if hasattr(node_settings, 'region'):
-        ret.update({'nodeRegion': node_settings.region.name})
+        ret.update({'nodeRegion': node_settings.region.name if node_settings.region.name else node_settings .config.full_name})
         ret.update({'waterbutlerURL': node_settings.region.waterbutler_url})
         is_readonly = check_authentication_attribute(
             user,

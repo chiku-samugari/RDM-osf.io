@@ -105,7 +105,7 @@ def get_storage_quota_info(user, region):
     except UserStorageQuota.DoesNotExist:
         return (
             api_settings.DEFAULT_MAX_QUOTA,
-            recalculate_used_of_user_by_region(user._id, region.id)
+            recalculate_used_of_user_by_region(user.id, region.id)
         )
 
 
@@ -120,11 +120,13 @@ def get_project_storage_type(node):
 def update_used_quota(self, target, user, event_type, payload):
     data = dict(payload.get('metadata', {}))
     provider = data.get('provider')
+    src_provider = None
     # Case move/copy
     if not provider and payload.get('destination'):
         provider = payload['destination']['provider']
-
-    if provider not in ENABLE_QUOTA_PROVIDERS:
+    if payload.get('source'):
+        src_provider = payload['source']['provider']
+    if provider not in ENABLE_QUOTA_PROVIDERS and src_provider not in ENABLE_QUOTA_PROVIDERS :
         return
 
     kind = data.get('kind')
@@ -562,14 +564,10 @@ def recalculate_used_quota_by_user(user_id, storage_type=UserQuota.NII_STORAGE):
 
     :param str user_id: The user is recalculated
     """
-    guid = Guid.objects.get(
-        _id=user_id,
-        content_type_id=ContentType.objects.get_for_model(OSFUser).id
-    )
     projects = AbstractNode.objects.filter(
         projectstoragetype__storage_type=storage_type,
         is_deleted=False,
-        creator_id=guid.object_id
+        creator_id=user_id
     )
 
     if projects is not None:
@@ -591,7 +589,7 @@ def recalculate_used_quota_by_user(user_id, storage_type=UserQuota.NII_STORAGE):
         for region_id in used_quota_result:
             try:
                 storage_quota = UserStorageQuota.objects.select_for_update().get(
-                    user_id=guid.object_id,
+                    user_id=user_id,
                     region_id=region_id
                 )
                 storage_quota.used = used_quota_result[region_id]
@@ -612,14 +610,10 @@ def recalculate_used_of_user_by_region(user_id, region_id=NII_STORAGE_REGION_ID)
     else:
         storage_type = UserQuota.CUSTOM_STORAGE
 
-    guid = Guid.objects.get(
-        _id=user_id,
-        content_type_id=ContentType.objects.get_for_model(OSFUser).id
-    )
     projects = AbstractNode.objects.filter(
         projectstoragetype__storage_type=storage_type,
         is_deleted=False,
-        creator_id=guid.object_id
+        creator_id=user_id
     )
 
     used = 0
@@ -639,7 +633,7 @@ def recalculate_used_of_user_by_region(user_id, region_id=NII_STORAGE_REGION_ID)
 
     try:
         storage_quota = UserStorageQuota.objects.select_for_update().get(
-            user_id=guid.object_id,
+            user_id=user_id,
             region_id=region_id
         )
         storage_quota.used = used
@@ -831,7 +825,7 @@ def file_copied(target, payload):
                     _des_path = payload['destination']['root_path'] + '/' + payload['destination']['materialized']
                 node_addon_destination = get_addon_osfstorage_by_path(
                     target,
-                    _des_path,
+                    payload['destination']['path'] if payload['destination']['kind'] == 'file' else payload['destination']['root_path'] + '/' + payload['destination']['materialized'],
                     payload['destination']['provider']
                 )
 

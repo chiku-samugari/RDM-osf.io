@@ -19,11 +19,14 @@ def set_region_external_account(region, account):
 
 def set_new_access_token(external_account, region=None):
     if region is None:
-        region_external_account = RegionExternalAccount.objects.filter(external_account=external_account).first()
-        if region_external_account is not None:
-            region = region_external_account.region
-    region.waterbutler_credentials['storage']['token'] = external_account.oauth_key
-    region.save()
+        region_externals = RegionExternalAccount.objects.filter(external_account=external_account)
+        for region_external in region_externals:
+            region = region_external.region
+            region.waterbutler_credentials['storage']['token'] = external_account.oauth_key
+            region.save()
+    else:
+        region.waterbutler_credentials['storage']['token'] = external_account.oauth_key
+        region.save()
 
 
 def remove_region_external_account(region):

@@ -1957,7 +1957,7 @@ function _fangornModifiedColumn(item, col) {
 function _connectCheckTemplate(item){
     var tb = this;
     return m('span.text-danger', [
-        m('span', item.data.name),
+        m('span', item.data.nodeRegion),
         m('em', ' couldn\'t load.' ),
         m('button.btn.btn-xs.btn-default.m-l-xs', {
             onclick : function(e){
