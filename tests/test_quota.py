@@ -279,12 +279,12 @@ class TestUserStorageQuota(OsfTestCase):
 
     def test_recalculate_used_quota_by_user(self):
         UserStorageQuota.objects.create(user=self.user, region_id=1)
-        quota.recalculate_used_quota_by_user(self.user._id, storage_type=UserQuota.CUSTOM_STORAGE)
+        quota.recalculate_used_quota_by_user(self.user.id, storage_type=UserQuota.CUSTOM_STORAGE)
         user_storage_quota = UserStorageQuota.objects.get(user=self.user, region_id=1)
         assert_equal(user_storage_quota.used, 900)
 
     def test_recalculate_used_quota_by_user_not_found(self):
-        res = quota.recalculate_used_quota_by_user(self.user._id, storage_type=UserQuota.CUSTOM_STORAGE)
+        res = quota.recalculate_used_quota_by_user(self.user.id, storage_type=UserQuota.CUSTOM_STORAGE)
         assert_is_none(res)
 
     def test_get_file_ids_by_institutional_storage(self):
@@ -1050,7 +1050,7 @@ class TestSaveUsedQuota(OsfTestCase):
             user=self.project_creator
         )
         assert_equal(user_quota.used, 5500)
-        mock_logger.warning.assert_called_with('FileNode not found, cannot update used quota!')
+        mock_logger.warning.assert_called_with('BaseFileNode not found, cannot update used quota!')
 
     @mock.patch('website.util.quota.logging')
     def test_delete_file_without_fileinfo(self, mock_logging):

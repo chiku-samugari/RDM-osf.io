@@ -19,7 +19,7 @@ from admin.rdm_addons.utils import get_rdm_addon_option
 from addons.base import exceptions
 from addons.base.models import BaseNodeSettings, BaseStorageAddon
 from framework.auth import Auth
-from website.util import check_authentication_attribute
+from website.util.rubeus import check_authentication_attribute
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +225,7 @@ class InstitutionsStorageAddon(BaseStorageAddon):
                     cls.create_folder(client, base_folder, folder_name)
                     try:
                         osfstorage_nodesetting = NodeSettings.objects.filter(owner_id=node.get_root().id, is_deleted=False, region_id=region.id).first()
-                        addon = node.add_addon(addon_name, auth=Auth(node.creator),
+                        addon = node.add_addon(addon_name, auth=auth,
                                             log=True, region_id=region.id)
                         addon.set_addon_option(addon_option)
                         addon.set_folder_id(folder_name)

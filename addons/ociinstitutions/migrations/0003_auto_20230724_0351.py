@@ -7,15 +7,15 @@ import django.db.models.deletion
 
 
 def add_region_and_root_id_value(apps, schema_editor):
-    OciNodeSettings = apps.get_model('addons_ociinstitutions', 'nodesettings')
-    OsfNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
-    for osfnodesettings in OsfNodeSettings.objects.all():
-        ociNodeSettings = OciNodeSettings.objects.filter(owner_id=osfnodesettings.owner_id)
-        if ociNodeSettings.exists():
-            for oci in ociNodeSettings:
-                oci.region_id = osfnodesettings.region_id
-                oci.root_node_id = osfnodesettings.root_node_id
-                oci.save()
+    OciInstNodeSettings = apps.get_model('addons_ociinstitutions', 'nodesettings')
+    OsfStorageNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
+    for node_settings in OsfStorageNodeSettings.objects.all():
+        OciInstNodeSettings.objects.filter(
+            owner_id=node_settings.owner_id
+        ).update(
+            region_id=node_settings.region_id,
+            root_node_id=node_settings.root_node_id,
+        )
 
 
 def noop(*args):

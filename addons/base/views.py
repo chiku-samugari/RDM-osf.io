@@ -820,7 +820,7 @@ def create_waterbutler_log(payload, **kwargs):
                     file_node = BaseFileNode.resolve_class(
                         dest_provider, BaseFileNode.FILE
                     ).get_or_create(node, '/' + metadata['dest_path'].lstrip('/'))
-                if file_node: 
+                if file_node:
                     # Update parent_id by destination root node id
                     if dest_root_folder_id and dest_provider in ADDON_METHOD_PROVIDER:
                         file_node.parent_id = dest_root_folder_id

@@ -18,12 +18,12 @@ from addons.osfstorage.models import Region
 from admin.rdm.utils import RdmPermissionMixin
 from admin.rdm_custom_storage_location import utils
 from api.base import settings as api_settings
-from framework.exceptions import HTTPError
 from osf.models import Institution, OSFUser, AuthenticationAttribute
 from osf.models.external import ExternalAccountTemporary
 from scripts import refresh_addon_tokens
 from website import settings as osf_settings
 from distutils.util import strtobool
+from admin.rdm.utils import get_institution_id_by_region
 
 logger = logging.getLogger(__name__)
 
@@ -655,8 +655,6 @@ class CheckExistingStorage(InstitutionalStorageBaseView, View):
             return JsonResponse(response, status=http_status.HTTP_409_CONFLICT)
 
 
-
-
 class ChangeAuthenticationAttributeView(InstitutionalStorageBaseView, View):
     raise_exception = True
 
@@ -761,13 +759,13 @@ class DeleteAttributeFormView(InstitutionalStorageBaseView, View):
             )
         except ValueError:
             return JsonResponse(
-                {"message": "The AuthenticationAttribute id must be a integer"},
+                {'message': 'The AuthenticationAttribute id must be a integer'},
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
         except AuthenticationAttribute.DoesNotExist:
             return JsonResponse(
                 {
-                    "message": f"The AuthenticationAttribute with id {attribute_id} is not exist"
+                    'message': f'The AuthenticationAttribute with id {attribute_id} is not exist'
                 },
                 status=http_status.HTTP_404_NOT_FOUND,
             )
@@ -851,15 +849,15 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
         if not data:
             return JsonResponse({'message': 'The request body data is required'},
                                  status=http_status.HTTP_400_BAD_REQUEST)
-        region_id = data.get("region_id", None)
-        allow = data.get("allow", None)
-        readonly = data.get("readonly", None)
-        allow_expression = data.get("allow_expression", None)
-        readonly_expression = data.get("readonly_expression", None)
-        storage_name = data.get("storage_name", None)
+        region_id = data.get('region_id', None)
+        allow = data.get('allow', None)
+        readonly = data.get('readonly', None)
+        allow_expression = data.get('allow_expression', None)
+        readonly_expression = data.get('readonly_expression', None)
+        storage_name = data.get('storage_name', None)
         if region_id is None or allow is None or readonly is None:
             return JsonResponse(
-                {"message": "Missing required parameter"},
+                {'message': 'Missing required parameter'},
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
@@ -875,7 +873,7 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
 
             if not is_valid_allow or not is_valid_readonly:
                 return JsonResponse(
-                    {"message": "Invalid condition."},
+                    {'message': 'Invalid condition.'},
                     status=http_status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -885,7 +883,7 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
                     is_deleted=False,
                     attribute_name__isnull=False,
                     attribute_value__isnull=False,
-                ).values_list("index_number", flat=True)
+                ).values_list('index_number', flat=True)
             )
             is_valid_allow = utils.validate_index_number_not_found(
                 allow_expression, index_numbers
@@ -896,7 +894,7 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
 
             if not is_valid_allow or not is_valid_readonly:
                 return JsonResponse(
-                    {"message": "Invalid condition."},
+                    {'message': 'Invalid condition.'},
                     status=http_status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -926,14 +924,14 @@ class SaveInstitutionalStorageView(InstitutionalStorageBaseView, View):
         except ValueError:
             return JsonResponse(
                 {
-                    "message": "The Region id must be a integer"
+                    'message': 'The Region id must be a integer'
                 },
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
         except Region.DoesNotExist:
             return JsonResponse(
                 {
-                    "message": f"The Region with id {region_id} is not exist"
+                    'message': f'The Region with id {region_id} is not exist'
                 },
                 status=http_status.HTTP_404_NOT_FOUND,
             )

@@ -164,6 +164,7 @@ class TestAppS3CompatInstitutions(OsfTestCase):
         self.project.add_addon('s3compatinstitutions', auth=self.auth)
 
         self.node_settings = self.project.get_addon('s3compatinstitutions')
+        self.node_settings.save()
 
     def test_s3compat_institutions_root(self):
         institution = InstitutionFactory(_id=123456)
@@ -175,7 +176,6 @@ class TestAppS3CompatInstitutions(OsfTestCase):
         self.node_settings.addon_option = get_rdm_addon_option(institution.id, self.ADDON_SHORT_NAME).first()
         self.node_settings.region = region
         self.node_settings.root_node = BaseFileNode()
-        self.node_settings.save()
 
         result = s3compatinstitutions_root(addon_config='', node_settings=self.node_settings, auth=self.auth)
 

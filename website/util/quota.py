@@ -126,7 +126,7 @@ def update_used_quota(self, target, user, event_type, payload):
         provider = payload['destination']['provider']
     if payload.get('source'):
         src_provider = payload['source']['provider']
-    if provider not in ENABLE_QUOTA_PROVIDERS and src_provider not in ENABLE_QUOTA_PROVIDERS :
+    if provider not in ENABLE_QUOTA_PROVIDERS and src_provider not in ENABLE_QUOTA_PROVIDERS:
         return
 
     kind = data.get('kind')
@@ -825,7 +825,7 @@ def file_copied(target, payload):
                     _des_path = payload['destination']['root_path'] + '/' + payload['destination']['materialized']
                 node_addon_destination = get_addon_osfstorage_by_path(
                     target,
-                    payload['destination']['path'] if payload['destination']['kind'] == 'file' else payload['destination']['root_path'] + '/' + payload['destination']['materialized'],
+                    _des_path,
                     payload['destination']['provider']
                 )
 

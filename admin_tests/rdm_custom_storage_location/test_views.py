@@ -1,14 +1,12 @@
 from django.test import RequestFactory
 from django.http import Http404, HttpResponse
 import json
-import mock
 from nose import tools as nt
 
 from admin_tests.utilities import setup_user_view
 from admin.rdm_custom_storage_location import views
 from addons.osfstorage.models import Region
 from api.base import settings as api_settings
-from framework.exceptions import HTTPError
 from osf.models import AuthenticationAttribute
 from tests.base import AdminTestCase
 from osf_tests.factories import (
@@ -1169,7 +1167,7 @@ class TestSaveAttributeFormView(AdminTestCase):
         nt.assert_equal(response.status_code, 404)
 
     def test_save_attribute_is_not_deleted(self):
-        attribute = AuthenticationAttributeFactory()
+        attribute = AuthenticationAttributeFactory(institution=self.institution)
         attribute_name_test = 'mail'
         attribute_value_test = 'admin'
         self.request = RequestFactory().post(
@@ -1708,7 +1706,7 @@ class TestInstitutionalStorageBaseView(AdminTestCase):
         nt.assert_false(setup_user_view(self.view, self.request, user=self.admin_not_inst).test_func())
 
     def test__test_func_admin_has_inst(self):
-        nt.assert_true(setup_user_view(self.view, self.request, user=self.user).test_func())      
+        nt.assert_true(setup_user_view(self.view, self.request, user=self.user).test_func())
 
 
 class TestCheckExistingStorageView(AdminTestCase):
@@ -1810,6 +1808,7 @@ class TestCheckExistingStorageView(AdminTestCase):
         }
         region = RegionFactory(waterbutler_settings=config)
         region._id = self.institution._id
+        region.save()
         request = RequestFactory().post(
             'custom_storage_location:check_existing_storage',
             json.dumps({'provider': 'osfstorage'}),

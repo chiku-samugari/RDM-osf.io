@@ -24,6 +24,7 @@ from framework.exceptions import HTTPError
 from framework.logging import logging
 from admin.rdm.utils import get_institution_id
 from addons.osfstorage.models import Region, NodeSettings as OsfStorageNodeSettings
+from website.util.rubeus import check_authentication_attribute
 
 logger = logging.getLogger(__name__)
 
@@ -438,33 +439,38 @@ def init_addon(node, addon_name):
         team_name, admin_group, admin_dbmid = get_admin_info(
             node, f_option, m_option, f_token, m_token)
         region = regions[index]
-        addon = node.add_addon(addon_name, auth=Auth(node.creator), log=True, region_id=region.id)
-        addon.set_two_options(f_option, m_option)
-        addon.set_admin_dbmid(admin_dbmid)
-        osfstorage_nodesettings = OsfStorageNodeSettings.objects.filter(
-            owner_id=node.get_root().id, is_deleted=False, region_id=region.id
-        ).first()
-        if osfstorage_nodesettings:
-            base_file_node = osfstorage_nodesettings.root_node
-            if base_file_node:
-                addon.set_root_node(base_file_node, save=True)
+        # check permission by authentication attribute
+        is_attribute_allowed = check_authentication_attribute(node.creator,
+                                                                  region.allow_expression,
+                                                                  region.is_allowed)
+        if is_attribute_allowed:
+            addon = node.add_addon(addon_name, auth=Auth(node.creator), log=True, region_id=region.id)
+            addon.set_two_options(f_option, m_option)
+            addon.set_admin_dbmid(admin_dbmid)
+            osfstorage_nodesettings = OsfStorageNodeSettings.objects.filter(
+                owner_id=node.get_root().id, is_deleted=False, region_id=region.id
+            ).first()
+            if osfstorage_nodesettings:
+                base_file_node = osfstorage_nodesettings.root_node
+                if base_file_node:
+                    addon.set_root_node(base_file_node, save=True)
 
-        team_info = utils.TeamInfo(f_token, m_token, admin=True, groups=True)
-        group_id = team_info.group_name_to_id.get(addon.group_name)
-        if group_id:
-            # Already have group_id, set team_folder and group_id to addon
-            team_folder_id = utils.get_team_folder_id(team_info, admin_dbmid, addon.team_folder_name)
-            if team_folder_id:
-                addon.team_folder_id = team_folder_id
-            addon.group_id = group_id
-            addon.save()
-        else:
-            # On post_save of Node, self.owner.contributors is empty.
-            addon.create_team_folder(
-                [utils.eppn_to_email(node.creator.eppn)],
-                admin_group, team_name,
-                save=True
-            )
+            team_info = utils.TeamInfo(f_token, m_token, admin=True, groups=True)
+            group_id = team_info.group_name_to_id.get(addon.group_name)
+            if group_id:
+                # Already have group_id, set team_folder and group_id to addon
+                team_folder_id = utils.get_team_folder_id(team_info, admin_dbmid, addon.team_folder_name)
+                if team_folder_id:
+                    addon.team_folder_id = team_folder_id
+                addon.group_id = group_id
+                addon.save()
+            else:
+                # On post_save of Node, self.owner.contributors is empty.
+                addon.create_team_folder(
+                    [utils.eppn_to_email(node.creator.eppn)],
+                    admin_group, team_name,
+                    save=True
+                )
 
 
 # store values in a short time to detect changed fields
@@ -525,15 +531,20 @@ def node_post_save(sender, instance, created, **kwargs):
             _id=institution_guid, waterbutler_settings__storage__provider='dropboxbusiness'
         ).order_by('id')
         for region in regions:
-            ns = instance.get_addon(addon_name, region_id=region.id)
-            if ns is None or not ns.complete:  # disabled
-                return
-            syncinfo = SyncInfo.get(instance.id)
-            if ns.owner.title != syncinfo.old_node_title:
-                ns.rename_team_folder()
-            if syncinfo.need_to_update_members:
-                ns.sync_members()
-                syncinfo.need_to_update_members = False
+            # check permission by authentication attribute
+            is_attribute_allowed = check_authentication_attribute(instance.creator,
+                                                                  region.allow_expression,
+                                                                  region.is_allowed)
+            if is_attribute_allowed:
+                ns = instance.get_addon(addon_name, region_id=region.id)
+                if ns is None or not ns.complete:  # disabled
+                    return
+                syncinfo = SyncInfo.get(instance.id)
+                if ns.owner.title != syncinfo.old_node_title:
+                    ns.rename_team_folder()
+                if syncinfo.need_to_update_members:
+                    ns.sync_members()
+                    syncinfo.need_to_update_members = False
 
 
 @receiver(post_save, sender=Contributor)

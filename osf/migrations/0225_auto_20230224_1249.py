@@ -7,32 +7,48 @@ from django.db import migrations, models
 import django.db.models.deletion
 import django_extensions.db.fields
 import osf.models.base
+import logging
 from osf.models.storage import StorageType
 from api.base import settings as api_settings
 
+
+logger = logging.getLogger(__name__)
 
 def move_quota_from_user_quota_table(apps, schema_editor):
     UserQuota = apps.get_model('osf', 'UserQuota')
     UserStorageQuota = apps.get_model('osf', 'UserStorageQuota')
     Region = apps.get_model('addons_osfstorage.region')
     OSFUser = apps.get_model('osf.OSFUser')
-    region_id = None
-    for user_quota in UserQuota.objects.all():
-        user = OSFUser.objects.get(id=user_quota.user_id)
-        if user_quota.storage_type == StorageType.NII_STORAGE:
-            region_id = api_settings.NII_STORAGE_REGION_ID
-        else:
+
+    for user in OSFUser.objects.all():
+        # Handle for case has multiple record in database
+        latest_nii_storage_quota = UserQuota.objects.filter(user=user, storage_type=StorageType.NII_STORAGE).order_by('-modified').first()
+        latest_custom_storage_quota = UserQuota.objects.filter(user=user, storage_type=StorageType.CUSTOM_STORAGE).order_by('-modified').first()
+        if latest_nii_storage_quota:
+            # Update storage_type = 1 quota
+            UserStorageQuota.objects.create(
+                user=user,
+                region_id=api_settings.NII_STORAGE_REGION_ID,
+                max_quota=latest_nii_storage_quota.max_quota,
+                used=latest_nii_storage_quota.used
+            )
+
+        if latest_custom_storage_quota:
+            # Update storage_type = 2 quota
             institution = user.affiliated_institutions.first()
-            if institution:
-                region = Region.objects.get(_id=institution._id)
-                region_id = region.id
-        UserStorageQuota.objects.create(
-            user=user,
-            region_id=region_id,
-            max_quota=user_quota.max_quota,
-            used=user_quota.used
-        )
-        user_quota.save()
+            if not institution:
+                continue
+            else:
+                region = Region.objects.filter(_id=institution._id).first()
+                if not region:
+                    logger.warn(f'The institution "{institution._id}" do not have any region')
+                else:
+                    UserStorageQuota.objects.create(
+                        user=user,
+                        region_id=region.id,
+                        max_quota=latest_custom_storage_quota.max_quota,
+                        used=latest_custom_storage_quota.used
+                    )
 
 
 def noop(*args):

@@ -7,15 +7,15 @@ import django.db.models.deletion
 
 
 def add_region_and_root_id_value(apps, schema_editor):
-    OneDriveNodeSettings = apps.get_model('addons_onedrivebusiness', 'nodesettings')
-    OsfNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
-    for osfnodesettings in OsfNodeSettings.objects.all():
-        onedrivenodesettings = OneDriveNodeSettings.objects.filter(owner_id=osfnodesettings.owner_id)
-        if onedrivenodesettings.exists():
-            for onedrive in onedrivenodesettings:
-                onedrive.region_id = osfnodesettings.region_id
-                onedrive.root_node_id = osfnodesettings.root_node_id
-                onedrive.save()
+    OnedriveBusinessNodeSettings = apps.get_model('addons_onedrivebusiness', 'nodesettings')
+    OsfStorageNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
+    for node_settings in OsfStorageNodeSettings.objects.all():
+        OnedriveBusinessNodeSettings.objects.filter(
+            owner_id=node_settings.owner_id
+        ).update(
+            region_id=node_settings.region_id,
+            root_node_id=node_settings.root_node_id,
+        )
 
 
 def noop(*args):

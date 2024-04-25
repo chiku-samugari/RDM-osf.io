@@ -18,7 +18,6 @@ from api.base import settings as api_settings
 from tests.base import AdminTestCase
 from website import settings
 from framework.auth import Auth
-from framework.exceptions import HTTPError
 from osf.models.user import OSFUser
 from osf.models.spam import SpamStatus
 from osf.models import UserQuota, UserStorageQuota
@@ -1108,10 +1107,10 @@ class TestGetUserInstitutionQuota(AdminTestCase):
         )
         request.user = self.user
         view = setup_view(
-                self.view,
-                request,
-                guid=self.user._id
-            )
+            self.view,
+            request,
+            guid=self.user._id
+        )
         view.user = self.user
         with nt.assert_raises(Http404):
             view.get_object()

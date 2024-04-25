@@ -7,15 +7,15 @@ import django.db.models.deletion
 
 
 def add_region_and_root_id_value(apps, schema_editor):
-    S3NodeSettings = apps.get_model('addons_s3compatinstitutions', 'nodesettings')
-    OsfNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
-    for osfnodesettings in OsfNodeSettings.objects.all():
-        s3nodesettings = S3NodeSettings.objects.filter(owner_id=osfnodesettings.owner_id)
-        if s3nodesettings.exists():
-            for s3 in s3nodesettings:
-                s3.region_id = osfnodesettings.region_id
-                s3.root_node_id = osfnodesettings.root_node_id
-                s3.save()
+    S3InstNodeSettings = apps.get_model('addons_s3compatinstitutions', 'nodesettings')
+    OsfStorageNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
+    for node_settings in OsfStorageNodeSettings.objects.all():
+        S3InstNodeSettings.objects.filter(
+            owner_id=node_settings.owner_id
+        ).update(
+            region_id=node_settings.region_id,
+            root_node_id=node_settings.root_node_id,
+        )
 
 
 def noop(*args):

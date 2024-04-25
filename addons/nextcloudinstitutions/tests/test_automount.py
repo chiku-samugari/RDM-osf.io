@@ -170,6 +170,7 @@ class TestAppNextcloudInstitutions(OsfTestCase):
         self.project.add_addon('nextcloudinstitutions', auth=self.auth)
 
         self.node_settings = self.project.get_addon('nextcloudinstitutions')
+        self.node_settings.save()
 
     def test_nextcloud_institutions_root(self):
         institution = InstitutionFactory(_id=123456)
@@ -181,7 +182,6 @@ class TestAppNextcloudInstitutions(OsfTestCase):
         self.node_settings.addon_option = get_rdm_addon_option(institution.id, self.ADDON_SHORT_NAME).first()
         self.node_settings.region = region
         self.node_settings.root_node = BaseFileNode()
-        self.node_settings.save()
 
         result = nextcloudinstitutions_root(addon_config='', node_settings=self.node_settings, auth=self.auth)
 

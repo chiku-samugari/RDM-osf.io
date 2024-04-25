@@ -588,7 +588,7 @@ class TestUpdateQuotaUserListByInstitutionID(AdminTestCase):
             {'maxQuota': 'abc'})
         request.user = self.user1
 
-        response = views.UpdateQuotaUserListByInstitutionID.as_view()(request, institution_id=self.institution.id)  
+        response = views.UpdateQuotaUserListByInstitutionID.as_view()(request, institution_id=self.institution.id)
         self.assertEqual(response.status_code, 400)
 
 
@@ -976,7 +976,7 @@ class TestRecalculateQuotaOfUsersInInstitution(AdminTestCase):
         self.view.request = self.request
         nt.assert_false(self.view.test_func())
 
-    @mock.patch('admin.institutions.views.Region.objects')  
+    @mock.patch('admin.institutions.views.Region.objects')
     def test__test_func_admin_without_permission(self, mock_region):
         mock_region.filter.return_value.first.return_value = self.region
         self.request.user = self.institution2_admin
@@ -1416,8 +1416,7 @@ class TestStatisticalStatusDefaultInstitutionalStorage(AdminTestCase):
             institution_id=self.institution.id,
             region_id=''
         )
-        with nt.assert_raises(Http404):
-            view.get_region()
+        nt.assert_equal(view.get_region(), None)
 
     def test_get_region_have_region_id(self):
         region = RegionFactory(id=10, name='Storage')

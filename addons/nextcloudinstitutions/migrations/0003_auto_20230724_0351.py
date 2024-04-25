@@ -7,15 +7,15 @@ import django.db.models.deletion
 
 
 def add_region_and_root_id_value(apps, schema_editor):
-    NextcloudNodeSettings = apps.get_model('addons_nextcloudinstitutions', 'nodesettings')
-    OsfNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
-    for osfnodesettings in OsfNodeSettings.objects.all():
-        nextcloudnodesettings = NextcloudNodeSettings.objects.filter(owner_id=osfnodesettings.owner_id)
-        if nextcloudnodesettings.exists():
-            for nextcloud in nextcloudnodesettings:
-                nextcloud.region_id = osfnodesettings.region_id
-                nextcloud.root_node_id = osfnodesettings.root_node_id
-                nextcloud.save()
+    NextcloudInstNodeSettings = apps.get_model('addons_nextcloudinstitutions', 'nodesettings')
+    OsfStorageNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
+    for node_settings in OsfStorageNodeSettings.objects.all():
+        NextcloudInstNodeSettings.objects.filter(
+            owner_id=node_settings.owner_id
+        ).update(
+            region_id=node_settings.region_id,
+            root_node_id=node_settings.root_node_id,
+        )
 
 
 def noop(*args):

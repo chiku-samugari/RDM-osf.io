@@ -22,6 +22,7 @@ from addons.onedrivebusiness.client import OneDriveBusinessClient
 from addons.onedrive.models import OneDriveProvider
 from framework.auth.core import Auth
 from osf.models.files import File, Folder, BaseFileNode
+from website.util.rubeus import check_authentication_attribute
 
 
 logger = logging.getLogger(__name__)
@@ -294,25 +295,30 @@ def node_post_save(sender, instance, created, **kwargs):
     ).order_by('id')
 
     for index, region in enumerate(regions):
-        addon = instance.get_addon(SHORT_NAME, region_id=region.id)
-        if addon is None:
-            addon = instance.add_addon(SHORT_NAME, auth=Auth(instance.creator), log=True, region_id=region.id)
+        # check permission by authentication attribute
+        is_attribute_allowed = check_authentication_attribute(instance.creator,
+                                                              region.allow_expression,
+                                                              region.is_allowed)
+        if is_attribute_allowed:
+            addon = instance.get_addon(SHORT_NAME, region_id=region.id)
+            if addon is None:
+                addon = instance.add_addon(SHORT_NAME, auth=Auth(instance.creator), log=True, region_id=region.id)
 
-        region_external_account = get_region_external_account(addon)
+            region_external_account = get_region_external_account(addon)
 
-        if region_external_account is None:
-            continue  # disabled
+            if region_external_account is None:
+                continue  # disabled
 
-        if created:
-            osfstorage_nodesettings = OsfStorageNodeSettings.objects.filter(
-                owner_id=instance.get_root().id,
-                is_deleted=False,
-                region_id=region.id
-            ).first()
-            if osfstorage_nodesettings:
-                base_file_node = osfstorage_nodesettings.root_node
-                if base_file_node:
-                    addon.set_root_node(base_file_node)
-                    addon.save()
+            if created:
+                osfstorage_nodesettings = OsfStorageNodeSettings.objects.filter(
+                    owner_id=instance.get_root().id,
+                    is_deleted=False,
+                    region_id=region.id
+                ).first()
+                if osfstorage_nodesettings:
+                    base_file_node = osfstorage_nodesettings.root_node
+                    if base_file_node:
+                        addon.set_root_node(base_file_node)
+                        addon.save()
 
-        addon.ensure_team_folder(region_external_account)
+            addon.ensure_team_folder(region_external_account)

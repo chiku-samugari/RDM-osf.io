@@ -8,14 +8,14 @@ import django.db.models.deletion
 
 def add_region_and_root_id_value(apps, schema_editor):
     DropboxBusinessNodeSettings = apps.get_model('addons_dropboxbusiness', 'nodesettings')
-    OsfNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
-    for osfnodesettings in OsfNodeSettings.objects.all():
-        dropboxbusinessnodesettings = DropboxBusinessNodeSettings.objects.filter(owner_id=osfnodesettings.owner_id)
-        if dropboxbusinessnodesettings.exists():
-            for dropbox in dropboxbusinessnodesettings:
-                dropbox.region_id = osfnodesettings.region_id
-                dropbox.root_node_id = osfnodesettings.root_node_id
-                dropbox.save()
+    OsfStorageNodeSettings = apps.get_model('addons_osfstorage', 'nodesettings')
+    for node_settings in OsfStorageNodeSettings.objects.all():
+        DropboxBusinessNodeSettings.objects.filter(
+            owner_id=node_settings.owner_id
+        ).update(
+            region_id=node_settings.region_id,
+            root_node_id=node_settings.root_node_id,
+        )
 
 
 def noop(*args):

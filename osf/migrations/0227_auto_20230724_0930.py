@@ -6,15 +6,18 @@ from django.db import migrations
 
 
 def add_parent_id_value(apps, schema_editor):
-    BaseFileNode = apps.get_model('osf', 'basefilenode')
-    rootbasefilenodes = BaseFileNode.objects.filter(is_root=True)
-    if rootbasefilenodes.exists():
-        for rootbasefilenode in rootbasefilenodes:
-            basefilenodes = BaseFileNode.objects.filter(is_root=None, target_object_id=rootbasefilenode.target_object_id)
-            if basefilenodes.exists():
-                for basefilenode in basefilenodes:
-                    basefilenode.parent_id = rootbasefilenode.id
-                    basefilenode.save()
+    BaseFileNode = apps.get_model('osf', 'BaseFileNode')
+    ContentType = apps.get_model('contenttypes', 'ContentType')
+    content_type = ContentType.objects.get(app_label='osf', model='abstractnode')
+    root_base_file_nodes = BaseFileNode.objects.filter(is_root=True)
+    for root_base_file_node in root_base_file_nodes:
+        BaseFileNode.objects.filter(
+            is_root=None,
+            target_object_id=root_base_file_node.target_object_id,
+            target_content_type=content_type,
+        ).update(
+            parent_id=root_base_file_node.id
+        )
 
 
 def noop(*args):

@@ -139,6 +139,7 @@ class TestAppDropboxBusiness(OsfTestCase):
         self.project.add_addon('dropboxbusiness', auth=self.auth)
 
         self.node_settings = self.project.get_addon('dropboxbusiness')
+        self.node_settings.save()
 
     def test_dropbox_business_root(self):
         institution = InstitutionFactory(_id=123456)
@@ -150,8 +151,6 @@ class TestAppDropboxBusiness(OsfTestCase):
         self.node_settings.fileaccess_option = get_rdm_addon_option(institution.id, FILEACCESS_NAME).first()
         self.node_settings.region = region
         self.node_settings.root_node = BaseFileNode()
-        self.node_settings.save()
-
         result = dropboxbusiness_root(addon_config='', node_settings=self.node_settings, auth=self.auth)
 
         assert isinstance(result, list)

@@ -639,6 +639,7 @@ function doItemOp(operation, to, from, rename, conflict) {
     orderFolder.call(tb, from.parent());
 
     var moveSpec;
+    var to_path;
     if (operation === OPERATIONS.RENAME) {
         moveSpec = {
             action: 'rename',
@@ -646,16 +647,20 @@ function doItemOp(operation, to, from, rename, conflict) {
             conflict: conflict
         };
     } else if (operation === OPERATIONS.COPY) {
+        if (ADDON_PROVIDER.includes(to.data.provider) && to.data.root_path !== undefined && to.data.root_path != null) {
+            to_path = '/' + to.data.root_path + to.data.path || '/';
+        } else {
+            to_path = to.data.path || '/';
+        }
         moveSpec = {
             action: 'copy',
-            path: to.data.path || '/',
+            path: to_path,
             conflict: conflict,
             resource: to.data.nodeId,
             provider: to.data.provider,
             size: from.data.size,
         };
     } else if (operation === OPERATIONS.MOVE) {
-        var to_path = '/';
         if (ADDON_PROVIDER.includes(to.data.provider) &&
             to.data.root_path !== undefined &&
             to.data.root_path != null) {
@@ -1198,6 +1203,7 @@ function _uploadFolderEvent(event, item, mode, col) {
         total_files_size = parseFloat(total_files_size).toFixed(2);
         var quota = null;
         var storage_quota;
+        var storage_quota_data;
 
         if (!item.data.provider) {
             return;
@@ -1214,11 +1220,19 @@ function _uploadFolderEvent(event, item, mode, col) {
             return;
         }
 
-        var storage_quota_data = {
-            root_path: item.data.path.split('/')[0],
-            provider: item.data.provider,
-            path: item.data.path,
-        };
+
+        if (item.data.path!== undefined){
+            storage_quota_data = {
+                root_path: item.data.path.split('/')[0],
+                provider: item.data.provider,
+                path: item.data.path,
+            };
+        }else{
+            storage_quota_data = {
+                provider: item.data.provider,
+                path: item.data.path,
+            };
+        }
         storage_quota = $.ajax({
             async: false,
             method: 'POST',
@@ -3502,11 +3516,19 @@ tbOptions = {
         var msgText;
         var quota;
         var storage_quota;
-        var storage_quota_data = {
-            root_path: item.data.path.split('/')[0],
-            provider: item.data.provider,
-            path: item.data.path,
-        };
+        var storage_quota_data;
+        if (item.data.path!== undefined){
+            storage_quota_data = {
+                root_path:item.data.path.split('/')[0],
+                provider:item.data.provider,
+                path:item.data.path,
+            };
+        }else{
+            storage_quota_data = {
+                provider:item.data.provider,
+                path:item.data.path,
+            };
+        }
         if (_fangornCanDrop(treebeard, item)) {
             if (item.data.accept && item.data.accept.maxSize) {
                 size = file.size / 1000000;

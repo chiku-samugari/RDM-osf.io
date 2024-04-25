@@ -163,6 +163,7 @@ class TestAppOCIInstitutions(OsfTestCase):
         self.project.add_addon('ociinstitutions', auth=self.auth)
 
         self.node_settings = self.project.get_addon('ociinstitutions')
+        self.node_settings.save()
 
     def test_oci_institutions_root(self):
         institution = InstitutionFactory(_id=123456)
@@ -174,7 +175,6 @@ class TestAppOCIInstitutions(OsfTestCase):
         self.node_settings.addon_option = get_rdm_addon_option(institution.id, self.ADDON_SHORT_NAME).first()
         self.node_settings.region = region
         self.node_settings.root_node = BaseFileNode()
-        self.node_settings.save()
 
         result = ociinstitutions_root(addon_config='', node_settings=self.node_settings, auth=self.auth)
 
