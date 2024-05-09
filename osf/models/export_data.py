@@ -321,6 +321,9 @@ class ExportData(base.BaseModel):
         node_id = self.EXPORT_DATA_FAKE_NODE_ID
         provider = self.location.provider_name
         path = '/'
+        # When export to dropboxbusiness will apply force_retry handle for issue#119
+        if provider == 'dropboxbusiness':
+            kwargs['force_retry'] = True
         url = waterbutler_api_url_for(
             node_id, provider, path=path,
             name=self.export_data_folder_name,
@@ -366,6 +369,9 @@ class ExportData(base.BaseModel):
         provider = self.location.provider_name
         path = self.export_data_folder_path
         file_name = kwargs.get('file_name', self.get_export_data_filename(self.location.institution_guid))
+        # When export to dropboxbusiness will apply force_retry handle for issue#119
+        if provider == 'dropboxbusiness':
+            kwargs['force_retry'] = True
         with open(file_path, 'rb') as fp:
             url = waterbutler_api_url_for(
                 node_id, provider, path=path,
@@ -476,6 +482,9 @@ class ExportData(base.BaseModel):
         node_id = self.EXPORT_DATA_FAKE_NODE_ID
         provider = self.location.provider_name
         path = self.export_data_folder_path
+        # When export to dropboxbusiness will apply force_retry handle for issue#119
+        if provider == 'dropboxbusiness':
+            kwargs['force_retry'] = True
         url = waterbutler_api_url_for(
             node_id, provider, path=path,
             name=self.EXPORT_DATA_FILES_FOLDER,
