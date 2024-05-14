@@ -3583,6 +3583,7 @@ Fangorn.ButtonEvents = {
     _removeEvent : _removeEvent,
     createFolder : _createFolder,
     _gotoFileEvent : gotoFileEvent,
+    _uploadFolderEvent : _uploadFolderEvent,
 };
 
 Fangorn.DefaultColumns = {
