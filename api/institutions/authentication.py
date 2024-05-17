@@ -406,7 +406,7 @@ class InstitutionAuthentication(BaseAuthentication):
         if not user.is_affiliated_with_institution(institution):
             user.affiliated_institutions.add(institution)
             user.save()
-            update_default_storage(user)
+        update_default_storage(user)
 
         # update every login. (for mAP API v1)
         init_cloud_gateway_groups(user, provider)
