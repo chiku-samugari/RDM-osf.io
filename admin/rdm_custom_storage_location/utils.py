@@ -40,11 +40,13 @@ from addons.base.institutions_utils import (KEYNAME_BASE_FOLDER,
                                             sync_all)
 from framework.exceptions import HTTPError
 from website import settings as osf_settings
+from osf.models import OSFUser
 from osf.models.external import ExternalAccountTemporary, ExternalAccount
 from osf.utils import external_util
 import datetime
 
 from website.util import inspect_info  # noqa
+from website.util.quota import update_default_storage
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +171,10 @@ def update_storage(institution_id, storage_name, wb_credentials, wb_settings):
         region.waterbutler_settings = wb_settings
         region.save()
     return region
+
+def update_users_storage(institution):
+    for osfuser in OSFUser.objects.filter(affiliated_institutions=institution.id):
+        update_default_storage(osfuser)
 
 def transfer_to_external_account(user, institution_id, provider_short_name):
     temp_external_account = ExternalAccountTemporary.objects.filter(_id=institution_id, provider=provider_short_name).first()
