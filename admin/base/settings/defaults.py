@@ -259,7 +259,7 @@ ROOT_URLCONF = 'admin.base.urls'
 WSGI_APPLICATION = 'admin.base.wsgi.application'
 ADMIN_BASE = ''
 STATIC_URL = '/static/'
-LOGIN_URL = 'account/login/'
+LOGIN_URL = '/account/login/'
 LOGIN_REDIRECT_URL = ADMIN_BASE
 
 STATIC_ROOT = os.path.join(os.path.dirname(BASE_DIR), 'static_root')
@@ -353,3 +353,28 @@ TEMPORARY_PATH = '/tmp/'
 
 # Time out for calling copy API
 EACH_FILE_EXPORT_TIME_OUT = 1800
+
+# Login access authentication attribute list
+ATTRIBUTE_NAME_LIST = [
+    'mail',
+    'sn',
+    'o',
+    'ou',
+    'givenName',
+    'displayName',
+    'eduPersonAffiliation',
+    'eduPersonPrincipalName',
+    'eduPersonEntitlement',
+    'eduPersonScopedAffiliation',
+    'eduPersonTargetedID',
+    'eduPersonAssurance',
+    'eduPersonUniqueId',
+    'eduPersonOrcid',
+    'isMemberOf',
+    'jasn',
+    'jaGivenName',
+    'jaDisplayName',
+    'jao',
+    'jaou',
+    'gakuninScopedPersonalUniqueCode',
+]
