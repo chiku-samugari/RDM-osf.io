@@ -9,7 +9,10 @@ urlpatterns = [
         name='update_quota_institution_user_list'),
     url(r'^user_list_by_institution_id/(?P<institution_id>[0-9]+)/(?P<region_id>[0-9]+)/$',
         views.UserListByInstitutionStorageID.as_view(), name='institution_user_list'),
+    url(r'^institutional_storages/$',
+        views.ProviderListByInstitution.as_view(),
+        name='affiliated_institutional_storages'),
     url(r'^institutional_storages/(?P<institution_id>[0-9]+)/$', views.ProviderListByInstitution.as_view(),
-        name='institutional_storages'),
+        name=views.ProviderListByInstitution.view_name),
     url(r'^icon/(?P<addon_name>\w+)/(?P<icon_filename>\w+\.\w+)$', views.IconView.as_view(), name='icon'),
 ]

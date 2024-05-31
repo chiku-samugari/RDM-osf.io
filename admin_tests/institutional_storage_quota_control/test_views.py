@@ -5,7 +5,7 @@ from addons.osfstorage.models import Region
 from admin.institutional_storage_quota_control import views
 from django.http import Http404
 from django.test import RequestFactory
-from django.urls import reverse
+from django.urls import reverse, resolve
 from nose import tools as nt
 
 from osf.models import UserQuota, UserStorageQuota
@@ -763,19 +763,6 @@ class TestIconView(AdminTestCase):
 class TestProviderListByInstitution(AdminTestCase):
     def setUp(self):
         super(TestProviderListByInstitution, self).setUp()
-        self.user = AuthUserFactory(fullname='fullname')
-        self.user.is_registered = True
-        self.user.is_active = True
-        self.user.is_superuser = True
-        self.institution = InstitutionFactory()
-        self.institution_1 = InstitutionFactory()
-        self.institution_2 = InstitutionFactory()
-        self.region = RegionFactory(_id=self.institution._id, name='Storage')
-        self.region_1 = RegionFactory(_id=self.institution_1._id,
-                                      name='Storage_1')
-        self.user.affiliated_institutions.add(self.institution)
-        self.user.save()
-
         self.anon = AnonymousUser()
 
         self.normal_user = AuthUserFactory(fullname='normal_user')
@@ -790,54 +777,43 @@ class TestProviderListByInstitution(AdminTestCase):
 
         self.admin_not_inst = AuthUserFactory(fullname='admin_without_ins')
         self.admin_not_inst.is_staff = True
+        self.admin_not_inst.is_superuser = False
         self.admin_not_inst.save()
 
+        self.institution = InstitutionFactory()
+        self.institution_admin = AuthUserFactory(fullname='admin000_inst00')
+        self.institution_admin.is_superuser = True
+        self.institution_admin.is_superuser = False
+        self.institution_admin.affiliated_institutions.add(self.institution)
+        self.institution_admin.save()
+
+        self.institution_1 = InstitutionFactory()
+        self.region_1 = RegionFactory(_id=self.institution_1._id, name='Storage_inst1_1')
         self.institution1_admin = AuthUserFactory(fullname='admin001_inst01')
         self.institution1_admin.is_staff = True
+        self.institution1_admin.is_superuser = False
         self.institution1_admin.affiliated_institutions.add(self.institution_1)
         self.institution1_admin.save()
 
+        self.institution_2 = InstitutionFactory()
+        self.region_inst2_1 = RegionFactory(_id=self.institution_2._id, name='Storage_inst2_1')
+        self.region_inst2_2 = RegionFactory(_id=self.institution_2._id, name='Storage_inst2_2')
         self.institution2_admin = AuthUserFactory(fullname='admin001_inst02')
         self.institution2_admin.is_staff = True
+        self.institution2_admin.is_superuser = False
         self.institution2_admin.affiliated_institutions.add(self.institution_2)
         self.institution2_admin.save()
 
         self.view = views.ProviderListByInstitution.as_view()
 
-    def test_get_context_data(self):
-        request = RequestFactory().get(
-            reverse(
-                'institutional_storage_quota_control:institutional_storages',
-                kwargs={'institution_id': self.institution.id}
-            )
-        )
-        request.user = self.user
-        self.view(
-            request,
-            institution_id=self.institution.id
-        )
-
-    def test_get_order_by(self):
-        request = RequestFactory().get(
-            reverse(
-                'institutional_storage_quota_control:institutional_storages',
-                kwargs={'institution_id': self.institution.id}
-            ),
-            {'order_by': 'provider', 'status': 'abc'}
-        )
-        request.user = self.user
-        self.view(
-            request,
-            institution_id=self.institution.id
-        )
-
     def test_permission_anonymous(self):
-        request = RequestFactory().get(
-            reverse(
-                'institutional_storage_quota_control:institutional_storages',
-                kwargs={'institution_id': self.institution.id}
-            )
+        # specific institution
+        url = reverse(
+            'institutional_storage_quota_control:institutional_storages',
+            kwargs={'institution_id': self.institution.id}
         )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
         request.user = self.anon
         with nt.assert_raises(PermissionDenied):
             self.view(
@@ -845,13 +821,24 @@ class TestProviderListByInstitution(AdminTestCase):
                 institution_id=self.institution.id
             )
 
-    def test_permission_normal_user(self):
-        request = RequestFactory().get(
-            reverse(
-                'institutional_storage_quota_control:institutional_storages',
-                kwargs={'institution_id': self.institution.id}
-            )
+        # affiliated institution
+        url = reverse(
+            'institutional_storage_quota_control:affiliated_institutional_storages',
         )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.anon
+        with nt.assert_raises(PermissionDenied):
+            self.view(request)
+
+    def test_permission_normal_user(self):
+        # specific institution
+        url = reverse(
+            'institutional_storage_quota_control:institutional_storages',
+            kwargs={'institution_id': self.institution.id}
+        )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
         request.user = self.normal_user
         with nt.assert_raises(PermissionDenied):
             self.view(
@@ -859,27 +846,77 @@ class TestProviderListByInstitution(AdminTestCase):
                 institution_id=self.institution.id
             )
 
-    def test_permission_super(self):
-        request = RequestFactory().get(
-            reverse(
-                'institutional_storage_quota_control:institutional_storages',
-                kwargs={'institution_id': self.institution.id}
-            )
+        # affiliated institution
+        url = reverse(
+            'institutional_storage_quota_control:affiliated_institutional_storages',
         )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.normal_user
+        with nt.assert_raises(PermissionDenied):
+            self.view(request)
+
+    def test_permission_super(self):
+        # institution (no custom)
+        url = reverse(
+            'institutional_storage_quota_control:institutional_storages',
+            kwargs={'institution_id': self.institution.id}
+        )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.superuser
+        with nt.assert_raises(Http404):
+            self.view(
+                request,
+                institution_id=self.institution.id
+            )
+
+        # institution 1 (1 storage)
+        url = reverse(
+            'institutional_storage_quota_control:institutional_storages',
+            kwargs={'institution_id': self.institution_1.id}
+        )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
         request.user = self.superuser
         response = self.view(
             request,
-            institution_id=self.institution.id
+            institution_id=self.institution_1.id
         )
         nt.assert_equal(response.status_code, 302)
 
-    def test_permission_admin_without_inst(self):
-        request = RequestFactory().get(
-            reverse(
-                'institutional_storage_quota_control:institutional_storages',
-                kwargs={'institution_id': self.institution.id}
-            )
+        # institution 2 (2 storages)
+        url = reverse(
+            'institutional_storage_quota_control:institutional_storages',
+            kwargs={'institution_id': self.institution_2.id}
         )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.superuser
+        response = self.view(
+            request,
+            institution_id=self.institution_2.id
+        )
+        nt.assert_equal(response.status_code, 200)
+
+        # affiliated institution
+        url = reverse(
+            'institutional_storage_quota_control:affiliated_institutional_storages',
+        )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.superuser
+        with nt.assert_raises(PermissionDenied):
+            self.view(request)
+
+    def test_permission_admin_without_inst(self):
+        # specific institution
+        url = reverse(
+            'institutional_storage_quota_control:institutional_storages',
+            kwargs={'institution_id': self.institution.id}
+        )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
         request.user = self.admin_not_inst
         with nt.assert_raises(PermissionDenied):
             self.view(
@@ -887,13 +924,38 @@ class TestProviderListByInstitution(AdminTestCase):
                 institution_id=self.institution.id
             )
 
-    def test_permission_admin_not_permission(self):
-        request = RequestFactory().get(
-            reverse(
-                'institutional_storage_quota_control:institutional_storages',
-                kwargs={'institution_id': self.institution_2.id}
-            )
+        # affiliated institution
+        url = reverse(
+            'institutional_storage_quota_control:affiliated_institutional_storages',
         )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.admin_not_inst
+        with nt.assert_raises(PermissionDenied):
+            self.view(request)
+
+    def test_permission_admin_not_permission(self):
+        # institution1 admin access to institution 1 (1 storage)
+        url = reverse(
+            'institutional_storage_quota_control:institutional_storages',
+            kwargs={'institution_id': self.institution.id}
+        )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.institution1_admin
+        with nt.assert_raises(PermissionDenied):
+            self.view(
+                request,
+                institution_id=self.institution.id
+            )
+
+        # institution1 admin access to institution 2 (2 storages)
+        url = reverse(
+            'institutional_storage_quota_control:institutional_storages',
+            kwargs={'institution_id': self.institution_2.id}
+        )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
         request.user = self.institution1_admin
         with nt.assert_raises(PermissionDenied):
             self.view(
@@ -902,15 +964,68 @@ class TestProviderListByInstitution(AdminTestCase):
             )
 
     def test_permission_admin_has_permission(self):
-        request = RequestFactory().get(
-            reverse(
-                'institutional_storage_quota_control:institutional_storages',
-                kwargs={'institution_id': self.institution_1.id}
-            )
+        # institution 1 (1 storage)
+        url = reverse(
+            'institutional_storage_quota_control:institutional_storages',
+            kwargs={'institution_id': self.institution_1.id}
         )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
         request.user = self.institution1_admin
         response = self.view(
             request,
             institution_id=self.institution_1.id
         )
         nt.assert_equal(response.status_code, 302)
+
+        # affiliated institution 1 (1 storage)
+        url = reverse(
+            'institutional_storage_quota_control:affiliated_institutional_storages',
+        )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.institution1_admin
+        response = self.view(request)
+        nt.assert_equal(response.status_code, 302)
+
+        # institution 2 (2 storages)
+        url = reverse(
+            'institutional_storage_quota_control:institutional_storages',
+            kwargs={'institution_id': self.institution_2.id}
+        )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.institution2_admin
+        response = self.view(
+            request,
+            institution_id=self.institution_2.id
+        )
+        nt.assert_equal(response.status_code, 200)
+
+        # affiliated institution 2 (2 storages)
+        url = reverse(
+            'institutional_storage_quota_control:affiliated_institutional_storages',
+        )
+        request = RequestFactory().get(url)
+        request.resolver_match = resolve(url)
+        request.user = self.institution2_admin
+        response = self.view(request)
+        nt.assert_equal(response.status_code, 200)
+
+    def test_get_order_by(self):
+        # institution 2 (2 storages)
+        url = reverse(
+            'institutional_storage_quota_control:institutional_storages',
+            kwargs={'institution_id': self.institution.id}
+        )
+        request = RequestFactory().get(
+            url,
+            {'order_by': 'provider', 'status': 'abc'}
+        )
+        request.resolver_match = resolve(url)
+        request.user = self.institution2_admin
+        response = self.view(
+            request,
+            institution_id=self.institution_2.id
+        )
+        nt.assert_equal(response.status_code, 200)
