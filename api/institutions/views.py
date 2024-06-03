@@ -1,3 +1,4 @@
+import logging
 import re
 
 from django.db.models import F
@@ -48,6 +49,8 @@ from api.institutions.serializers import (
 )
 from api.institutions.permissions import UserIsAffiliated
 from api.institutions.renderers import InstitutionDepartmentMetricsCSVRenderer, InstitutionUserMetricsCSVRenderer, MetricsCSVRenderer
+
+logger = logging.getLogger(__name__)
 
 
 class InstitutionMixin(object):
@@ -540,12 +543,14 @@ class LoginAvailability(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
+        logger.info(f'login availability request data: {data}')
         institution_guid = data.get('institution_id')
         institution = Institution.load(institution_guid)
         if institution is None or institution.is_deleted is True:
-            # If institution GUID does not exist or institution is ...
+            # If institution GUID does not exist or institution is deleted, return HTTP 403 response
             return Response({}, status=status.HTTP_403_FORBIDDEN)
         logic_condition = institution.login_logic_condition
+        logger.info(f'login availability logic condition in DB: {logic_condition}')
         if logic_condition is None:
             # If institution's login logic condition is not set, return check mail address response
             return Response({'login_availability': UserExtendedData.CHECK_MAIL_ADDRESS}, status=status.HTTP_200_OK)
@@ -577,6 +582,8 @@ class LoginAvailability(APIView):
             replace('&&', ' and '). \
             replace('||', ' or '). \
             replace('!', ' not ')
+
+        logger.info(f'login availability logic condition expression: {expression}')
 
         # Evaluate the converted expression
         expression = eval(expression)
