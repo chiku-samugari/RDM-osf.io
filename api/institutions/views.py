@@ -551,7 +551,7 @@ class LoginAvailability(APIView):
             return Response({}, status=status.HTTP_403_FORBIDDEN)
         logic_condition = institution.login_logic_condition
         logger.info(f'login availability logic condition in DB: {logic_condition}')
-        if logic_condition is None:
+        if not logic_condition:
             # If institution's login logic condition is not set, return check mail address response
             return Response({'login_availability': UserExtendedData.CHECK_MAIL_ADDRESS}, status=status.HTTP_200_OK)
 
@@ -585,17 +585,21 @@ class LoginAvailability(APIView):
 
         logger.info(f'login availability logic condition expression: {expression}')
 
-        # Evaluate the converted expression
-        expression = eval(expression)
+        try:
+            # Evaluate the converted expression
+            expression = eval(expression)
 
-        # Check if expression is evaluated to be true
-        if type(expression) == bool and expression is True:
-            if institution.login_availability_default is True:
-                # If institution's login availability default is True, return forbidden response
-                return Response({}, status=status.HTTP_403_FORBIDDEN)
-            else:
-                # If institution's login availability default is False, return can login response
-                return Response({'login_availability': UserExtendedData.CAN_LOGIN}, status=status.HTTP_200_OK)
+            # Check if expression is evaluated to be true
+            if type(expression) == bool and expression is True:
+                if institution.login_availability_default is True:
+                    # If institution's login availability default is True, return forbidden response
+                    return Response({}, status=status.HTTP_403_FORBIDDEN)
+                else:
+                    # If institution's login availability default is False, return can login response
+                    return Response({'login_availability': UserExtendedData.CAN_LOGIN}, status=status.HTTP_200_OK)
+        except (SyntaxError, NameError):
+            # Cannot evaluate the logic condition, do nothing here to return check mail address response below
+            pass
 
-        # If expression is evaluated to be false, return check mail address response
+        # If expression cannot be evaluated or expression is evaluated to be false, return check mail address response
         return Response({'login_availability': UserExtendedData.CHECK_MAIL_ADDRESS}, status=status.HTTP_200_OK)
