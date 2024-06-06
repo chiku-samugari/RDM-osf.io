@@ -260,8 +260,9 @@ def update_user(auth):
     # check user's login availability by user's mail address
     if not user.check_login_availability_by_mail_address():
         # If user is not allowed to login by mail address, logout then redirect to top page
-        osf_logout()
-        return redirect(web_url_for('index', login_not_available='true'))
+        top_page_url = web_url_for('index', login_not_available='true', _absolute=True)
+        logout_url = web_url_for('auth_logout', redirect_url=top_page_url)
+        return HTTPError(http_status.HTTP_401_UNAUTHORIZED, data=dict(redirect_url=logout_url))
 
     return _profile_view(user, is_profile=True)
 
