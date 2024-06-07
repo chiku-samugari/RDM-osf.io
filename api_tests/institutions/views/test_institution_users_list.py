@@ -25,9 +25,4 @@ class TestInstitutionUsersList:
         url = '/{0}institutions/{1}/users/'.format(API_BASE, institution._id)
         res = app.get(url)
 
-        assert res.status_code == 200
-
-        ids = [each['id'] for each in res.json['data']]
-        assert len(res.json['data']) == 2
-        assert user_one._id in ids
-        assert user_two._id in ids
+        assert res.status_code == 401
