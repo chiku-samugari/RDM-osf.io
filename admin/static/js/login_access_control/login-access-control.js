@@ -206,26 +206,6 @@ $('a[name="deleteMailAddress"]').on('click', function(event) {
     });
 });
 
-$('#mail_add_new_button').on('click', function(event) {
-    var mailAddressHtml = `
-        <div class="clearfix flex-container" style="margin-bottom: 15px;">
-            <div class="input-group flex-item">
-                <input type="text" name="mail_address_input" class="form-control"
-                       oninput="setCustomValidity('')"
-                       style="width: calc(100% - 20px)"
-                       minlength="1" maxlength="320" required>
-                <button name="remove_mail_address_button" type="button" class="close remove-button" onclick="removeMailAddressRow(this)">x</button>
-            </div>
-        </div>
-    `;
-    document.getElementById('mail_addresses_block').append(new DOMParser().parseFromString(mailAddressHtml, 'text/html').body.childNodes[0]);
-    var elements = document.getElementsByName('remove_mail_address_button');
-    if (elements.length > 1) {
-        elements[0].removeAttribute('disabled');
-        elements[0].classList.remove('disabled');
-    }
-});
-
 $('#attributes_block').on('attribute_created', function() {
     $('select[name="attribute_name"]').on('invalid', setInvalidMessageForAttributeName);
     $('input[name="attribute_value_input"]').on('invalid', setInvalidMessageForAttributeValue);
