@@ -3,7 +3,6 @@ import itsdangerous
 import mock
 import pytest
 import unittest
-from future.moves.urllib.parse import urlparse, parse_qs
 from uuid import UUID
 
 from api.base.settings.defaults import API_BASE
@@ -11,11 +10,8 @@ from framework.auth.cas import CasResponse
 from osf.models import OSFUser, Session, ApiOAuth2PersonalToken
 from osf_tests.factories import (
     AuthUserFactory,
-    UserFactory,
-    OSFGroupFactory,
     ProjectFactory,
     ApiOAuth2ScopeFactory,
-    RegistrationFactory,
     Auth,
 )
 from osf.utils.permissions import CREATOR_PERMISSIONS
@@ -35,7 +31,7 @@ class TestUsers:
         return AuthUserFactory(fullname='Freddie Mercury II')
 
     def test_returns_401(self, app):
-        res = app.get('/{}users/'.format(API_BASE))
+        res = app.get('/{}users/'.format(API_BASE), expect_errors=True)
         assert res.status_code == 401
 
     def test_users_projects_in_common_with_embed_and_right_query(

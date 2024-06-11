@@ -23,6 +23,6 @@ class TestInstitutionUsersList:
         user_two.save()
 
         url = '/{0}institutions/{1}/users/'.format(API_BASE, institution._id)
-        res = app.get(url)
+        res = app.get(url, expect_errors=True)
 
         assert res.status_code == 401
