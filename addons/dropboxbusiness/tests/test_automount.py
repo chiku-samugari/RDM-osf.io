@@ -88,11 +88,11 @@ class TestDropboxBusiness(unittest.TestCase):
         self.f_option.is_allowed = True
         self.f_option.save()
 
-    def test_dropboxbusiness_default_is_not_allowed(self):
-        assert_false(self.f_option.is_allowed)
+    def test_dropboxbusiness_default_is_allowed(self):
+        assert_true(self.f_option.is_allowed)
         self._new_project()
         result = self.project.get_addon('dropboxbusiness')
-        assert_equal(result, None)
+        assert_true(isinstance(result, NodeSettings))
 
     def test_dropboxbusiness_no_eppn(self):
         self.user.eppn = None

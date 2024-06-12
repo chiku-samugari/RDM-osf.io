@@ -196,6 +196,8 @@ class InstitutionsStorageAddon(BaseStorageAddon):
         if addon_options is None or not addon_options.exists():
             logger.debug('No addon option for institution_id={}, addon_name={}'.format(institution_id, addon_name))
             return None  # disabled
+        else:
+            addon_options = addon_options.filter(is_allowed=True)
 
         addons = []
         institution = Institution.objects.get(id=institution_id)
@@ -213,7 +215,7 @@ class InstitutionsStorageAddon(BaseStorageAddon):
                 is_attribute_allowed = check_authentication_attribute(auth.user,
                                                                       region.allow_expression,
                                                                       region.is_allowed)
-                if addon_option.is_allowed and is_attribute_allowed:
+                if is_attribute_allowed:
                     provider = cls.cls_provider_switch(addon_option)
                     client = cls.get_client(provider)
 

@@ -151,30 +151,34 @@ def update_used_quota(self, target, user, event_type, payload):
             else:
                 if data.get('kind') == 'folder' and action == 'create_folder':
                     return
-
+                root_file_node_id = None
                 if payload.get('root_path'):
                     root_path = payload.get('root_path').strip('/')
+                    root_file_node_id = get_root_institutional_storage(root_path)
+                    if root_file_node_id:
+                        root_file_node_id = root_file_node_id.id
 
                 materialized = data.get('materialized')
                 name = data.get('name')
+                file_node_kwargs = {
+                    'name': name,
+                    'provider': provider,
+                    'target_object_id': target.id,
+                    'target_content_type': target_content_type_id
+                }
                 # If provider is onedrivebusiness will find by materialized_path
                 if provider == 'onedrivebusiness':
-                    file_node = BaseFileNode.objects.filter(
-                        _materialized_path='/' + materialized.strip('/'),
-                        name=name,
-                        provider=provider,
-                        type='osf.onedrivebusinessfile',
-                        target_object_id=target.id,
-                        target_content_type=target_content_type_id,
-                    ).order_by('-id').first()
+                    file_node_kwargs.update({
+                        '_materialized_path': '/' + materialized.strip('/'),
+                        'type': 'osf.onedrivebusinessfile',
+
+                    })
+                    if root_file_node_id:
+                        file_node_kwargs.update({'parent_id': root_file_node_id})
+                    file_node = BaseFileNode.objects.filter(**file_node_kwargs).order_by('-id').first()
                 else:
-                    file_node = BaseFileNode.objects.filter(
-                        _path='/' + root_path + '/' + materialized.strip('/'),
-                        name=name,
-                        provider=provider,
-                        target_object_id=target.id,
-                        target_content_type=target_content_type_id
-                    ).order_by('-id').first()
+                    file_node_kwargs.update({'_path': '/' + root_path + '/' + materialized.strip('/')})
+                    file_node = BaseFileNode.objects.filter(**file_node_kwargs).order_by('-id').first()
 
             if file_node is None and kind != 'folder':
                 raise BaseFileNode.DoesNotExist
@@ -248,10 +252,19 @@ def file_added(target, payload, file_node, storage_type):
         region_id=region_id
     )
 
-    user_storage_quota.used += file_size
-    user_storage_quota.save()
-
-    FileInfo.objects.create(file=file_node, file_size=file_size)
+    try:
+        # Handle for case modify but call event add
+        file_info = FileInfo.objects.get(file=file_node)
+        user_storage_quota.used += file_size - file_info.file_size
+        if user_storage_quota.used < 0:
+            user_storage_quota.used = 0
+        user_storage_quota.save()
+        file_info.file_size = file_size
+        file_info.save()
+    except FileInfo.DoesNotExist:
+        user_storage_quota.used += file_size
+        user_storage_quota.save()
+        FileInfo.objects.create(file=file_node, file_size=file_size)
 
 
 def node_removed(target, payload, file_node, storage_type):
@@ -550,14 +563,6 @@ def update_institutional_storage_used_quota(creator, region, size, add=True):
             used=size
         )
 
-        # Add max quota of user-per-storage to max quota of user
-        user_quota = UserQuota.objects.get(
-            user=creator,
-            storage_type=UserQuota.CUSTOM_STORAGE
-        )
-        user_quota.max_quota += storage_max_quota
-        user_quota.save()
-
 
 def recalculate_used_quota_by_user(user_id, storage_type=UserQuota.NII_STORAGE):
     """Recalculate used per-user-per-storage
@@ -620,9 +625,7 @@ def recalculate_used_of_user_by_region(user_id, region_id=NII_STORAGE_REGION_ID)
     if projects is None:
         return used
 
-    _length = len(projects)
-    for index, project in enumerate(projects):
-        logger.debug(f'[{1 + index}/{_length}] project: {project._id}')
+    for project in projects:
         addon = project.get_addon('osfstorage', region_id=region_id)
         if addon is None or addon.region_id != region_id:
             continue

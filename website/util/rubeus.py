@@ -331,7 +331,6 @@ class NodeFileCollector(object):
                     if institution_id is not None:
                         if addon.short_name != 'osfstorage':
                             region = Region.objects.filter(id=addon.region.id).first()
-                            logger.debug(f'region is {region}')
                         else:
                             region = Region.objects.filter(
                                 _id=institution_id,

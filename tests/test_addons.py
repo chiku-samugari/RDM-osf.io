@@ -587,13 +587,13 @@ class TestAddonLogs(OsfTestCase):
             metadata={
                 'provider': 's3compatinstitutions',
                 'name': 'new.txt',
-                'materialized': '/' + 'new.txt',
-                'path': '/' + self.file._id + '/' + 'new.txt',
+                'materialized': '/' + newfilename,
+                'path': newfilename,
                 'node': {'_id': self.node._id},
                 'kind': 'file',
                 'root_path': self.file._id,
                 'nid': self.node._id,
-                'dest_pạth': '/' + self.file._id + '/' + 'new.txt',
+                'dest_pạth': '/' + newfilename,
             },
             source={
                 'provider': 's3compatinstitutions',
@@ -618,10 +618,10 @@ class TestAddonLogs(OsfTestCase):
                 'size': 1,
             },
         ), headers={'Content-Type': 'application/json'})
-        files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
+        files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id,path='/'+file_node._id +'/'+ newfilename)
         assert_equal(1, files_query.count())
         renamed_file = files_query.get()
-        assert_equal('/testfile/' + newfilename, renamed_file.path)
+        assert_equal('/'+file_node._id +'/'+ newfilename, renamed_file.path)
 
     @mock.patch('requests.get')
     @mock.patch('website.util.waterbutler.download_file')
@@ -658,9 +658,22 @@ class TestAddonLogs(OsfTestCase):
         assert_equal(1, files_query.count())
         created_file = files_query.get()
         assert_equal('/' + file_node._id + filepath, created_file.path)
-
         # Rename the folder
         newfoldername = 'folder_ver2'
+        children_move_path='/{}/{}'.format(newfoldername, filename)
+        children = [{
+            'provider': 's3compatinstitutions',
+            'name': filename,
+            'materialized': children_move_path,
+            'path': children_move_path,
+            'kind': 'file',
+            'size': 2345,
+            'created_utc': '',
+            'modified_utc': '',
+            'extra': {
+                'version': '1'
+            }
+        }]
         self.app.put_json(wb_log_url, self.build_payload(
             request_meta={'url': wb_url},
             root_path=file_node._id,
@@ -668,19 +681,20 @@ class TestAddonLogs(OsfTestCase):
             metadata={
                 'provider': 's3compatinstitutions',
                 'name': newfoldername,
-                'materialized': '/' + newfoldername,
-                'path': '/' + file_node._id + '/' + newfoldername,
+                'materialized': newfoldername+'/',
+                'path': file_node._id +'/'+ newfoldername + '/',
                 'node': {'_id': self.node._id},
                 'kind': 'folder',
                 'root_path': file_node._id,
                 'nid': self.node._id,
-                'dest_pạth': '/' + file_node._id + '/' + newfoldername,
+                'dest_pạth': newfoldername+'/',
+                'children':children
             },
             source={
                 'provider': 's3compatinstitutions',
                 'name': foldername,
-                'materialized': '/' + foldername,
-                'path': '/' + foldername,
+                'materialized': '/' + foldername + '/',
+                'path': '/' + foldername +'/',
                 'node': {'_id': self.node._id},
                 'kind': 'folder',
                 'root_path': file_node._id,
@@ -690,8 +704,8 @@ class TestAddonLogs(OsfTestCase):
             destination={
                 'provider': 's3compatinstitutions',
                 'name': newfoldername,
-                'materialized': '/' + newfoldername,
-                'path': file_node._id + '/' + newfoldername,
+                'materialized': '/' + newfoldername+'/',
+                'path': '/' + newfoldername+'/',
                 'node': {'_id': self.node._id},
                 'kind': 'folder',
                 'root_path': file_node._id,
@@ -699,7 +713,7 @@ class TestAddonLogs(OsfTestCase):
                 'size': 1
             },
         ), headers={'Content-Type': 'application/json'})
-        files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
+        files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id,path='/'+file_node._id +children_move_path)
         assert_equal(1, files_query.count())
         renamed_file = files_query.get()
         filepath = '/{}/{}'.format(newfoldername, filename)
@@ -745,13 +759,13 @@ class TestAddonLogs(OsfTestCase):
             metadata={
                 'provider': 's3compatinstitutions',
                 'name': filename,
-                'materialized': '/' + filename,
-                'path': '/' + file_node._id + '/' + filename,
+                'materialized': '/' + movedfilepath,
+                'path': movedfilepath,
                 'node': {'_id': self.node._id},
                 'kind': 'file',
                 'root_path': file_node._id,
                 'nid': self.node._id,
-                'dest_pạth': '/' + file_node._id + '/' + filename,
+                'dest_pạth': '/' + movedfilepath,
             },
             source={
                 'provider': 's3compatinstitutions',
@@ -776,7 +790,7 @@ class TestAddonLogs(OsfTestCase):
                 'size': 1,
             },
         ), headers={'Content-Type': 'application/json'})
-        files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
+        files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id,path='/' + file_node._id + '/' + movedfilepath,)
         assert_equal(1, files_query.count())
         renamed_file = files_query.get()
         assert_equal('/' + file_node._id + '/' + movedfilepath, renamed_file.path)
@@ -816,18 +830,33 @@ class TestAddonLogs(OsfTestCase):
 
         # Move the folder
         movedfolderpath = 'trash_bin/{}/'.format(foldername)
+        children_move_path='/trash_bin/{}/{}'.format(foldername, filename)
+        children = [{
+            'provider': 's3compatinstitutions',
+            'name': filename,
+            'materialized': children_move_path,
+            'path': children_move_path,
+            'kind': 'file',
+            'size': 2345,
+            'created_utc': '',
+            'modified_utc': '',
+            'extra': {
+                'version': '1'
+            }
+        }]
         self.app.put_json(wb_log_url, self.build_payload(
             action='move',
             metadata={
                 'provider': 's3compatinstitutions',
                 'name': 'new.txt',
                 'materialized': '/' + movedfolderpath,
-                'path': '/' + file_node._id + '/' + movedfolderpath,
+                'path':  movedfolderpath,
                 'node': {'_id': self.node._id},
                 'kind': 'file',
                 'root_path': file_node._id,
                 'nid': self.node._id,
-                'dest_pạth': '/' + file_node._id + '/' + movedfolderpath,
+                'dest_pạth': movedfolderpath,
+                'children':children
             },
             source={
                 'provider': 's3compatinstitutions',
@@ -852,7 +881,7 @@ class TestAddonLogs(OsfTestCase):
                 'size': 1
             },
         ), headers={'Content-Type': 'application/json'})
-        files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id)
+        files_query = RdmFileTimestamptokenVerifyResult.objects.filter(project_id=self.node._id,path='/' + file_node._id + '/' + movedfolderpath + filename)
         assert_equal(1, files_query.count())
         renamed_file = files_query.get()
         assert_equal('/' + file_node._id + '/' + movedfolderpath + filename, renamed_file.path)
@@ -2263,8 +2292,11 @@ class TestViewUtils(OsfTestCase):
         assert enabled_addons[1]['short_name'] == 'osfstorage'
 
         default_addons = [addon for addon in addon_dicts if addon['default']]
-        assert len(default_addons) == 1
-        assert default_addons[0]['short_name'] == 'osfstorage'
+        assert len(default_addons) == 4
+        assert default_addons[0]['short_name'] == 'dropboxbusiness'
+        assert default_addons[1]['short_name'] == 'nextcloudinstitutions'
+        assert default_addons[2]['short_name'] == 'osfstorage'
+        assert default_addons[3]['short_name'] == 'onedrivebusiness'
 
     @mock.patch('addons.github.models.NodeSettings.get_folders', return_value=[])
     def test_include_template_json(self, mock_folders):

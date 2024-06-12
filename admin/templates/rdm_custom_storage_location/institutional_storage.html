@@ -181,7 +181,7 @@
                                 <td class="storage_input_content">
                                     <div>
                                         <input
-                                                {% if provider_item.provider.short_name != 'osfstorage' and provider_item.provider.short_name != 'onedrivebusiness' %}
+                                                {% if provider_item.provider.short_name != 'osfstorage' %}
                                                     maxlength="200"
                                                     value="{{ provider_item.region.name }}"
                                                 {% else %}

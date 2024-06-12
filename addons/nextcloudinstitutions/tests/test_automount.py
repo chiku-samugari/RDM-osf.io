@@ -100,11 +100,11 @@ class TestNextcloudinstitutions(unittest.TestCase):
         if save:
             self.option.save()
 
-    def test_nextcloudinstitutions_default_is_not_allowed(self):
-        assert_false(self.option.is_allowed)
+    def test_nextcloudinstitutions_default_is_allowed(self):
+        assert_true(self.option.is_allowed)
         self._new_project()
         result = self.project.get_addon(NAME)
-        assert_equal(result, None)
+        assert_true(isinstance(result, NodeSettings))
 
     def test_nextcloudinstitutions_no_eppn(self):
         self.user.eppn = None

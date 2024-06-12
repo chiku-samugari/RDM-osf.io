@@ -294,15 +294,18 @@ def node_post_save(sender, instance, created, **kwargs):
         _id=institution_id, waterbutler_settings__storage__provider=SHORT_NAME
     ).order_by('id')
 
-    for index, region in enumerate(regions):
+    for region in regions:
         # check permission by authentication attribute
         is_attribute_allowed = check_authentication_attribute(instance.creator,
                                                               region.allow_expression,
                                                               region.is_allowed)
         if is_attribute_allowed:
             addon = instance.get_addon(SHORT_NAME, region_id=region.id)
-            if addon is None:
+            if (addon is None or addon.region.id != region.id) and created:
                 addon = instance.add_addon(SHORT_NAME, auth=Auth(instance.creator), log=True, region_id=region.id)
+
+            if addon is None:
+                continue  # disabled
 
             region_external_account = get_region_external_account(addon)
 

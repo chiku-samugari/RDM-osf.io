@@ -10,7 +10,7 @@ var sprintf = require('agh.sprintf').sprintf;
 
 var clipboard = require('js/clipboard');
 
-var no_storage_name_providers = ['osfstorage', 'onedrivebusiness'];
+var no_storage_name_providers = ['osfstorage'];
 // type1: get from admin/rdm_addons/api_v1/views.py
 var preload_accounts_type1 = ['dropboxbusiness'];
 // type2: get from admin/rdm_custom_storage_location/views.py
@@ -167,9 +167,14 @@ $('#add_storage').click(function (e) {
             $('#' + provider + '_modal').modal('show');
             $('body').css('overflow', 'hidden');
             $('.modal').css('overflow', 'auto');
+            $('#' + provider + '_save').attr('disabled', false);
+            if (['onedrivebusiness', 'googledrive'].includes(provider)) {
+                $('#' + provider + '_save').removeClass('btn-default').addClass('btn-success');
+            }
+            $('#' + provider + '_message').html('');
             validateRequiredFields(provider);
         };
-        if (provider === 'osfstorage' || provider === 'onedrivebusiness') {
+        if (provider === 'osfstorage') {
             var route = 'check_existing_storage';
             $.ajax({
                 url: '../' + route + '/',

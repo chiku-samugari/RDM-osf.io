@@ -823,6 +823,7 @@ def create_waterbutler_log(payload, **kwargs):
                 if file_node:
                     # Update parent_id by destination root node id
                     if dest_root_folder_id and dest_provider in ADDON_METHOD_PROVIDER:
+                        file_node.materialized_path = '/' + metadata['dest_materialized'].lstrip('/')
                         file_node.parent_id = dest_root_folder_id
                         file_node.save()
                     func_hash = getattr(file_node, 'get_hash_for_timestamp', None)
@@ -843,11 +844,8 @@ def create_waterbutler_log(payload, **kwargs):
                     if fileinfo is None:
                         FileInfo.objects.create(file=file_node, file_size=metadata.get('dest_size'))
                     if provider in ADDON_METHOD_PROVIDER:
-                        check_path = '/' + metadata['src_path'].lstrip('/')
-                        logger.warning(f'check_path is {check_path}')
                         if provider == 'onedrivebusiness' and metadata['src_materialized']:
                             # If source provider is onedrivebusiness will remove old base filenode
-                            logger.debug('materialized_path is ' + str(metadata['src_materialized']))
                             old_file_nodes = BaseFileNode.objects.filter(target_object_id=node.id,
                                                                     provider=provider,
                                                                     deleted_on__isnull=True,
@@ -861,7 +859,6 @@ def create_waterbutler_log(payload, **kwargs):
                                                                             parent_id=root_folder_id).all()
                         if old_file_nodes:
                             for old_file_node in old_file_nodes:
-                                logger.debug(f'old_file_node id is {old_file_node.id}')
                                 old_file_node.delete()
             elif metadata.get('kind') == 'folder' and dest_provider in ADDON_METHOD_PROVIDER:
                 if provider in ADDON_METHOD_PROVIDER:
@@ -896,7 +893,6 @@ def create_waterbutler_log(payload, **kwargs):
                             create_child_file_node(child, dest_root_folder_id)
             else:
                 if provider in ADDON_METHOD_PROVIDER:
-                    logger.warning(f'src_path for move folder is {src_path}')
                     old_file_nodes = BaseFileNode.objects.filter(target_object_id=node.id,
                                                              provider=provider,
                                                              deleted_on__isnull=True,
@@ -1031,15 +1027,22 @@ def addon_delete_file_node(self, target, user, event_type, payload):
     if event_type == 'file_removed' and payload.get('provider', None) != 'osfstorage':
         provider = payload['provider']
         path = payload['metadata']['path']
+        root_path = payload.get('root_path', None)
+        root_id = None
+        if root_path:
+            root_id = get_root_institutional_storage(root_path)
+            if root_id:
+                root_id = root_id.id
         materialized_path = payload['metadata']['materialized']
         content_type = ContentType.objects.get_for_model(target)
+        file_node_kwargs = {'target_object_id': target.id,
+                            'target_content_type': content_type}
+        if root_id:
+            file_node_kwargs.update({'parent_id': root_id})
         if path.endswith('/'):
-            folder_children = BaseFileNode.resolve_class(provider, BaseFileNode.ANY).objects.filter(
-                provider=provider,
-                target_object_id=target.id,
-                target_content_type=content_type,
-                _materialized_path__startswith=materialized_path
-            )
+            file_node_kwargs.update({'provider': provider,
+                                     '_materialized_path__startswith': materialized_path})
+            folder_children = BaseFileNode.resolve_class(provider, BaseFileNode.ANY).objects.filter(**file_node_kwargs)
             for item in folder_children:
                 if item.kind == 'file' and not TrashedFileNode.load(item._id):
                     item.delete(user=user)
@@ -1047,19 +1050,13 @@ def addon_delete_file_node(self, target, user, event_type, payload):
                     BaseFileNode.delete(item)
         else:
             try:
-                file_node = BaseFileNode.resolve_class(provider, BaseFileNode.FILE).objects.get(
-                    target_object_id=target.id,
-                    target_content_type=content_type,
-                    _materialized_path=materialized_path
-                )
+                file_node_kwargs.update({'_materialized_path': materialized_path})
+                file_node = BaseFileNode.resolve_class(provider, BaseFileNode.FILE).objects.get(**file_node_kwargs)
             except BaseFileNode.DoesNotExist:
                 file_node = None
             except BaseFileNode.MultipleObjectsReturned:
                 file_node = None
-                for o in BaseFileNode.objects.filter(
-                        target_object_id=target.id,
-                        target_content_type=content_type,
-                        _materialized_path=materialized_path):
+                for o in BaseFileNode.objects.filter(**file_node_kwargs):
                     o.delete(user=user)
 
             if file_node and not TrashedFileNode.load(file_node._id):

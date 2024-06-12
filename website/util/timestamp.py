@@ -708,7 +708,6 @@ def file_node_moved(uid, project_id, src_provider, dest_provider, src_path, dest
         ).all()
 
     if not (src_provider == 'osfstorage' and dest_provider == 'osfstorage'):
-        logger.warning(f'deleted files is {deleted_files}')
         if src_provider != 'osfstorage' and src_provider not in ADDON_METHOD_PROVIDER:
             for deleted_file in deleted_files:
                 file_node_overwitten(project_id, target_object_id, src_provider, src_path)
@@ -733,19 +732,15 @@ def file_node_moved(uid, project_id, src_provider, dest_provider, src_path, dest
                 moved_file.provider = dest_provider
                 moved_file.save()
         else:
-            src_root_path = '/' + src_metadata.get('root_path') + src_metadata.get('path')
-            dest_root_path = '/' + metadata.get('root_path') + dest_path
-            moved_files = RdmFileTimestamptokenVerifyResult.objects.filter(
-                path__startswith=src_root_path,
-                project_id=project_id,
-                provider=src_provider
-            ).exclude(
-                inspection_result_status__in=STATUS_NOT_ACCESSIBLE
-            ).all()
-            for moved_file in moved_files:
-                moved_file.path = moved_file.path.replace(src_root_path, dest_root_path, 1)
-                moved_file.provider = dest_provider
-                moved_file.save()
+            if is_folder(src_path):
+                metadata_list = []
+                get_child_file_metadata(metadata, metadata_list, metadata.get('root_path'))
+                node = AbstractNode.objects.get(pk=Guid.objects.filter(_id=metadata['node']['_id']).first().object_id)
+                for metadata_child in metadata_list:
+                    file_created_or_updated(node, metadata_child, uid, True)
+            else:
+                node = AbstractNode.objects.get(pk=Guid.objects.filter(_id=metadata['node']['_id']).first().object_id)
+                file_created_or_updated(node, metadata, uid, True)
     else:
         if src_provider not in ADDON_METHOD_PROVIDER and dest_provider not in ADDON_METHOD_PROVIDER:
             moved_files = RdmFileTimestamptokenVerifyResult.objects.filter(
@@ -769,7 +764,6 @@ def file_node_moved(uid, project_id, src_provider, dest_provider, src_path, dest
             if is_folder(src_path):
                 metadata_list = []
                 get_child_file_metadata(metadata, metadata_list, metadata.get('root_path'))
-                logger.warning(f'metadata_list is {metadata_list}')
                 node = AbstractNode.objects.get(pk=Guid.objects.filter(_id=metadata['node']['_id']).first().object_id)
                 for metadata_child in metadata_list:
                     file_created_or_updated(node, metadata_child, uid, True)
@@ -779,40 +773,42 @@ def file_node_moved(uid, project_id, src_provider, dest_provider, src_path, dest
 
     file_nodes = []
     if src_provider != 'osfstorage' and is_folder(src_path):
-        file_nodes = BaseFileNode.objects.filter(target_object_id=target_object_id,
-                                                 provider=src_provider,
-                                                 deleted_on__isnull=True,
-                                                 _materialized_path__startswith=src_path).all()
-        for file_node in file_nodes:
-            file_node._path = re.sub(r'^' + src_path, dest_path, file_node._path)
-            file_node._materialized_path = re.sub(r'^' + src_path, dest_path, file_node._path)
-            children = metadata.get('children', None)
-            if children is not None:
-                for child in metadata['children']:
-                    if file_node.name == child['name']:
-                        file_node._materialized_path = child.get('materialized')
-                        break
-            file_node = move_file_node_update(file_node, src_provider, dest_provider, metadata)
-            if dest_provider == 'osfstorage':
-                file_node.delete()
-                rft = RdmFileTimestamptokenVerifyResult.objects.filter(file_id=file_node._id).first()
-                if rft is not None:
-                    temp_path = rft.path
-                    if file_node.name[0] != '/' and rft.path[0] == '/':
-                        temp_path = rft.path[1:]
-                    children = metadata.get('children', None)
-                    if children is not None:
-                        for child in metadata['children']:
-                            if file_node.name == child['name']:
-                                temp_path = child['name']
-                                break
-                    file_node = BaseFileNode.objects.filter(name=temp_path, provider=dest_provider).order_by('-id').first()
-                    if file_node is not None:
-                        rft.file_id = file_node._id
-                        rft.provider = 'osfstorage'
-                        rft.save()
-            if file_node is not None:
-                provider_change_update_timestampverification(uid, file_node, src_provider, dest_provider)
+        # Use for extend storage
+        if src_provider not in ADDON_METHOD_PROVIDER:
+            file_nodes = BaseFileNode.objects.filter(target_object_id=target_object_id,
+                                                    provider=src_provider,
+                                                    deleted_on__isnull=True,
+                                                    _materialized_path__startswith=src_path).all()
+            for file_node in file_nodes:
+                file_node._path = re.sub(r'^' + src_path, dest_path, file_node._path)
+                file_node._materialized_path = re.sub(r'^' + src_path, dest_path, file_node._path)
+                children = metadata.get('children', None)
+                if children is not None:
+                    for child in metadata['children']:
+                        if file_node.name == child['name']:
+                            file_node._materialized_path = child.get('materialized')
+                            break
+                file_node = move_file_node_update(file_node, src_provider, dest_provider, metadata)
+                if dest_provider == 'osfstorage':
+                    file_node.delete()
+                    rft = RdmFileTimestamptokenVerifyResult.objects.filter(file_id=file_node._id).first()
+                    if rft is not None:
+                        temp_path = rft.path
+                        if file_node.name[0] != '/' and rft.path[0] == '/':
+                            temp_path = rft.path[1:]
+                        children = metadata.get('children', None)
+                        if children is not None:
+                            for child in metadata['children']:
+                                if file_node.name == child['name']:
+                                    temp_path = child['name']
+                                    break
+                        file_node = BaseFileNode.objects.filter(name=temp_path, provider=dest_provider).order_by('-id').first()
+                        if file_node is not None:
+                            rft.file_id = file_node._id
+                            rft.provider = 'osfstorage'
+                            rft.save()
+                if file_node is not None:
+                    provider_change_update_timestampverification(uid, file_node, src_provider, dest_provider)
 
     else:  # "any file -> any file" OR "osfstorage folder -> any folder"
         file_nodes = BaseFileNode.objects.filter(target_object_id=target_object_id,

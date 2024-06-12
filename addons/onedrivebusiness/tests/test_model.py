@@ -18,7 +18,7 @@ from addons.onedrivebusiness.tests.factories import (
     OneDriveBusinessAccountFactory
 )
 from framework.auth import Auth
-from osf_tests.factories import ProjectFactory, DraftRegistrationFactory
+from osf_tests.factories import ProjectFactory, DraftRegistrationFactory, AuthUserFactory, InstitutionFactory, RegionFactory, BaseNodeFactory
 from tests.base import get_default_metaschema
 
 pytestmark = pytest.mark.django_db
@@ -147,3 +147,57 @@ class TestNodeSettings(OAuthAddonNodeSettingsTestSuiteMixin, unittest.TestCase):
             'drive_id': 'drive-1234',
         }
         assert_equal(_waterbutler_settings, expected)
+
+    def test_node_post_save_single(self):
+        config = {
+                'storage': {
+                    'provider': 'onedrivebusiness'
+                    },
+                'disabled': True,
+                'root_folder_id': 'root'
+                }
+        institution = InstitutionFactory()
+        user = AuthUserFactory()
+        user.affiliated_institutions.add(institution)
+        region = RegionFactory(_id=institution._id, waterbutler_settings=config)
+        user.save()
+        new_project = ProjectFactory(creator=user)
+        count_node_settings = NodeSettings.objects.filter(owner=new_project,region_id=region.id).count()
+        assert_equal(count_node_settings, 1)
+
+    def test_node_post_save_multi(self):
+        config = {
+                'storage': {
+                    'provider': 'onedrivebusiness'
+                    },
+                'disabled': True,
+                'root_folder_id': 'root'
+                }
+        institution = InstitutionFactory()
+        user = AuthUserFactory()
+        user.affiliated_institutions.add(institution)
+        user.save()
+        region1 = RegionFactory(_id=institution._id, waterbutler_settings=config)
+        region2 = RegionFactory(_id=institution._id, waterbutler_settings=config)
+        new_project = ProjectFactory(creator=user)
+        count_node_settings = NodeSettings.objects.filter(owner=new_project,region_id__in=[region1.id,region2.id]).count()
+        assert_equal(count_node_settings, 2)
+
+    def test_node_post_save_not_allowed(self):
+        config = {
+                'storage': {
+                    'provider': 'onedrivebusiness'
+                    },
+                'disabled': True,
+                'root_folder_id': 'root'
+                }
+        institution = InstitutionFactory()
+        user = AuthUserFactory()
+        user.affiliated_institutions.add(institution)
+        user.save()
+        region = RegionFactory(_id=institution._id, waterbutler_settings=config)
+        region.is_allowed = False
+        region.save()
+        new_project = ProjectFactory(creator=user)
+        count_node_settings = NodeSettings.objects.filter(owner=new_project,region_id=region.id).count()
+        assert_equal(count_node_settings, 0)
