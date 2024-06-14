@@ -1032,7 +1032,6 @@ class TestOsfStorageCheckout(StorageTestCase):
 class TestOsfStorageFolder(StorageTestCase):
     def test_serialize(self):
         folder = OsfStorageFolder(
-            id= 49018,
             name='Test Mendeley Folder',
             created=datetime.datetime.strptime('2017-10-14T21:17:14.000Z', '%Y-%m-%dT%H:%M:%S.%fZ'),
             modified=datetime.datetime.strptime('2017-10-14T21:18:00.000Z', '%Y-%m-%dT%H:%M:%S.%fZ'),
