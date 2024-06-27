@@ -89,6 +89,8 @@ var OPERATIONS = {
     }
 };
 
+var begin = new Date()
+
 // Cross browser key codes for the Command key
 var COMMAND_KEYS = [224, 17, 91, 93];
 var ESCAPE_KEY = 27;
@@ -958,6 +960,7 @@ function _fangornComplete(treebeard, file) {
             this.processFile(nextFile);
         }
     }
+    console.log("_fangornComplete: " + new Date().toLocaleString());
 }
 
 /**
@@ -1019,6 +1022,7 @@ function _fangornDropzoneSuccess(treebeard, file, response) {
     }
 
     treebeard.redraw();
+    console.log("_fangornDropzoneSuccess: " + new Date().toLocaleString());
 }
 
 function _fangornDropzoneRemovedFile(treebeard, file, message, xhr) {
@@ -1097,6 +1101,8 @@ function _fangornDropzoneError(treebeard, file, message, xhr) {
  * @private
  */
 function _uploadEvent(event, item, col) {
+    begin = new Date()
+    console.log("_uploadEvent:" + begin.toLocaleString());
     var self = this;  // jshint ignore:line
     try {
         event.stopPropagation();
@@ -2911,6 +2917,30 @@ function _fangornQueueComplete(treebeard) {
            }
         });
     }
+    let result = new Date() - begin
+    console.log("_fangornQueueComplete: " + new Date().toLocaleString());
+    console.log("Total time to run _fangornQueueComplete: " + diffDates(result));
+}
+
+function diffDates(date) {
+    // Convert milliseconds to hours, minutes, and seconds
+    let hours = Math.floor(date / 3600000); // 1 hour = 3600000 ms
+    let minutes = Math.floor((date % 3600000) / 60000); // 1 minute = 60000 ms
+    let seconds = Math.floor((date % 60000) / 1000); // 1 second = 1000 ms
+
+    // Format hours, minutes, and seconds to hh:mm:ss format
+    let formattedTime = [
+        padWithZero(hours),
+        padWithZero(minutes),
+        padWithZero(seconds)
+    ].join(':');
+
+    return formattedTime;
+}
+
+function padWithZero(number) {
+    // Helper function to pad single digits with a leading zero
+    return (number < 10 ? '0' : '') + number;
 }
 
 /**

@@ -34,7 +34,7 @@ except Exception as ex:
     logger.warn('No migration settings loaded for OSFStorage, falling back to local dev. {}'.format(ex))
 
 # Max file size permitted by frontend in megabytes
-MAX_UPLOAD_SIZE = 5 * 1024  # 5 GB
+MAX_UPLOAD_SIZE = 60 * 1024  # 5 GB
 
 # Max file size permitted by frontend in megabytes for verified users
 HIGH_MAX_UPLOAD_SIZE = 5 * 1024  # 5 GB
