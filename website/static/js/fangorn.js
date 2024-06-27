@@ -89,7 +89,7 @@ var OPERATIONS = {
     }
 };
 
-var begin = new Date()
+var begin = new Date();
 
 // Cross browser key codes for the Command key
 var COMMAND_KEYS = [224, 17, 91, 93];
@@ -960,7 +960,7 @@ function _fangornComplete(treebeard, file) {
             this.processFile(nextFile);
         }
     }
-    console.log("_fangornComplete: " + new Date().toLocaleString());
+    console.log('_fangornComplete: ' + new Date().toLocaleString());
 }
 
 /**
@@ -1022,7 +1022,7 @@ function _fangornDropzoneSuccess(treebeard, file, response) {
     }
 
     treebeard.redraw();
-    console.log("_fangornDropzoneSuccess: " + new Date().toLocaleString());
+    console.log('_fangornDropzoneSuccess: ' + new Date().toLocaleString());
 }
 
 function _fangornDropzoneRemovedFile(treebeard, file, message, xhr) {
@@ -1102,7 +1102,7 @@ function _fangornDropzoneError(treebeard, file, message, xhr) {
  */
 function _uploadEvent(event, item, col) {
     begin = new Date()
-    console.log("_uploadEvent:" + begin.toLocaleString());
+    console.log('_uploadEvent:' + begin.toLocaleString());
     var self = this;  // jshint ignore:line
     try {
         event.stopPropagation();
@@ -2918,8 +2918,8 @@ function _fangornQueueComplete(treebeard) {
         });
     }
     let result = new Date() - begin
-    console.log("_fangornQueueComplete: " + new Date().toLocaleString());
-    console.log("Total time to run _fangornQueueComplete: " + diffDates(result));
+    console.log('_fangornQueueComplete: ' + new Date().toLocaleString());
+    console.log('Total time to run _fangornQueueComplete: ' + diffDates(result));
 }
 
 function diffDates(date) {
