@@ -1101,7 +1101,7 @@ function _fangornDropzoneError(treebeard, file, message, xhr) {
  * @private
  */
 function _uploadEvent(event, item, col) {
-    begin = new Date()
+    begin = new Date();
     console.log('_uploadEvent:' + begin.toLocaleString());
     var self = this;  // jshint ignore:line
     try {
@@ -2917,7 +2917,7 @@ function _fangornQueueComplete(treebeard) {
            }
         });
     }
-    let result = new Date() - begin
+    let result = new Date() - begin;
     console.log('_fangornQueueComplete: ' + new Date().toLocaleString());
     console.log('Total time to run _fangornQueueComplete: ' + diffDates(result));
 }
