@@ -2917,19 +2917,19 @@ function _fangornQueueComplete(treebeard) {
            }
         });
     }
-    let result = new Date() - begin;
+    var result = new Date() - begin;
     console.log('_fangornQueueComplete: ' + new Date().toLocaleString());
     console.log('Total time to run _fangornQueueComplete: ' + diffDates(result));
 }
 
 function diffDates(date) {
     // Convert milliseconds to hours, minutes, and seconds
-    let hours = Math.floor(date / 3600000); // 1 hour = 3600000 ms
-    let minutes = Math.floor((date % 3600000) / 60000); // 1 minute = 60000 ms
-    let seconds = Math.floor((date % 60000) / 1000); // 1 second = 1000 ms
+    var hours = Math.floor(date / 3600000); // 1 hour = 3600000 ms
+    var minutes = Math.floor((date % 3600000) / 60000); // 1 minute = 60000 ms
+    var seconds = Math.floor((date % 60000) / 1000); // 1 second = 1000 ms
 
     // Format hours, minutes, and seconds to hh:mm:ss format
-    let formattedTime = [
+    var formattedTime = [
         padWithZero(hours),
         padWithZero(minutes),
         padWithZero(seconds)
