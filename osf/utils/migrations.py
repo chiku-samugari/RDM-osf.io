@@ -31,6 +31,7 @@ FORMAT_TYPE_TO_TYPE_MAP = {
     ('osf-upload-open', 'osf-upload'): 'file-input',
     ('osf-upload-toggle', 'osf-upload'): 'file-input',
     ('singleselect', 'choose'): 'single-select-input',
+    (None, 'object'): 'single-select-input',
     ('text', 'string'): 'short-text-input',
     ('textarea', 'osf-author-import'): 'contributors-input',
     ('textarea', None): 'long-text-input',

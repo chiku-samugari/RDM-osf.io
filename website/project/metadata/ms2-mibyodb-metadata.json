@@ -1,13 +1,13 @@
 {
   "name": "ムーンショット目標2未病データベース-メタデータ",
   "version": 1,
-  "description": "本登録画面は、ムーンショット型研究開発事業 目標2（MS2）の関係者のみが利用可能です。ムーンショット目標2データベース（未病DB）ではデータセット全体に対するメタデータを「プロジェクトメタデータ」、個々のファイルやフォルダに対するメタデータを「ファイルメタデータ」としています。本登録画面では未病DBのプロジェクトメタデータを入力することができます。ファイルメタデータ入力画面は現在準備中です。|This registration screen can only be used by those involved in the Moonshot Research and Development Project Goal 2 (MS2). In the Moonshot Goal 2 database (Mibyo DB), the metadata for the entire dataset is called 「project metadata」, and the metadata for individual files and folders is called 「file metadata」. On this registration screen, you can enter project metadata for the Mibyo DB. The file metadata input screen is currently under preparation.",
+  "description": "本登録画面は、ムーンショット型研究開発事業 目標2（MS2）の関係者のみが利用可能です。ムーンショット目標2データベース（未病DB）ではデータセット全体に対するメタデータを「プロジェクトメタデータ」、個々のファイルやフォルダに対するメタデータを「ファイルメタデータ」としています。本登録画面では未病DBのプロジェクトメタデータを入力することができます。|This registration screen can only be used by those involved in the Moonshot Research and Development Project Goal 2 (MS2). In the Moonshot Goal 2 database (Mibyo DB), the metadata for the entire dataset is called 「project metadata」, and the metadata for individual files and folders is called 「file metadata」. On this registration screen, you can enter project metadata for the Mibyo DB. The file metadata input screen is currently under preparation.",
   "pages": [
     {
       "id": "page1",
       "level": "レベル1|Level1",
       "title": "メタデータ登録|Metadata Registration",
-      "description": "本登録画面は、ムーンショット型研究開発事業 目標2（MS2）の関係者のみが利用可能です。ムーンショット目標2データベース（未病DB）ではデータセット全体に対するメタデータを「プロジェクトメタデータ」、個々のファイルやフォルダに対するメタデータを「ファイルメタデータ」としています。本登録画面では未病DBのプロジェクトメタデータを入力することができます。ファイルメタデータ入力画面は現在準備中です。|This registration screen can only be used by those involved in the Moonshot Research and Development Project Goal 2 (MS2). In the Moonshot Goal 2 database (Mibyo DB), the metadata for the entire dataset is called 「project metadata」, and the metadata for individual files and folders is called 「file metadata」. On this registration screen, you can enter project metadata for the Mibyo DB. The file metadata input screen is currently under preparation.",
+      "description": "本登録画面は、ムーンショット型研究開発事業 目標2（MS2）の関係者のみが利用可能です。ムーンショット目標2データベース（未病DB）ではデータセット全体に対するメタデータを「プロジェクトメタデータ」、個々のファイルやフォルダに対するメタデータを「ファイルメタデータ」としています。本登録画面では未病DBのプロジェクトメタデータを入力することができます。|This registration screen can only be used by those involved in the Moonshot Research and Development Project Goal 2 (MS2). In the Moonshot Goal 2 database (Mibyo DB), the metadata for the entire dataset is called 「project metadata」, and the metadata for individual files and folders is called 「file metadata」. On this registration screen, you can enter project metadata for the Mibyo DB. The file metadata input screen is currently under preparation.",
       "questions": [
         {
           "qid": "title-of-dataset",
@@ -166,47 +166,47 @@
           "format": "e-rad-award-funder",
           "options": [
               {
-                "text": "1000",
+                "text": "自然科学一般/Natural Science",
                 "tooltip": "自然科学一般|Natural Science"
               },
               {
-                "text": "189",
+                "text": "ライフサイエンス/Life Science",
                 "tooltip": "ライフサイエンス|Life Science"
               },
               {
-                "text": "289",
+                "text": "情報通信/Informatics",
                 "tooltip": "情報通信|Informatics"
               },
               {
-                "text": "389",
+                "text": "環境/Environmental science",
                 "tooltip": "環境|Environmental science"
               },
               {
-                "text": "489",
+                "text": "ナノテク・材料/Nanotechnology/Materials",
                 "tooltip": "ナノテク・材料|Nanotechnology/Materials"
               },
               {
-                "text": "589",
+                "text": "エネルギー/Energy Engineering",
                 "tooltip": "エネルギー|Energy Engineering"
               },
               {
-                "text": "689",
+                "text": "ものづくり技術/Manufacturing Technology",
                 "tooltip": "ものづくり技術|Manufacturing Technology"
               },
               {
-                "text": "789",
+                "text": "社会基盤/Social Infrastructure",
                 "tooltip": "社会基盤|Social Infrastructure"
               },
               {
-                "text": "889",
+                "text": "フロンティア/Frontier Technology",
                 "tooltip": "フロンティア|Frontier Technology"
               },
               {
-                "text": "900",
+                "text": "人文・社会/Humanities & Social Sciences",
                 "tooltip": "人文・社会|Humanities & Social Sciences"
               },
               {
-                "text": "9999",
+                "text": "その他/Others",
                 "tooltip": "その他|Others"
               }
           ],
@@ -300,8 +300,8 @@
           "format": "e-rad-award-funder",
           "options": [
             {
-              "text": "解析結果・解析ツール以外をデポジットしている/Deposit items other than analysis results and analysis tools",
-              "tooltip": "解析結果・解析ツール以外をデポジットしている|Deposit items other than analysis results and analysis tools|Deposit items other than analysis results and analysis tools"
+              "text": "該当なし（解析ツールではない） /N/A (NOT analytical tools)",
+              "tooltip": "該当なし（解析ツールではない）|N/A (NOT analytical tools)"
             },
             {
               "text": "ライセンスなし/No license",
@@ -876,15 +876,1379 @@
           "space_normalization": true
         },
         {
-          "qid": "grdm-file:notice-2024-03",
-          "nav": "お知らせ",
-          "title": "お知らせ：ファイルメタデータは後日リリース予定となります |Notice：File metadata will be released at a later date ",
+          "qid": "grdm-file:d-fol-Structure-or-descriptions-of-folders-jp",
+          "nav": "フォルダ構成や各フォルダの説明",
+          "title": "フォルダ構成や各フォルダの説明（日本語）|Structure or descriptions of folders（Japanese）",
+          "type": "array",
+          "properties": [
+            {
+              "id": "folder-name",
+              "title": "フォルダ名（命名規則など）|Folder name（Naming conventions, etc.）",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "description-of-folder",
+              "title": "フォルダの概要説明（格納されているファイルなど）|Description of folder(Contained folders and files)",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "contents",
+              "title": "コンテンツ（代表的な拡張子など）|Contents (typical file extensions, etc.)",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-fol-Structure-or-descriptions-of-folders-en",
+          "nav": "フォルダ構成や各フォルダの説明",
+          "title": "Structure or descriptions of folders（English）",
+          "type": "array",
+          "properties": [
+            {
+              "id": "folder-name",
+              "title": "Folder name（Naming conventions, etc.）",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "description-of-folder",
+              "title": "Description of folder(Contained folders and files)",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "contents",
+              "title": "Contents (typical file extensions, etc.)",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-fol-remarks-jp",
+          "nav": "備考",
+          "title": "備考（日本語）|Remarks（Japanese）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-fol-remarks-en",
+          "nav": "備考",
+          "title": "Remarks（English）|Remarks（English）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:Label-DomainMetadata-text",
+          "nav": "データ作成者",
+          "title": "■ドメインメタデータ_テキストファイル ────────────────────────────────────────|■DomainMetadata_TextFile ────────────────────────────────────────",
+          "type": "object",
+          "properties": [
+          ],
+          "required": false
+        },
+        {
+          "qid": "grdm-file:d-txt-file-name-convention-file-extension-jp",
+          "nav": "ファイル名、または命名規則・拡張子（e.g. csv, tsv, txt）など",
+          "title": "ファイル名、または命名規則・拡張子（e.g. csv, tsv, txt）など（日本語）|File name, naming convention, file extension （e.g. csv, tsv, txt）, etc.（Japanese）",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "qid": "grdm-file:d-txt-file-name-convention-file-extension-en",
+          "nav": "ファイル名、または命名規則・拡張子（e.g. csv, tsv, txt）など",
+          "title": "File name, naming convention, file extension （e.g. csv, tsv, txt）, etc.（English）|File name, naming convention, file extension （e.g. csv, tsv, txt）, etc.（English）",
+          "type": "string",
+          "format": "text",
+          "required": false
+        },
+        {
+          "qid": "grdm-file:d-txt-description-jp",
+          "nav": "説明",
+          "title": "説明（日本語）|Description（Japanese）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-txt-description-en",
+          "nav": "説明",
+          "title": "Description（English）|Description（English）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-txt-description-of-row-jp",
+          "nav": "行の説明",
+          "title": "行の説明（日本語）|Description of row（Japanese）",
+          "type": "array",
+          "help": "（※）記入上の注意・記入例を参考に、各行の説明を自由に記載。・命名規則などを用いて簡略な記載も可能・適宜、行の追加も可能。|(＊)Notes for entry・Refer to the example and describe each line freely.・Simplified descriptions are possible using naming conventions, etc.・Additional lines can be added as needed.",
+          "properties": [
+            {
+              "id": "Position-of-row",
+              "title": "行、列の位置|Position of row and column",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "Name-of-term",
+              "title": "項目名|Name of term",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "Description-of-term",
+              "title": "項目の説明|Description of term",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-txt-description-of-row-en",
+          "nav": "行の説明",
+          "title": "Description of row（English）",
+          "type": "array",
+          "help": "(＊)Notes for entry・Refer to the example and describe each line freely.・Simplified descriptions are possible using naming conventions, etc.・Additional lines can be added as needed.",
+          "properties": [
+            {
+              "id": "Position-of-row",
+              "title": "Position of row and column",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "Name-of-term",
+              "title": "Name of term",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "Description-of-term",
+              "title": "Description of term",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-txt-description-of-column-jp",
+          "nav": "列の説明",
+          "title": "列の説明（日本語）|Description of column（Japanese）",
+          "type": "array",
+          "help": "（※）記入上の注意・記入例を参考に、各列の説明を自由に記載。・命名規則などを用いて簡略な記載も可能。・適宜、行の追加も可能。|(＊)Notes for entry・The description of each column can be freely described by referring to the example.・A simple description using naming conventions, etc. is also possible.・Rows can be added as needed.",
+          "properties": [
+            {
+              "id": "Position-of-row",
+              "title": "行、列の位置|Position of row and column",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "Name-of-term",
+              "title": "項目名|Name of term",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "Description-of-term",
+              "title": "項目の説明|Description of term",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-txt-description-of-column-en",
+          "nav": "列の説明",
+          "title": "Description of column（English）",
+          "type": "array",
+          "help": "(＊)Notes for entry・The description of each column can be freely described by referring to the example.・A simple description using naming conventions, etc. is also possible.・Rows can be added as needed.",
+          "properties": [
+            {
+              "id": "Position-of-row",
+              "title": "Position of row and column",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "Name-of-term",
+              "title": "Name of term",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "Description-of-term",
+              "title": "Description of term",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-txt-data-preprocessing-jp",
+          "nav": "データ前処理",
+          "title": "データ前処理（日本語）|Data preprocessing（Japanese）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-txt-data-preprocessing-en",
+          "nav": "データ前処理",
+          "title": "Data preprocessing（English）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-txt-temporal-measurement-data",
+          "nav": "経時的に測定したデータ ",
+          "title": "経時的に測定したデータ |Temporal measurement data",
+          "type": "choose",
+          "format": "singleselect",
+          "help": "（Yes/No）|（Yes/No）",
+          "options": [
+            {
+              "text": "Yes|Yes",
+              "tooltip": "Yes|Yes"
+            },
+            {
+              "text": "No|No",
+              "tooltip": "No|No"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-txt-number-of-rows",
+          "title": "行数|Number of rows",
           "type": "string",
           "format": "text",
           "required": false,
-          "help": "以下の欄は入力不要です。データが反映されることはありません |The fields below do not require input. Data is never reflected "
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、行数が異なる場合は最大のものを記載して下さい。・備考に、「行数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of rows differs for the same type of file, please list the largest one.・In the remarks, please state something like \"The number of lines depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:d-txt-number-of-columns",
+          "title": "列数|Number of columns",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、列数が異なる場合は最大のものを記載して下さい。・備考に、「列数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of columns is different for the same type of file, please list the largest number.・In the remarks, please state something like \"The number of columns depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:d-txt-approximate-number-of-similar-files",
+          "title": "同種のファイル概数|Approximate number of similar files",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-txt-remarks-jp",
+          "nav": "備考",
+          "title": "備考（日本語）|Remarks（Japanese）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-txt-remarks-en",
+          "nav": "備考",
+          "title": "Remarks（English）|Remarks（English）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:Label-DomainMetadata-excel",
+          "nav": "データ作成者",
+          "title": "■ドメインメタデータ_エクセルファイル ────────────────────────────────────────|■DomainMetadata_ExcelFile ────────────────────────────────────────",
+          "type": "object",
+          "properties": [
+          ],
+          "required": false
+        },
+        {
+          "qid": "grdm-file:d-exl-file-name-convention-file-extension-jp",
+          "nav": "ファイル名、または命名規則・拡張子（e.g. xlsx, xlsm）など",
+          "title": "ファイル名、または命名規則・拡張子（e.g. xlsx, xlsm）など（日本語）|File name, naming convention, file extension （e.g. xlsx, xlsm）, etc.（Japanese）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-exl-file-name-convention-file-extension-en",
+          "nav": "ファイル名、または命名規則・拡張子（e.g. xlsx, xlsm）など",
+          "title": "File name, naming convention, file extension （e.g. xlsx, xlsm）, etc.（English）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-exl-description-jp",
+          "nav": "説明",
+          "title": "説明（日本語）|Description（Japanese）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-exl-description-en",
+          "nav": "説明",
+          "title": "Description（English）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-exl-description-of-row-jp",
+          "nav": "行の説明",
+          "title": "行の説明（日本語）|Description of row（Japanese）",
+          "type": "array",
+          "help": "（※）記入上の注意・記入例を参考に、各行の説明を自由に記載。・命名規則などを用いて簡略な記載も可能・適宜、行の追加も可能。|(＊)Notes for entry・Refer to the example and describe each line freely.・Simplified descriptions are possible using naming conventions, etc.・Additional lines can be added as needed.",
+          "properties": [
+            {
+              "id": "Position-of-row",
+              "title": "行、列の位置|Position of row and column",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "Name-of-term",
+              "title": "項目名|Name of term",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "d-exl-description-of-term",
+              "title": "項目の説明|Description of term",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-exl-description-of-row-en",
+          "nav": "行の説明",
+          "title": "Description of row（English）",
+          "type": "array",
+          "help": "(＊)Notes for entry・Refer to the example and describe each line freely.・Simplified descriptions are possible using naming conventions, etc.・Additional lines can be added as needed.",
+          "properties": [
+            {
+              "id": "Position-of-row",
+              "title": "Position of row and column",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "Name-of-term",
+              "title": "Name of term",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "d-exl-description-of-term",
+              "title": "Description of term",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-exl-description-of-column-jp",
+          "nav": "列の説明",
+          "title": "列の説明（日本語）|Description of column（Japanese）",
+          "type": "array",
+          "help": "（※）記入上の注意・記入例を参考に、各列の説明を自由に記載。・命名規則などを用いて簡略な記載も可能。・適宜、行の追加も可能。|(＊)Notes for entry・The description of each column can be freely described by referring to the example.・A simple description using naming conventions, etc. is also possible.・Rows can be added as needed.",
+          "properties": [
+            {
+              "id": "d-exl-position-of-column",
+              "title": "行、列の位置|Position of row and column",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "d-exl-name-of-term",
+              "title": "項目名|Name of term",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "d-exl-description-of-term",
+              "title": "項目の説明|Description of term",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-exl-description-of-column-en",
+          "nav": "列の説明",
+          "title": "Description of column（English）",
+          "type": "array",
+          "help": "(＊)Notes for entry・The description of each column can be freely described by referring to the example.・A simple description using naming conventions, etc. is also possible.・Rows can be added as needed.",
+          "properties": [
+            {
+              "id": "d-exl-position-of-column",
+              "title": "Position of row and column",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "d-exl-name-of-term-en",
+              "title": "Name of term",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "d-exl-description-of-term",
+              "title": "Description of term",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-exl-data-preprocessing-jp",
+          "nav": "データ前処理",
+          "title": "データ前処理（日本語）|Data Preprocessing（Japanese）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-exl-data-preprocessing-en",
+          "nav": "データ前処理",
+          "title": "Data Preprocessing（English）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-exl-temporal-measurement-data",
+          "nav": "経時的に測定したデータ",
+          "title": "経時的に測定したデータ|Temporal measurement data ",
+          "type": "choose",
+          "format": "singleselect",
+          "help": "（Yes/No）|（Yes/No）",
+          "options": [
+            {
+              "text": "Yes|Yes",
+              "tooltip": "Yes|Yes"
+            },
+            {
+              "text": "No|No",
+              "tooltip": "No|No"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-exl-number-of-rows",
+          "title": "行数|Number of rows",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、行数が異なる場合は最大のものを記載して下さい。・備考に、「行数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of rows differs for the same type of file, please list the largest one.・In the remarks, please state something like \"The number of lines depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:d-exl-number-of-columns",
+          "title": "列数|Number of columns",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、列数が異なる場合は最大のものを記載して下さい。・備考に、「列数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of columns is different for the same type of file, please list the largest number.・In the remarks, please state something like \"The number of columns depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:d-exl-approximate-number-of-similar-files",
+          "title": "同種のファイル概数|Approximate number of similar files",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-exl-remarks-jp",
+          "nav": "備考",
+          "title": "備考（日本語）|Remarks（Japanese）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-exl-remarks-en",
+          "nav": "備考",
+          "title": "Remarks（English）|Remarks（English）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:Label-DomainMetadata-image",
+          "nav": "データ作成者",
+          "title": "■ドメインメタデータ_画像ファイル ────────────────────────────────────────|■DomainMetadata_ImageFile ────────────────────────────────────────",
+          "type": "object",
+          "properties": [
+          ],
+          "required": false
+        },
+        {
+          "qid": "grdm-file:d-img-file-name-convention-file-extension-jp",
+          "nav": "ファイル名、または、ファイルの種類",
+          "title": "ファイル名、または命名規則・拡張子（e.g. jpg, jng, tif）など（日本語）|File name, naming convention, file extension （e.g. jpg, jng, tif）, etc.（Japanese）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-img-file-name-convention-file-extension-en",
+          "nav": "ファイル名、または、ファイルの種類",
+          "title": "File name, naming convention, file extension （e.g. jpg, jng, tif）, etc.（English）|File name, naming convention, file extension （e.g. jpg, jng, tif）, etc.（English）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-img-description-jp",
+          "nav": "説明",
+          "title": "説明（日本語）|Description（Japanese）",
+          "type": "string",
+          "format": "text",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-img-description-en",
+          "nav": "説明",
+          "title": "Description（English）",
+          "type": "string",
+          "format": "text",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-img-data-preprocessing-jp",
+          "nav": "データ前処理",
+          "title": "データ前処理（日本語）|Data Preprocessing（Japanese）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-img-data-preprocessing-en",
+          "nav": "データ前処理",
+          "title": "Data preprocessing（English）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-img-temporal-measurement-data",
+          "nav": "経時的に測定したデータ",
+          "title": "経時的に測定したデータ|Temporal measurement data",
+          "type": "choose",
+          "format": "singleselect",
+          "help": "（Yes/No）|（Yes/No）",
+          "options": [
+            {
+              "text": "Yes|Yes",
+              "tooltip": "Yes|Yes"
+            },
+            {
+              "text": "No|No",
+              "tooltip": "No|No"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-img-data-size ",
+          "nav": "データサイズ ",
+          "title": "データサイズ|Data size ",
+          "help": "（e.g. 1920x1080 pixel, 512x512x4(ch)(B,G,R,IR)）（※）記入上の注意・単位は任意（pixel, ch, etc.）|（e.g. 1920x1080 pixel, 512x512x4(ch)(B,G,R,IR)）(＊)Notes for entry・Units are optional（pixel, ch, etc.）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-img-resolution",
+          "nav": "解像度",
+          "title": "解像度|Resolution",
+          "type": "string",
+          "help": "（e.g. 96 dpi, 0.61 μm/px）（※）記入上の注意・単位は任意（dpi, μm/px, etc.）|（e.g. 96 dpi, 0.61 μm/px）(＊)Notes for entry・Units are optional（dpi, μm/px, etc.）",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-img-approximate-number-of-similar-files",
+          "nav": "同種のファイル概数",
+          "title": "同種のファイル概数|Approximate number of similar files",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-img-remarks-jp",
+          "nav": "備考",
+          "title": "備考（日本語）|Remarks（Japanese）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-img-remarks-en",
+          "nav": "備考",
+          "title": "Remarks（English）|Remarks（English）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:Label-DomainMetadata-any",
+          "nav": "データ作成者",
+          "title": "■ドメインメタデータ_任意 ────────────────────────────────────────|■DomainMetadata_AnyFile ────────────────────────────────────────",
+          "type": "object",
+          "properties": [
+          ],
+          "required": false
+        },
+        {
+          "qid": "grdm-file:d-abt-file-name-convention-file-extension-jp",
+          "nav": "ファイル名、または、ファイルの種類",
+          "title": "ファイル名、または命名規則・拡張子など（日本語）|File name, naming convention, file extension, etc.（Japanese）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-abt-file-name-convention-file-extension-en",
+          "nav": "ファイル名、または、ファイルの種類",
+          "title": "File name, naming convention, file extension, etc.（English） ",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-abt-description-jp",
+          "nav": "説明",
+          "title": "説明（日本語）|Description（Japanese）",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-abt-description-en",
+          "nav": "説明",
+          "title": "Description（English）",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-abt-data-preprocessing-jp",
+          "nav": "データ前処理",
+          "title": "データ前処理（日本語）|Data Preprocessing（Japanese）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-abt-data-preprocessing-en",
+          "nav": "データ前処理",
+          "title": "Data Preprocessing（English）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-abt-temporal-measurement-data",
+          "nav": "経時的に測定したデータ",
+          "title": "経時的に測定したデータ|Temporal measurement data",
+          "type": "choose",
+          "format": "singleselect",
+          "help": "（Yes/No）|（Yes/No）",
+          "options": [
+            {
+              "text": "Yes|Yes",
+              "tooltip": "Yes|Yes"
+            },
+            {
+              "text": "No|No",
+              "tooltip": "No|No"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-abt-number-of-rows",
+          "title": "行数|Number of rows",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、行数が異なる場合は最大のものを記載して下さい。・備考に、「行数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of rows differs for the same type of file, please list the largest one.・In the remarks, please state something like \"The number of lines depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:d-abt-number-of-columns",
+          "title": "列数|Number of columns",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、列数が異なる場合は最大のものを記載して下さい。・備考に、「列数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of columns is different for the same type of file, please list the largest number.・In the remarks, please state something like \"The number of columns depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:d-abt-approximate-number-of-similar-files",
+          "title": "同種のファイル概数|Approximate number of similar files",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-abt-user-defined-metadata-items-jp",
+          "nav": "ユーザー定義メタデータ項目",
+          "title": "ユーザー定義メタデータ項目（日本語）|user-defined metadata item（Japanese）",
+          "type": "array",
+          "properties": [
+            {
+              "id": "Metadata-item-name",
+              "title": "メタデータ項目名|Metadata item name",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "value-or-content",
+              "title": "値または内容|value or content",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-abt-user-defined-metadata-items-en",
+          "nav": "ユーザー定義メタデータ項目",
+          "title": "user-defined metadata item（English）",
+          "type": "array",
+          "properties": [
+            {
+              "id": "Metadata-item-name",
+              "title": "Metadata item name",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "value-or-content",
+              "title": "value or content",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-abt-remarks-jp",
+          "nav": "備考",
+          "title": "備考（日本語）|Remarks（Japanese）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:d-abt-remarks-en",
+          "nav": "備考",
+          "title": "Remarks（English）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:Label-DomainMetadata-measurement",
+          "nav": "データ作成者",
+          "title": "■ドメインメタデータ_測定手順・条件等 ────────────────────────────────────────|■Domain metadata_measurement procedures/conditions ────────────────────────────────────────",
+          "type": "object",
+          "properties": [
+          ],
+          "required": false
+        },
+        {
+          "qid": "grdm-file:d-msr-object-of-measurement-jp",
+          "nav": "測定対象",
+          "title": "測定対象（日本語）|Object of measurement（Japanese）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-msr-object-of-measurement-en",
+          "nav": "測定対象",
+          "title": "Object of measurement（English）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-msr-target-organs-for-measurement",
+          "nav": "測定対象器官",
+          "title": "測定対象器官|Target organs for measurement",
+          "type": "array",
+          "help": "（※）記入上の注意器官の種別（以下から選択、または、具体的な内容をご記入下さい）：・ 臓器・（由来）臓器・培養・ 上記以外（具体的に記述下さい）器官の名称（１行に１器官を記入、具体的な臓器名などをご記入下さい）：e.g. 肝臓、・腎臓、・膵臓、・精巣上体白色脂肪組織 (eWAT)、・視床下部、・脳下垂体|(＊)Notes for entry Type of organ (Please select from the following or provide specifics):・Organ・Organ-derived cultured tissues and cells・Other than the above (please specify)Name of organ (one organ per line, please provide specific organ name, etc.):e.g. liver, kidney, pancreas, epididymal white adipose tissue (eWAT), hypothalamus, pituitary gland",
+          "properties": [
+            {
+              "id": "Organ-Types",
+              "title": "器官の種別|Organ Types",
+              "type": "choose",
+              "format": "singleselect",
+              "options": [
+                {
+                  "text": "臓器|Organ",
+                  "tooltip": "臓器|Organ"
+                },
+                {
+                  "text": "（由来）臓器・培養|Organ-derived cultured tissues and cells",
+                  "tooltip": "（由来）臓器・培養|Organ-derived cultured tissues and cells"
+                },
+                {
+                  "text": "上記以外（具体的に記述下さい）|Other than the above (please specify)",
+                  "tooltip": "上記以外（具体的に記述下さい）|Other than the above (please specify)"
+                }
+              ]
+            },
+            {
+              "id": "d-msr-name-of-organ",
+              "title": "器官の名称|Name of organ",
+              "type": "choose",
+              "format": "singleselect",
+              "options": [
+                {
+                  "text": "肝臓|liver",
+                  "tooltip": "肝臓|liver"
+                },
+                {
+                  "text": "腎臓|kidney",
+                  "tooltip": "腎臓|kidney"
+                },
+                {
+                  "text": "膵臓|pancreas",
+                  "tooltip": "膵臓|pancreas"
+                },
+                {
+                  "text": "精巣上体白色脂肪組織 (eWAT)|epididymal white adipose tissue (eWAT)",
+                  "tooltip": "精巣上体白色脂肪組織 (eWAT)|epididymal white adipose tissue (eWAT)"
+                },
+                {
+                  "text": "視床下部|hypothalamus",
+                  "tooltip": "視床下部|hypothalamus"
+                },
+                {
+                  "text": "脳下垂体|pituitary gland",
+                  "tooltip": "脳下垂体|pituitary gland"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-msr-data-type-jp",
+          "nav": "データの種類",
+          "title": "データの種類（日本語）|Data type（Japanese）",
+          "type": "string",
+          "help": "（e.g. scRNA-seqデータ, 顕微鏡画像およびその定量データ）|(e.g. scRNA-seq data, microscopic images and their quantitative data)",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-msr-data-type-en",
+          "nav": "データの種類",
+          "title": "Data type（English）",
+          "type": "string",
+          "help": "(e.g. scRNA-seq data, microscopic images and their quantitative data)",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-msr-classification-of-measuring-devices-jp",
+          "nav": "測定装置の分類",
+          "title": "測定装置の分類（日本語）|Classification of measuring devices（Japanese）",
+          "type": "string",
+          "help": "（e.g. fMRI、顕微鏡、CT、RNA-seq分析器、次世代シーケンサー、マイクロアレイリーダー、その他）|(e.g. fMRI, microscopy, CT, RNA-seq analyzers, next generation sequencers, microarray readers, etc.)",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-msr-classification-of-measuring-devices-en",
+          "nav": "測定装置の分類",
+          "title": "Classification of measuring devices（English）",
+          "type": "string",
+          "help": "(e.g. fMRI, microscopy, CT, RNA-seq analyzers, next generation sequencers, microarray readers, etc.)",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:d-msr-measuring-device-name-jp",
+          "nav": "計測装置名",
+          "type": "array",
+          "properties": [
+            {
+              "id": "Measuring-device-name",
+              "title": "計測装置名（日本語）|Measuring device name（Japanese）",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-msr-measuring-device-name-en",
+          "nav": "計測装置名",
+          "type": "array",
+          "properties": [
+            {
+              "id": "Measuring-device-name",
+              "title": "Measuring device name（English）",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-msr-procedure-jp",
+          "nav": "手順",
+          "type": "array",
+          "properties": [
+            {
+              "id": "Procedure",
+              "title": "手順 （論文を書く際に必要な最小限の内容）（日本語）|Procedure （Minimum content required for writing a paper）（Japanese）",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-msr-procedure-en",
+          "nav": "手順",
+          "type": "array",
+          "properties": [
+            {
+              "id": "Procedure",
+              "title": "Procedure （Minimum content required for writing a paper）（English）",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-msr-user-defined-metadata-items-jp",
+          "nav": "ユーザー定義メタデータ項目",
+          "title": "ユーザー定義メタデータ項目（日本語）|user-defined metadata item（Japanese）",
+          "type": "array",
+          "properties": [
+            {
+              "id": "Metadata-item-name",
+              "title": "メタデータ項目名|Metadata item name",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "value-or-content",
+              "title": "値または内容|value or content",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-msr-user-defined-metadata-items-en",
+          "nav": "ユーザー定義メタデータ項目",
+          "title": "user-defined metadata item（English）",
+          "type": "array",
+          "properties": [
+            {
+              "id": "Metadata-item-name",
+              "title": "Metadata item name",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "value-or-content",
+              "title": "value or content",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:d-msr-remarks-jp",
+          "nav": "備考",
+          "title": "備考（日本語）|Remarks（Japanese）",
+          "type": "string",
+          "format": "textarea"
+        },
+        {
+          "qid": "grdm-file:d-msr-remarks-en",
+          "nav": "備考",
+          "title": "Remarks（English）|Remarks（English）",
+          "type": "string",
+          "format": "textarea"
+        },
+        {
+          "qid": "grdm-file:Label-TechnicalMetadata-measurement",
+          "nav": "テクニカルメタデータ_データ概要～フォルダ構成",
+          "title": "■テクニカルメタデータ_データ概要～フォルダ構成 ────────────────────────────────────────|■Technical Metadata_Data Overview - Folder structure ────────────────────────────────────────",
+          "type": "object",
+          "properties": [
+          ],
+          "required": false
+        },
+        {
+          "qid": "grdm-file:t-dat-data-type",
+          "nav": "データ種別",
+          "group_title": "",
+          "title": "データ種別|Data Type",
+          "type": "string",
+          "format": "text",
+          "help": "（e.g. txt, csv, tsv, asc, sif, xlsx, jpg, jng, tif, nd2）（※）記入上の注意・全てのファイル種を拡張子で記載|（e.g. txt, csv, tsv, asc, sif, xlsx, jpg, jng, tif, nd2）　（※）Notes on Entry・List all file types by their extensions"
+        },
+        {
+          "qid": "grdm-file:t-dat-total-size",
+          "title": "全サイズ|Total size",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（e.g. 30MB, 1.2TB）"
+        },
+        {
+          "qid": "grdm-file:t-dat-total-number-of-folders",
+          "title": "全フォルダ数|Total number of folders",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:t-dat-total-number-of-files",
+          "title": "全ファイル数|Total number of files",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:t-dat-maximum-number-of-layers",
+          "title": "最大階層数|Maximum number of layers",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:Label-Technical-metadata-text-file",
+          "nav": "テクニカルメタデータ_テキストファイル",
+          "title": "■テクニカルメタデータ_テキストファイル ────────────────────────────────────────|■Technical metadata_text file ────────────────────────────────────────",
+          "type": "object",
+          "properties": [
+          ],
+          "required": false
+        },
+        {
+          "qid": "grdm-file:t-txt-delimiter",
+          "nav": "区切り文字",
+          "title": "区切り文字|Delimiter",
+          "type": "string",
+          "help": "（e.g. タブ, カンマ, etc.）|（e.g. tab, comma, etc.）",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-txt-character-code",
+          "nav": "文字コード",
+          "title": "文字コード|Character code",
+          "type": "string",
+          "help": "（e.g. UTF-8, ASCII, etc.）",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-txt-number-of-rows",
+          "title": "行数|Number of rows",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、行数が異なる場合は最大のものを記載して下さい。・備考に、「行数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of rows differs for the same type of file, please list the largest one.・In the remarks, please state something like \"The number of lines depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:t-txt-number-of-columns",
+          "title": "列数|Number of columns",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、列数が異なる場合は最大のものを記載して下さい。・備考に、「列数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of columns is different for the same type of file, please list the largest number.・In the remarks, please state something like \"The number of columns depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:t-txt-approximate-number-of-similar-files",
+          "title": "同種のファイル概数|Approximate number of similar files",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:t-txt-remarks-jp",
+          "nav": "備考",
+          "group_title": "",
+          "title": "備考（日本語）|Remarks（Japanese）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:t-txt-remarks-en",
+          "nav": "備考",
+          "group_title": "",
+          "title": "Remarks（English）|Remarks（English）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:Label-TechnicalMetadata-excel",
+          "nav": "データ作成者",
+          "title": "■テクニカルメタデータ_エクセル ────────────────────────────────────────|■TechnicalMetadata_excelFile ────────────────────────────────────────",
+          "type": "object",
+          "properties": [
+          ],
+          "required": false
+        },
+        {
+          "qid": "grdm-file:t-exl-number-of-rows",
+          "title": "行数|Number of rows",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、行数が異なる場合は最大のものを記載して下さい。・備考に、「行数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of rows differs for the same type of file, please list the largest one.・In the remarks, please state something like \"The number of lines depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:t-exl-number-of-columns",
+          "title": "列数|Number of columns",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、列数が異なる場合は最大のものを記載して下さい。・備考に、「列数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of columns is different for the same type of file, please list the largest number.・In the remarks, please state something like \"The number of columns depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:t-exl-approximate-number-of-similar-files",
+          "title": "同種のファイル概数|Approximate number of similar files",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:t-exl-remarks-jp",
+          "nav": "備考",
+          "title": "備考（日本語）|Remarks（Japanese）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:t-exl-remarks-en",
+          "nav": "備考",
+          "title": "Remarks（English）|Remarks（English）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:Label-TechnicalMetadata-image",
+          "nav": "データ作成者",
+          "title": "■テクニカルメタデータ_画像 ────────────────────────────────────────|■TechnicalMetadata_ImageFile ────────────────────────────────────────",
+          "type": "object",
+          "properties": [
+          ],
+          "required": false
+        },
+        {
+          "qid": "grdm-file:t-img-image-type",
+          "nav": "画像タイプ",
+          "title": "画像タイプ|Image Type",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-img-Color-Monochrome",
+          "nav": "カラー/モノクロ",
+          "title": "カラー/モノクロ|Color/Monochrome",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-img-data-size",
+          "nav": "データサイズ",
+          "title": "データサイズ|Data size",
+          "help": "（e.g. 1920x1080 pixel, 512x512x4 (ch) (B,G,R,IR)）（※）記入上の注意・単位は任意（pixel, ch, etc.）|（e.g. 1920x1080 pixel, 512x512x4 (ch) (B,G,R,IR)）(＊)Notes for entry・Units are optional（pixel, ch, etc.）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-img-resolution",
+          "nav": "解像度",
+          "title": "解像度|Resolution",
+          "type": "string",
+          "help": "（e.g. 96 dpi, 0.61 μm/px）（※）記入上の注意・単位は任意（dpi, μm/px, etc.）|（e.g. 96 dpi, 0.61 μm/px）(＊)Notes for entry・Units are optional（dpi, μm/px, etc.）",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-img-approximate-number-of-similar-files",
+          "nav": "同種のファイル概数",
+          "title": "同種のファイル概数|Approximate number of similar files",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-img-remarks-jp",
+          "nav": "備考",
+          "title": "備考（日本語）|Remarks（Japanese）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:t-img-remarks-en",
+          "nav": "備考",
+          "title": "Remarks（English）|Remarks（English）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:Label-TechnicalMetadata-any",
+          "nav": "データ作成者",
+          "title": "■テクニカルメタデータ_任意 ────────────────────────────────────────|■TechnicalMetadata_AnyFile ────────────────────────────────────────",
+          "type": "object",
+          "properties": [
+          ],
+          "required": false
+        },
+        {
+          "qid": "grdm-file:t-abt-text/binary",
+          "nav": "テキスト/バイナリ",
+          "title": "テキスト/バイナリ|Text/Binary",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-abt-image-type",
+          "nav": "画像タイプ",
+          "title": "画像タイプ|Image Type",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-abt-Color-Monochrome",
+          "nav": "カラー/モノクロ",
+          "title": "カラー/モノクロ|Color/Monochrome",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-abt-data-size",
+          "nav": "データサイズ",
+          "title": "データサイズ|Data size",
+          "help": "（e.g. 1920x1080 pixcel, 512x512x4 (ch) (B,G,R,IR)）（※）記入上の注意・単位は任意（pixel, ch, etc.）|（e.g. 1920x1080 pixel, 512x512x4 (ch) (B,G,R,IR)）(＊)Notes for entry・Units are optional（pixel, ch, etc.）",
+          "type": "string",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-abt-resolution",
+          "nav": "解像度",
+          "title": "解像度|Resolution",
+          "type": "string",
+          "help": "（e.g. 96 dpi, 0.61 μm/px）（※）記入上の注意・単位は任意（dpi, μm/px, etc.）|（e.g. 96 dpi, 0.61 μm/px）(＊)Notes for entry・Units are optional（dpi, μm/px, etc.）",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-abt-delimiter",
+          "nav": "区切り文字",
+          "title": "区切り文字|Delimiter ",
+          "type": "string",
+          "help": "（e.g. タブ, カンマ） |（e.g. tab, comma, etc.）",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-abt-character-code",
+          "nav": "文字コード",
+          "title": "文字コード|Character code",
+          "type": "string",
+          "help": "（e.g. UTF-8）",
+          "format": "text"
+        },
+        {
+          "qid": "grdm-file:t-abt-number-of-rows",
+          "title": "行数|Number of rows",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、行数が異なる場合は最大のものを記載して下さい。・備考に、「行数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of rows differs for the same type of file, please list the largest one・In the remarks, please state something like \"The number of lines depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:t-abt-number-of-columns",
+          "title": "列数|Number of columns",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true,
+          "help": "（※）記入上の注意・同種のファイルで、列数が異なる場合は最大のものを記載して下さい。・備考に、「列数はファイルに依って異なる」などと記載して下さい。|(＊)Notes for entry・If the number of columns is different for the same type of file, please list the largest number.・In the remarks, please state something like \"The number of columns depends on the file\"."
+        },
+        {
+          "qid": "grdm-file:t-abt-approximate-number-of-similar-files",
+          "title": "同種のファイル概数|Approximate number of similar files",
+          "type": "string",
+          "format": "text",
+          "required": false,
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:t-abt-user-defined-metadata-items-jp",
+          "nav": "ユーザー定義メタデータ項目",
+          "title": "ユーザー定義メタデータ項目（日本語）|user-defined metadata item（Japanese）",
+          "type": "array",
+          "properties": [
+            {
+              "id": "Metadata-item-name",
+              "title": "メタデータ項目名|Metadata item name",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "value-or-content",
+              "title": "値または内容|value or content",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:t-abt-user-defined-metadata-items-en",
+          "nav": "ユーザー定義メタデータ項目",
+          "title": "user-defined metadata item（English）",
+          "type": "array",
+          "properties": [
+            {
+              "id": "Metadata-item-name",
+              "title": "Metadata item name",
+              "type": "string",
+              "format": "text"
+            },
+            {
+              "id": "value-or-content",
+              "title": "value or content",
+              "type": "string",
+              "format": "text"
+            }
+          ]
+        },
+        {
+          "qid": "grdm-file:t-abt-remarks-jp",
+          "nav": "備考",
+          "title": "備考（日本語）|Remarks（Japanese）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
+        },
+        {
+          "qid": "grdm-file:t-abt-remarks-en",
+          "nav": "備考",
+          "title": "Remarks（English）|Remarks（English）",
+          "type": "string",
+          "format": "textarea",
+          "space_normalization": true
         }
       ]
     }
   ]
 }
+
