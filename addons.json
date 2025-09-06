@@ -14,6 +14,7 @@
         "owncloud",
         "onedrive",
         "s3",
+        "s3compat",
         "twofactor",
         "wiki",
         "googledrive",
@@ -35,6 +36,7 @@
         "gitlab": "partial",
         "owncloud": "partial",
         "s3": "partial",
+        "s3compat": "partial",
         "wiki": "full",
         "bitbucket": "partial"
     },
@@ -49,6 +51,7 @@
         "googledrive",
         "owncloud",
         "s3",
+        "s3compat",
         "bitbucket",
         "onedrive"
     ],
@@ -74,6 +77,7 @@
         "osfstorage": "OSF Storage is the default storage provider for OSF projects.",
         "owncloud": "ownCloud is an open source, self-hosted file sync and share app platform. Connect your ownCloud account to an OSF project to interact with files hosted on ownCloud via the OSF.",
         "s3": "Amazon S3 is a file storage add-on. Connect your S3 account to an OSF project to interact with files hosted on S3 via the OSF.",
+        "s3compat": "S3 Compatible Storage allows you to connect to S3-compatible storage services from Japanese academic institutions including Wasabi, IDCF Cloud, and university-hosted storage systems.",
         "twofactor": "Two-factor authentication is a security add-on. By using two-factor authentication, you'll protect your OSF account with both your password and your mobile phone.",
         "wiki": "The wiki is a versatile communication tool. Wikis can be used to explain the main points of your project and can contain information like lab notes or contact information.",
         "googledrive": "Google Drive is a file storage add-on. Connect your Google Drive account to an OSF project to interact with files hosted on Google Drive via the OSF.",

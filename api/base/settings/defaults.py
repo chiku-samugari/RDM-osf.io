@@ -115,6 +115,7 @@ INSTALLED_APPS = (
     'addons.onedrive',
     'addons.owncloud',
     'addons.s3',
+    'addons.s3compat',
     'addons.twofactor',
     'addons.wiki',
     'addons.zotero',
