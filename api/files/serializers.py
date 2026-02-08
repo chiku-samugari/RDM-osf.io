@@ -285,9 +285,11 @@ class BaseFileSerializer(JSONAPISerializer):
         type_ = 'files'
 
     def get_size(self, obj):
-        if obj.versions.exists():
+        if obj.provider == 'osfstorage' and obj.versions.exists():
             self.size = obj.versions.first().size
             return self.size
+        elif obj.provider != 'osfstorage' and obj.history:
+            return obj.history[-1].get('size', None)
         return None
 
     def get_date_created(self, obj):
